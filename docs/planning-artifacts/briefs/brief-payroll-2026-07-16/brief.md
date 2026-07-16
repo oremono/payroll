@@ -32,7 +32,7 @@ Because the answers are hand-built, they are also inconsistent — and inconsist
 
 **Peer comparison, computed.** Two employees are peers when they share **role, level, and country**. For any employee, she sees where they sit against their peer group — the median, the spread, the distance. This is the VLOOKUP, already done. Because country is part of peer identity, peers are always paid in the same currency and exchange rates never enter the fairness math — structural, not a discipline to remember. Conversion appears only in aggregate totals, where the rate is pinned, stamped, and disclosed.
 
-**Outliers, surfaced.** She does not have to go looking. The people sitting far from their peer group come to her.
+**Outliers, surfaced.** She does not have to go looking. The people sitting far from their peer group come to her — further than 20% from their peer median, above or below, which she can widen when the list is longer than her afternoon.
 
 **Pay equity, two ways.** Gender does not define a peer group — it is sliced *within* one. Men and women doing the same job at the same level in the same country are peers, and that is what makes the comparison possible. It is paired with an org-wide view of gender distribution across levels, which catches what the peer view structurally cannot: clustering.
 
@@ -72,5 +72,6 @@ Because the answers are hand-built, they are also inconsistent — and inconsist
 - **[ASSUMPTION]** Salary means base salary, annual, gross, in local currency. Currency is never implicit: every salary shown carries the currency it is denominated in.
 - **[DECIDED]** Gender values are `MALE` and `FEMALE`. A deliberate simplification: the equity views compare two groups, and at peer-group scale any third value would sit below the reporting threshold nearly everywhere. The cost is real — the schema cannot represent an employee outside those two values.
 - **[DECIDED]** The minimum peer group threshold is 5, and the gender gap requires 5 of *each* gender within the group. Both are product judgments, not statistical results.
+- **[DECIDED]** An outlier is an employee more than 20% from their peer median, above or below — one finding, not two. The threshold is user-adjustable; 20% is the default. Distance is a percentage rather than standard deviations, quartiles, or percentile rank, because peer groups are small by construction and every distribution-fitting method is unreliable at that size — an SD from five points is noise, and the bottom decile of eight people is less than one person. The 20% default is borrowed, not invented: employers police compa-ratio within an 80–120% corridor, and the peer median plays the structural role a band midpoint would.
 - **[DECIDED]** Role and level are seeded reference tables, not free text.
 - **[DECIDED]** Bulk import rejects rows with unknown role or level rather than mapping them, per-row rather than per-file — a single bad row does not lose the import. Mapping variants automatically would be friendlier and occasionally wrong, and a wrong match is invisible.
