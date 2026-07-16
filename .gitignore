@@ -4,3 +4,6 @@
 
 # Personal BMAD install answers (user_name, language) — not shared with the team
 _bmad/config.user.toml
+
+# Personal application context — not part of the solution
+_job_desc.md
