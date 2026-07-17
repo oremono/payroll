@@ -49,6 +49,7 @@ Cross-cutting quality attributes and business rules — from SPEC constraints an
 - **NFR9 — Accessibility floor** · WCAG 2.2 AA across the desktop web surface, gated in CI by an automated axe pass; color is never the sole carrier; refusals are announced as content, not `role="alert"`. (EXPERIENCE § Accessibility Floor; DESIGN § Contrast floor)
 - **NFR10 — Desktop web surface** · 1280px+ is the primary surface; 768–1279px prioritizes columns and stacks card grids; no mobile layout is specified. (DESIGN § Layout & Spacing; EXPERIENCE Foundation)
 - **NFR11 — Deployed and demonstrable** · the product is deployed and demonstrable end-to-end: a planted outlier surfaced without being searched for, and a thin peer group refused out loud. (SPEC; AD deployment table)
+- **NFR12 — Test-first development** · TDD is the standard — red → green → refactor, tests written before the code they cover; ordering enforced in review, and mechanically backed in CI by a coverage floor on `src/domain` + `src/application` and mutation testing over `src/domain`. (AD-23)
 
 ### Additional Requirements
 
@@ -57,7 +58,8 @@ Technical requirements from the Architecture spine that shape stories, especiall
 - **Greenfield, no starter kit.** The spine chooses **Next.js 16 App Router as a single full-stack deployable** rather than a named starter template. Epic 1 Story 1 is a hand-scaffolded Next.js project, not a `create-*` clone. (Stack; AD-21)
 - **Paradigm scaffold — functional core, imperative shell.** Source tree `src/domain` (pure) ← `src/application` (use-cases, ports) ← `src/adapters` (prisma, csv, clock, prng) ← `src/app`/`src/ui`. Dependencies point inward. (AD-1, Structural Seed)
 - **Import-boundary lint gate.** A CI lint rule forbids `src/domain/**` from importing Prisma, Next, `Date`, `Math.random`, or `fs` — must exist before the second feature merges. (AD-1)
-- **CI pipeline.** Every push runs lint, typecheck, unit tests, the import-boundary rule, and axe; a failing gate blocks merge. (AD-1; NFR9)
+- **CI pipeline.** Every push runs lint, typecheck, unit tests, the import-boundary rule, axe, **a coverage floor on `src/domain` + `src/application`, and mutation testing over `src/domain`** (a surviving mutant fails the gate); a failing gate blocks merge. (AD-1, AD-23; NFR9, NFR12)
+- **Test-first discipline (TDD).** Every domain and application unit is written red-before-green: a failing test precedes the code that satisfies it. Ordering is enforced in review (the commit sequence must show it — CI cannot prove test-first); the coverage floor and mutation-testing gate above are what CI enforces mechanically. Integration tests (the one place DB access is allowed) run under Vitest, outside the domain suite, which stays clock-free and DB-free. (AD-23)
 - **Data model.** `employee` (UUIDv7 id, immutable country), `salary_record` (BIGSERIAL `seq`, `amount_minor > 0` CHECK, `currency_code`, `effective_from` DATE), reference tables (`role`, `level`, `country`, `currency` with minor-unit exponent), `fx_rate (from, to, rate NUMERIC, pinned_on)`, single-row `settings` (`outlier_threshold_pct`, `reporting_currency`). (Structural Seed; AD-4, AD-8, AD-10, AD-13)
 - **Repository contract.** `salary_record` exposes only `append` + read; UPDATE/DELETE revoked on that table at the DB role by migration; one write funnel enforces currency-from-country and no-future-dating on form, import, and seed alike. (AD-18, AD-6, AD-7)
 - **One canonical resolver each.** One median (`src/domain/statistics.ts`), one current-salary resolver (greatest `(effective_from, seq) ≤ asOf`), one verdict-sentence composer (`src/domain/verdict.ts`), one money formatter — no capability writes its own. (AD-3, AD-8, AD-20)
@@ -106,18 +108,18 @@ Functional requirements are `CAP-N`; each maps to exactly one epic. Epic number 
 - **CAP-10** → Epic 11 — Overdue-for-review by period.
 - **CAP-11** → Epic 12 — Seed 10,000 employees, reproducibly.
 
-**Cross-cutting NFRs** are standing gates established in Epic 1 and enforced in every epic thereafter: NFR1 determinism, NFR2 currency-always-visible, NFR3 currency isolation, NFR4 append-only, NFR5 fast deterministic tests, NFR6 boundary exactness (owned by Epic 7, exercised by Epic 6), NFR7 refusal-over-widening (Epics 6, 8), NFR8 reproducible seed (Epic 12), NFR9 accessibility floor, NFR10 desktop surface, NFR11 deployed-and-demonstrable.
+**Cross-cutting NFRs** are standing gates established in Epic 1 and enforced in every epic thereafter: NFR1 determinism, NFR2 currency-always-visible, NFR3 currency isolation, NFR4 append-only, NFR5 fast deterministic tests, NFR6 boundary exactness (owned by Epic 7, exercised by Epic 6), NFR7 refusal-over-widening (Epics 6, 8), NFR8 reproducible seed (Epic 12), NFR9 accessibility floor, NFR10 desktop surface, NFR11 deployed-and-demonstrable, NFR12 test-first development (TDD — enforced in review, gated in CI by coverage floor + domain mutation testing).
 
 **UX-DR distribution:** DR1 (tokens), DR2 (shell/IA), DR3 (as-of control), DR19 (visual foundations) → Epic 1. DR15 → Epic 2. DR13 → Epic 3. DR14 → Epic 4. DR9 → Epic 5. DR5/DR6/DR7 (refusal, provenance, copy-answer) → introduced Epic 6, reused after. DR4/DR8/DR10/DR16 → Epic 7. DR12 → Epics 9, 10. DR11 → Epic 11. DR17 (state patterns) and DR18 (interaction primitives) are cross-cutting, applied on every surface from Epic 1 onward.
 
 ## Epic List
 
-12 epics: one Foundation epic, then one per capability in CAP order. Each capability epic holds a **backend story** (schema/use-case/domain logic + fast deterministic unit tests) followed by a **frontend story** (its surface); no frontend story starts before its capability's backend story is done.
+12 epics: one Foundation epic, then one per capability in CAP order. Each capability epic holds a **backend story** (schema/use-case/domain logic, written **test-first** per AD-23 with fast deterministic unit tests, a finalized AD-20 boundary payload, and — where the epic touches persistence — at least one adapter integration test against a real disposable Postgres 18, never a mock) followed by a **frontend story** (its surface, consuming the fixed payload); no frontend story starts before its capability's backend story is done. "Backend done" is a gate: domain + application suites green under AD-23, the integration test green, and the AD-20 payload finalized. (AD-23, AD-24)
 
 ### Epic 1: Foundation & Deployable Skeleton
 
-Stand up a deployed, empty-but-real application on the target stack: the functional-core/imperative-shell source tree, CI gates, the full data model with reference tables and migrations, the money/currency domain primitives, the generated design-token system, and the app shell with sidebar IA and the global as-of date control. After this epic Alice can open the deployed app and see the shell; every later epic has a paradigm, a schema, tokens, and a CI pipeline to build into.
-**FRs covered:** none directly (foundational). **Enables:** all of CAP-1…CAP-11. **NFRs:** NFR1–5, 9, 10, 11. **UX-DR:** DR1, DR2, DR3, DR19.
+Stand up a deployed, empty-but-real application on the target stack: the functional-core/imperative-shell source tree, CI gates (lint, typecheck, import-boundary rule, axe, coverage floor, and domain mutation testing — the AD-23 gate), the full data model with reference tables and migrations, the money/currency domain primitives written test-first, the generated design-token system, and the app shell with sidebar IA and the global as-of date control. After this epic Alice can open the deployed app and see the shell; every later epic has a paradigm, a schema, tokens, and a CI pipeline — including the test-first gate — to build into.
+**FRs covered:** none directly (foundational). **Enables:** all of CAP-1…CAP-11. **NFRs:** NFR1–5, 9, 10, 11, **12**. **UX-DR:** DR1, DR2, DR3, DR19.
 
 ### Epic 2: CAP-1 — Bulk Import
 
