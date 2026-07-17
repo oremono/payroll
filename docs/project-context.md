@@ -46,7 +46,7 @@ Greenfield — no scaffold exists yet (story `1-1` builds it, hand-scaffolded, *
 | TypeScript | 5.9.x (not 7.x — pinned; see spine Deferred) |
 | Next.js (App Router) | 16.2.10 |
 | React | 19.2.7 |
-| PostgreSQL (Neon) | 18 (pinned across all environments) |
+| PostgreSQL (Neon) | 18 (pinned across all environments); region `aws-ap-southeast-1` (Singapore) — Neon has no India region |
 | Prisma ORM | 7.8.0 |
 | Tailwind CSS | 4.3.2 |
 | shadcn/ui | copy-in; pinned in `components.json` |

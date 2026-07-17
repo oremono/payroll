@@ -209,7 +209,7 @@ graph RL
 | TypeScript | 5.9.x *(see Deferred: TypeScript 7)* |
 | Next.js (App Router) | 16.2.10 |
 | React | 19.2.7 |
-| PostgreSQL (Neon serverless) | 18 |
+| PostgreSQL (Neon serverless) | 18 — region **`aws-ap-southeast-1` (Singapore)** |
 | Prisma ORM | 7.8.0 |
 | Tailwind CSS | 4.3.2 |
 | shadcn/ui | pinned by CLI revision at copy-in; recorded in `components.json` |
@@ -226,7 +226,7 @@ graph TB
   subgraph Vercel
     NEXT["Next.js 16 app<br/>RSC reads · server actions · 2 route handlers<br/>domain runs in-process"]
   end
-  subgraph Neon
+  subgraph Neon["Neon · aws-ap-southeast-1 (Singapore)"]
     PG[("PostgreSQL 18<br/>employee · salary_record<br/>reference tables · fx_rate · settings")]
   end
   SEED["seed script<br/>(CAP-11, seeded PRNG)"]
@@ -293,6 +293,8 @@ Module filenames inside `src/domain/` are the code's to own; the Capability map 
 | Production | Vercel | Neon primary | `prisma migrate deploy` (build) | one-time, explicit |
 
 Postgres major is pinned to 18 across all three — a Neon branch inherits its parent's major, and local must match. No staging tier: one user, no real data, no auth (SPEC non-goal). Seeding is never automatic — a command, never a deploy side effect.
+
+**Region: `aws-ap-southeast-1` (Singapore).** Neon has no India/Mumbai region (nearest is Singapore, verified 2026-07-17); Singapore is the region for all Neon projects here. Data is fully synthetic (AD-14 seed, no real PII), so there is no data-residency constraint forcing an in-country host, and ~40–70 ms latency from India is immaterial for a single-user deployment. The `DATABASE_URL` connection string is the only thing that changes if the host is later swapped — no domain, application, or migration code depends on the provider (the repository port isolates it).
 
 ## Capability → Architecture Map
 

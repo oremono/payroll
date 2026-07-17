@@ -65,7 +65,7 @@ Technical requirements from the Architecture spine that shape stories, especiall
 - **One canonical resolver each.** One median (`src/domain/statistics.ts`), one current-salary resolver (greatest `(effective_from, seq) ≤ asOf`), one verdict-sentence composer (`src/domain/verdict.ts`), one money formatter — no capability writes its own. (AD-3, AD-8, AD-20)
 - **Delivery boundary.** RSC reads call use-cases in-process (no self-fetch); mutations are Server Actions; exactly two Route Handlers exist — the CAP-1 multipart upload and CSV export downloads. (AD-21)
 - **Answer payloads carry receipts.** Every computed answer crosses the boundary as a discriminated union `{ kind:'answer' | 'refusal', … }` carrying value + provenance (group, n, as-of, currency, threshold, rate+pinned_on) in one object. (AD-20)
-- **Deployment.** Vercel + Neon (Postgres 18, pinned across all environments; branch-per-PR); `prisma migrate deploy` at build; seed is an explicit command, never a deploy side effect; no auth (SPEC non-goal, the one deferral that must flip before real data). (Deployment & environments; Deferred)
+- **Deployment.** Vercel + Neon (Postgres 18, pinned across all environments; region `aws-ap-southeast-1` Singapore — Neon has no India region; branch-per-PR); `prisma migrate deploy` at build; seed is an explicit command, never a deploy side effect; no auth (SPEC non-goal, the one deferral that must flip before real data). (Deployment & environments; Deferred)
 - **Stack pins (verified 2026-07-17).** Node 24 LTS · TypeScript 5.9 · Next.js 16.2.10 · React 19.2.7 · PostgreSQL 18 (Neon) · Prisma 7.8.0 · Tailwind 4.3.2 · shadcn/ui (copy-in) · Vitest 4.1.10 · Playwright. (Stack)
 
 ### UX Design Requirements
