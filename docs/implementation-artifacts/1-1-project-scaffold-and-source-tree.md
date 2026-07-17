@@ -4,7 +4,7 @@ baseline_commit: c2069369287fa34c83478730017794ea83c7da39
 
 # Story 1.1: Project Scaffold and Source Tree
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
