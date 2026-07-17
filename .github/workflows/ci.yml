@@ -1,0 +1,40 @@
+name: CI
+
+# Standing rails (AD-1, AD-23). Every push (any branch) and every PR to master runs the full gate
+# set; a failing gate blocks merge once the checks below are required in branch protection.
+# See README.md § Continuous Integration for the required-check list.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [master]
+
+# Cancel superseded runs on the same ref to save CI minutes — except on master, where every commit
+# must keep its completed gate verdict (a cancelled run records nothing).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  # Fast code gates: lint (incl. import-boundary + domain/application purity), typecheck, the
+  # production build, and unit tests.
+  check:
+    name: Lint · Typecheck · Build · Unit + Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Lint (import-boundary + purity)
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm run test
