@@ -24,7 +24,7 @@ Verified checks per screen: contains `As of 16 Jul 2026`; no "snapshot"/"Snapsho
 | `screen-09-record-change.html/.png` | Record a salary change - Priya Nair (Final) | `84abd3d67c34451fb9177e2c5731b68c` | PASS |
 | `screen-10-settings.html/.png` | Settings - Salary Management (Final v2) | `d4b2288de1ec4aa99aa543c97e64eff5` | PASS |
 
-Former `screen-04-peer-group-corrected.*` and `screen-05-gender-insights-corrected.*` files were replaced by the canonical names above and deleted. `screen-03-employee-detail-A.png` / `-B.png` are older exploratory thumbnails kept for reference only.
+Former `screen-04-peer-group-corrected.*` and `screen-05-gender-insights-corrected.*` files were replaced by the canonical names above and deleted.
 
 ## DELETE IN STITCH UI — superseded old screens still on canvas (1)
 
@@ -35,3 +35,6 @@ Audited against the live canvas on 2026-07-17: the canvas holds 12 screens — t
 | Home - The Sweep (Final v3) | `359a61292b0946f38aca7419cfc3fe54` |
 
 This is a same-titled duplicate of the canonical Home (`3792d8f9…`); it is a 3072px-wide render, whereas the canonical screen is the standard 2560px width. The 12 previously listed superseded screens (`f58ce40d…`, `d5e457cc…`, `dff16564…`, `020a207f…`, `97b15415…`, `f474bf50…`, `79c8bec0…`, `88dd87a0…`, `9d755096…`, `333ae874…`, `727222b0…`, `c1506031…`) have all been deleted, as had three earlier ids (`72eb605a…`, `811ee7bf…`, `ac70ade8…`). After deleting the duplicate above, the canvas should hold exactly the 11 canonical screens.
+
+## Addition (2026-07-17, finalize pass)
+| `screen-11-add-employee.html/.png` | Add Employee (Final) | `9c43ca9325804802ba60c73e4c156d0b` | PASS (as-of, no snapshot, no Peer Groups nav, MALE/FEMALE, reference-table note) |

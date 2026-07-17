@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ACME HR - Add Employee</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#505f76",
+                        "surface-container-highest": "#e0e3e5",
+                        "primary-fixed": "#d8e3fb",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#111c2d",
+                        "on-secondary-container": "#54647a",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-secondary-fixed": "#0b1c30",
+                        "tertiary-fixed": "#e1e0ff",
+                        "surface-variant": "#e0e3e5",
+                        "outline-variant": "#c5c6cd",
+                        "on-tertiary-container": "#7f82ff",
+                        "on-primary-container": "#8590a6",
+                        "on-primary-fixed-variant": "#3c475a",
+                        "on-surface-variant": "#45474c",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "outline": "#75777d",
+                        "error-container": "#ffdad6",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#191c1e",
+                        "tertiary-fixed-dim": "#c0c1ff",
+                        "surface-container-low": "#f2f4f6",
+                        "secondary-fixed": "#d3e4fe",
+                        "secondary-container": "#d0e1fb",
+                        "primary": "#091426",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#07006c",
+                        "surface-dim": "#d8dadc",
+                        "on-tertiary-fixed-variant": "#2f2ebe",
+                        "background": "#f7f9fb",
+                        "inverse-surface": "#2d3133",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "tertiary-container": "#0d0093",
+                        "primary-container": "#1e293b",
+                        "tertiary": "#040057",
+                        "inverse-primary": "#bcc7de",
+                        "surface-container": "#eceef0",
+                        "surface-bright": "#f7f9fb",
+                        "surface": "#f7f9fb",
+                        "inverse-on-surface": "#eff1f3",
+                        "primary-fixed-dim": "#bcc7de",
+                        "surface-tint": "#545f73",
+                        "surface-container-high": "#e6e8ea",
+                        "on-surface": "#191c1e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-margin": "24px",
+                        "unit": "4px",
+                        "gutter": "12px",
+                        "cell-padding-v": "8px",
+                        "cell-padding-h": "12px"
+                    },
+                    "fontFamily": {
+                        "number-md": ["JetBrains Mono"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "number-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "number-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "number-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #F8FAFC;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        [data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        .form-input-minimal {
+            border: 1px solid #E2E8F0;
+            background-color: #FFFFFF;
+            transition: border-color 0.2s ease;
+        }
+        .form-input-minimal:focus {
+            outline: none;
+            border-color: #1E293B;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface bg-background flex h-screen overflow-hidden">
+<!-- Overlay Background (Dimming the underlying page) -->
+<div class="fixed inset-0 bg-primary/20 z-50 transition-opacity"></div>
+<!-- Side Navigation -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col py-gutter px-cell-padding-h z-40">
+<div class="mb-8 pl-3 pt-2">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">ACME HR</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Salary Management</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">home</span>
+<span>Home</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-primary font-bold border-r-2 border-primary bg-surface-container-low hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-weight="fill">badge</span>
+<span>Employees</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">diversity_3</span>
+<span>Gender Insights</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+<span>Payroll Totals</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">history_toggle_off</span>
+<span>Overdue for Review</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]">upload_file</span>
+<span>Import</span>
+</a>
+<a class="flex items-center space-x-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80 transition-all font-body-md text-body-md mt-auto" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 ml-64 flex flex-col h-screen relative z-30">
+<!-- Top App Bar -->
+<header class="h-12 w-full sticky top-0 z-40 bg-surface-container-lowest border-b border-outline-variant flex items-center justify-between pl-6 pr-gutter">
+<div class="font-headline-md text-headline-md font-semibold text-on-surface">
+                Salary Management for ACME HR
+            </div>
+<div class="flex items-center space-x-4">
+<span class="font-body-sm text-body-sm text-on-surface-variant font-number-md">As of 16 Jul 2026</span>
+<div class="flex items-center space-x-2 text-on-surface-variant">
+<button class="p-1 hover:bg-surface-container-high rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+</button>
+<button class="p-1 hover:bg-surface-container-high rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+</button>
+<button class="p-1 hover:bg-surface-container-high rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Dummy Background Table Data (Dimmed via overlay) -->
+<main class="p-container-margin overflow-hidden pointer-events-none opacity-40">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant font-label-caps text-label-caps text-on-surface-variant uppercase">
+<th class="py-2 pr-4 font-normal">Name</th>
+<th class="py-2 px-4 font-normal">Role</th>
+<th class="py-2 px-4 font-normal text-right">Base Salary</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="border-b border-surface-variant">
+<td class="py-2 pr-4">John Doe</td>
+<td class="py-2 px-4">Software Engineer</td>
+<td class="py-2 px-4 text-right font-number-sm text-number-sm">120,000 USD</td>
+</tr>
+</tbody>
+</table>
+</main>
+</div>
+<!-- Right Side Panel (Active Context) -->
+<aside class="fixed right-0 top-0 h-screen w-[420px] bg-surface-container-lowest border-l border-outline-variant shadow-[-4px_0_24px_rgba(0,0,0,0.04)] z-50 flex flex-col transform transition-transform duration-300">
+<!-- Panel Header -->
+<div class="px-6 py-5 border-b border-surface-variant flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md font-semibold text-primary">Add employee</h2>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Panel Body / Form -->
+<div class="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+<!-- Name -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Name</label>
+<input class="w-full h-8 px-3 text-body-md form-input-minimal rounded-DEFAULT" placeholder="Full legal name" type="text"/>
+</div>
+<!-- Role -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Role</label>
+<div class="relative">
+<select class="w-full h-8 pl-3 pr-8 text-body-md form-input-minimal rounded-DEFAULT appearance-none bg-transparent">
+<option disabled="" selected="" value="">Select role</option>
+<option value="software_engineer">Software Engineer</option>
+<option value="product_manager">Product Manager</option>
+<option value="data_scientist">Data Scientist</option>
+<option value="designer">Designer</option>
+<option value="sales_executive">Sales Executive</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Level -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Level</label>
+<div class="relative">
+<select class="w-full h-8 pl-3 pr-8 text-body-md form-input-minimal rounded-DEFAULT appearance-none bg-transparent">
+<option disabled="" selected="" value="">Select level</option>
+<option value="l1">L1</option>
+<option value="l2">L2</option>
+<option value="l3">L3</option>
+<option value="l4">L4</option>
+<option value="l5">L5</option>
+<option value="l6">L6</option>
+<option value="l7">L7</option>
+<option value="l8">L8</option>
+<option value="m1">M1</option>
+<option value="m2">M2</option>
+<option value="m3">M3</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Country -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Country</label>
+<div class="relative">
+<select class="w-full h-8 pl-3 pr-8 text-body-md form-input-minimal rounded-DEFAULT appearance-none bg-transparent">
+<option disabled="" selected="" value="">Select country</option>
+<option value="india">India</option>
+<option value="us">US</option>
+<option value="uk">UK</option>
+<option value="germany">Germany</option>
+<option value="japan">Japan</option>
+<option value="brazil">Brazil</option>
+<option value="norway">Norway</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Currency follows country: INR</p>
+</div>
+<!-- Gender -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Gender</label>
+<div class="relative">
+<select class="w-full h-8 pl-3 pr-8 text-body-md form-input-minimal rounded-DEFAULT appearance-none bg-transparent">
+<option value="male">MALE</option>
+<option value="female">FEMALE</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Hire Date -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Hire date</label>
+<input class="w-full h-8 px-3 text-body-md form-input-minimal rounded-DEFAULT font-number-md text-number-md text-on-surface" type="date"/>
+</div>
+<!-- Starting Salary -->
+<div class="space-y-1">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase">Starting salary</label>
+<div class="relative flex items-center">
+<input class="w-full h-8 pl-3 pr-12 text-body-md form-input-minimal rounded-DEFAULT font-number-md text-number-md text-on-surface" placeholder="0" type="text"/>
+<div class="absolute right-3 text-on-surface-variant font-number-sm text-number-sm pointer-events-none">
+                        INR
+                    </div>
+</div>
+</div>
+</div>
+<!-- Panel Footer -->
+<div class="border-t border-surface-variant bg-surface-bright px-6 py-4 flex flex-col gap-4">
+<div class="flex justify-end gap-3">
+<button class="px-4 h-8 font-body-md text-body-md font-medium text-on-surface border border-outline-variant rounded-DEFAULT hover:bg-surface-container-highest transition-colors">
+                    Cancel
+                </button>
+<button class="px-4 h-8 font-body-md text-body-md font-medium text-on-primary bg-primary-container rounded-DEFAULT hover:opacity-90 transition-opacity">
+                    Add employee
+                </button>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-body-sm text-body-sm">
+<span>Enter to save · Esc to cancel</span>
+</div>
+<div class="text-on-surface-variant font-body-sm text-body-sm pt-2 border-t border-surface-variant/50">
+                Role and level come from the reference tables. Anything else is rejected — never guessed.
+            </div>
+</div>
+</aside>
+</body></html>
