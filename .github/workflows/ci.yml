@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   # Fast code gates: lint (incl. import-boundary + domain/application purity), typecheck, the
-  # production build, and unit tests.
+  # production build, unit tests, and the coverage floor on src/domain + src/application.
   check:
     name: Lint · Typecheck · Build · Unit + Coverage
     runs-on: ubuntu-latest
@@ -36,5 +36,5 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Unit tests
-        run: npm run test
+      - name: Unit tests + coverage floor
+        run: npm run test:coverage
