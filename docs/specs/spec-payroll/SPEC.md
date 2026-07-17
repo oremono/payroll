@@ -2,6 +2,9 @@
 id: SPEC-payroll
 companions:
   - ../../planning-artifacts/briefs/brief-payroll-2026-07-16/addendum.md
+  - ../../planning-artifacts/architecture/architecture-payroll-2026-07-17/ARCHITECTURE-SPINE.md
+  - ../../planning-artifacts/ux-designs/ux-payroll-2026-07-16/EXPERIENCE.md
+  - ../../planning-artifacts/ux-designs/ux-payroll-2026-07-16/DESIGN.md
 sources:
   - ../../planning-artifacts/briefs/brief-payroll-2026-07-16/brief.md
   - ../../../Incubyte THA.md
@@ -97,10 +100,10 @@ The HR manager opens the product, sees which employees need attention, and acts 
 ## Assumptions
 
 - Employee attributes are role, level, country, currency, gender, hire date, and an identifying name. The source brief does not enumerate an exhaustive field list.
-- Currency is determined by country. Whether it is stored per salary record or resolved from the employee's country is an architecture decision this contract does not settle.
+- Currency is determined by country. **Settled by the architecture spine (AD-6):** currency is stored on each salary record, written from the employee's country at write time and validated against it, so immutable history keeps its own currency and reads never re-resolve it.
 - Salary means base salary, annual, gross, in local currency.
 - The sole user is the HR manager. The source problem statement describes an HR *team* managing the spreadsheets today but names the HR *manager* as the persona and intended user. If the team are users, authentication moves from deferred to required.
 
 ## Open Questions
 
-- The UI surface is undefined. No UX pass has been run, so no screen, view, or navigation is specified for CAP-1 through CAP-10. Downstream will invent it unless it is decided. This now also owns where CAP-6's threshold control lives.
+None open. The one that stood — the undefined UI surface — is resolved by the UX pass (companions `EXPERIENCE.md` and `DESIGN.md`): the sidebar IA and per-capability surfaces for CAP-1 through CAP-10 are specified, and CAP-6's threshold control lives in Settings, a deliberate act kept off the sweep. The five items UX flagged to architecture, and the currency-storage question above, are settled in companion `ARCHITECTURE-SPINE.md` (AD-6 through AD-10).
