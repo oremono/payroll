@@ -7,3 +7,39 @@ _bmad/config.user.toml
 
 # Personal application context — not part of the solution
 _job_desc.md
+
+# ─── Node / Next.js ───────────────────────────────────────────────
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js build output
+.next/
+out/
+build/
+next-env.d.ts
+
+# typescript
+*.tsbuildinfo
+
+# testing / coverage
+coverage/
+.vitest/
+
+# environment (keep .env.example if added)
+.env
+.env.*
+!.env.example
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

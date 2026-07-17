@@ -1,6 +1,10 @@
+---
+baseline_commit: c2069369287fa34c83478730017794ea83c7da39
+---
+
 # Story 1.1: Project Scaffold and Source Tree
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -80,36 +84,36 @@ This is the **first story of Epic 1 (Foundation & Deployable Skeleton)** and the
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Toolchain & manifest** (AC: 1, 2, 9, 10)
-  - [ ] Author `package.json` by hand with exact pins (next 16.2.10, react/react-dom 19.2.7, typescript 5.9.x, tailwindcss 4.3.2, vitest 4.1.10) and the script set.
-  - [ ] Add `.nvmrc` (`24`) and `engines.node`.
-  - [ ] Extend `.gitignore` for Node/Next (preserve existing BMAD entries).
-  - [ ] `npm install`; commit `package-lock.json`.
-- [ ] **Task 2 — Source tree & boundary docs** (AC: 3, 4)
-  - [ ] Create every directory in the spine source tree, plus `prisma/` and `tests/`.
-  - [ ] Add a boundary `README.md` to each `src/*` layer stating its allowed imports.
-  - [ ] Create `src/adapters/clock.ts` and `src/adapters/prng.ts` as documented placeholder seams (a typed stub that throws "not implemented in 1-1" or an empty export is fine — they are wired in later stories; keep them import-free of domain rules they don't yet need).
-- [ ] **Task 3 — TypeScript config** (AC: 5)
-  - [ ] Write `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `module: esnext`, `moduleResolution: bundler`, `jsx: preserve`, `target: ES2022`+, and the `@/*` path aliases.
-  - [ ] Wire `typecheck` script; confirm it passes on the skeleton.
-- [ ] **Task 4 — App Router skeleton** (AC: 6)
-  - [ ] `src/app/layout.tsx` (root layout, imports the global stylesheet) and `src/app/page.tsx` (placeholder).
-  - [ ] `next.config.ts` as needed for `src/app` routing.
-  - [ ] Verify `next build` and `next dev`.
-- [ ] **Task 5 — Tailwind v4 pipeline (empty theme)** (AC: 7)
-  - [ ] Install/wire Tailwind v4 + PostCSS integration for Next 16 (`@tailwindcss/postcss` in `postcss.config.mjs`).
-  - [ ] Global stylesheet with Tailwind layers, **no hex literals / no token values** — placeholder only.
-  - [ ] Confirm styles compile into the build.
-- [ ] **Task 6 — Vitest + first test-first domain unit** (AC: 8)
-  - [ ] Add `vitest.config.ts` with path-alias resolution mirroring tsconfig.
-  - [ ] **Write the failing test first** in `tests/` against a not-yet-existing pure, branching `src/domain/` helper; watch it fail for the right reason.
-  - [ ] Implement the minimal domain function to go green; commit in an order that shows red-before-green.
-  - [ ] Confirm `npm run test` is green and DB/clock/network-free.
-- [ ] **Task 7 — ESLint baseline & README** (AC: 9, 10)
-  - [ ] Baseline ESLint in flat config (`eslint.config.mjs`) using `eslint-config-next`; `lint` script runs `eslint .` clean. Do NOT use `next lint` (removed in Next 16), and do NOT author the import-boundary rule (that's 1-2).
-  - [ ] Write `README.md` (prereqs, install, dev/build/typecheck/test).
-- [ ] **Task 8 — Final verification** (AC: 6, 9)
-  - [ ] Run all four gates locally: `build`, `typecheck`, `lint`, `test` — all green. Record outcomes in the Dev Agent Record.
+- [x] **Task 1 — Toolchain & manifest** (AC: 1, 2, 9, 10)
+  - [x] Author `package.json` by hand with exact pins (next 16.2.10, react/react-dom 19.2.7, typescript 5.9.x, tailwindcss 4.3.2, vitest 4.1.10) and the script set.
+  - [x] Add `.nvmrc` (`24`) and `engines.node`.
+  - [x] Extend `.gitignore` for Node/Next (preserve existing BMAD entries).
+  - [x] `npm install`; commit `package-lock.json`.
+- [x] **Task 2 — Source tree & boundary docs** (AC: 3, 4)
+  - [x] Create every directory in the spine source tree, plus `prisma/` and `tests/`.
+  - [x] Add a boundary `README.md` to each `src/*` layer stating its allowed imports.
+  - [x] Create `src/adapters/clock.ts` and `src/adapters/prng.ts` as documented placeholder seams (a typed stub that throws "not implemented in 1-1" or an empty export is fine — they are wired in later stories; keep them import-free of domain rules they don't yet need).
+- [x] **Task 3 — TypeScript config** (AC: 5)
+  - [x] Write `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `module: esnext`, `moduleResolution: bundler`, `jsx: preserve`, `target: ES2022`+, and the `@/*` path aliases. (See Completion Notes: Next 16 mandatorily rewrites `jsx` to `react-jsx` on build.)
+  - [x] Wire `typecheck` script; confirm it passes on the skeleton.
+- [x] **Task 4 — App Router skeleton** (AC: 6)
+  - [x] `src/app/layout.tsx` (root layout, imports the global stylesheet) and `src/app/page.tsx` (placeholder).
+  - [x] `next.config.ts` as needed for `src/app` routing.
+  - [x] Verify `next build` and `next dev`.
+- [x] **Task 5 — Tailwind v4 pipeline (empty theme)** (AC: 7)
+  - [x] Install/wire Tailwind v4 + PostCSS integration for Next 16 (`@tailwindcss/postcss` in `postcss.config.mjs`).
+  - [x] Global stylesheet with Tailwind layers, **no hex literals / no token values** — placeholder only.
+  - [x] Confirm styles compile into the build.
+- [x] **Task 6 — Vitest + first test-first domain unit** (AC: 8)
+  - [x] Add `vitest.config.ts` with path-alias resolution mirroring tsconfig.
+  - [x] **Write the failing test first** in `tests/` against a not-yet-existing pure, branching `src/domain/` helper; watch it fail for the right reason.
+  - [x] Implement the minimal domain function to go green; commit in an order that shows red-before-green.
+  - [x] Confirm `npm run test` is green and DB/clock/network-free.
+- [x] **Task 7 — ESLint baseline & README** (AC: 9, 10)
+  - [x] Baseline ESLint in flat config (`eslint.config.mjs`) using `eslint-config-next`; `lint` script runs `eslint .` clean. Do NOT use `next lint` (removed in Next 16), and do NOT author the import-boundary rule (that's 1-2).
+  - [x] Write `README.md` (prereqs, install, dev/build/typecheck/test).
+- [x] **Task 8 — Final verification** (AC: 6, 9)
+  - [x] Run all four gates locally: `build`, `typecheck`, `lint`, `test` — all green. Record outcomes in the Dev Agent Record.
 
 ## Dev Notes
 
@@ -221,8 +225,71 @@ payroll/
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Claude Opus 4.8, 1M context) — dev-story workflow.
+
 ### Debug Log References
+
+Four gates, all green on the final run (Node v22.22.0 locally — see Completion Notes):
+
+- `npm run build` → ✓ Compiled successfully (Turbopack); TypeScript checked; 3 static routes (`/`, `/_not-found`). No warnings after pinning `turbopack.root`.
+- `npm run typecheck` (`tsc --noEmit`) → exit 0.
+- `npm run lint` (`eslint .`) → exit 0, clean.
+- `npm run test` (`vitest run`) → 1 file, 4 tests passed; no DB/clock/network.
+- `npm run dev` → Ready in ~288ms; `GET /` → 200 serving the "Salary Management for ACME HR" heading.
+- Hex-literal scan of `src/` → no matches (AC7 / AD-15).
+
+TDD evidence (AC8): the `blankToNull` spec was committed **before** its implementation and observed failing for the right reason (`Cannot find package '@/domain/text'`), then went green after the minimal implementation landed — see the `test(domain): …` → `feat(domain): …` commit pair.
 
 ### Completion Notes List
 
+- **Hand-scaffolded, not generated** (AC1): every file authored deliberately; no `create-*` generator was run, no template boilerplate/demo assets exist.
+- **Exact pins** (AC2): `next@16.2.10`, `react`/`react-dom@19.2.7`, `typescript@5.9.3` (concrete 5.9 patch — not 7.x), `tailwindcss@4.3.2`, `vitest@4.1.10`, all with no `^`/`~`. Node pinned via `.nvmrc` (`24`) and `engines.node` (`>=24 <25`). Prisma / Playwright / shadcn deliberately **not** added (sibling stories own them).
+- **`jsx: "preserve"` → `"react-jsx"` (framework-mandated deviation from AC5's literal wording).** AC5 lists `"jsx": "preserve"`, but Next 16's `next build` performs a *mandatory* reconfiguration of `tsconfig.json`, rewriting `jsx` to `react-jsx` (Next uses the React automatic runtime). Setting it back to `preserve` is overwritten on every build. All other AC5 settings hold verbatim (`strict`, `noUncheckedIndexedAccess`, `module: esnext`, `moduleResolution: bundler`, `target: ES2022`, the `@/*` aliases) and `typecheck` passes. This is a framework requirement, not a Law conflict — surfaced here per the "stop and surface" rule.
+- **ESLint pinned to `9.39.5`, not 10.x.** `eslint-config-next@16.2.10` bundles `typescript-eslint@^8.46` whose ESLint peer is `^8.57 || ^9` — ESLint 10 is not yet supported by those plugins. `lint` uses the ESLint **CLI** (`eslint .`), not `next lint` (removed in Next 16), via native flat config (`eslint.config.mjs`); the import-boundary rule is intentionally **left to Story 1-2**.
+- **`eslint .` scoped to application source.** Added ignores for tooling/planning dirs (`.claude/**`, `_bmad/**`, `.bmad-loop/**`, `design-artifacts/**`, `docs/**`) so the lint gate covers the app, not BMAD skill templates (one such template referenced an uninstalled rule).
+- **Turbopack root pinned** in `next.config.ts` to silence a multiple-lockfile workspace-root warning (a stray `~/package-lock.json` had been inferred as root).
+- **Local Node is v22.22.0, target is 24 LTS.** `npm install` emitted the expected `EBADENGINE` warning and proceeded (npm does not enforce `engines` by default; Next 16 requires Node ≥20.9, so all local gates run clean on 22). CI/deploy will run the pinned Node 24.
+- **Seams set, not implemented** (out-of-scope guard): `clock.ts`/`prng.ts` are typed stubs that throw; `prisma/` and the `application`/`adapters`/`ui` layers are empty-but-documented. No tokens, no Prisma model, no boundary lint rule were pre-implemented.
+
 ### File List
+
+**Added**
+- `.nvmrc`
+- `README.md`
+- `package.json`
+- `package-lock.json`
+- `tsconfig.json`
+- `next.config.ts`
+- `postcss.config.mjs`
+- `vitest.config.ts`
+- `eslint.config.mjs`
+- `src/app/layout.tsx`
+- `src/app/page.tsx`
+- `src/app/globals.css`
+- `src/app/README.md`
+- `src/domain/text.ts`
+- `src/domain/README.md`
+- `src/application/README.md`
+- `src/application/ports/README.md`
+- `src/application/use-cases/README.md`
+- `src/adapters/clock.ts`
+- `src/adapters/prng.ts`
+- `src/adapters/README.md`
+- `src/adapters/db/README.md`
+- `src/adapters/csv/README.md`
+- `src/ui/README.md`
+- `prisma/README.md`
+- `tests/README.md`
+- `tests/domain/text.test.ts`
+
+**Modified**
+- `.gitignore` (added Node/Next/TS/coverage/OS ignores; preserved existing BMAD entries)
+- `docs/implementation-artifacts/1-1-project-scaffold-and-source-tree.md` (frontmatter `baseline_commit`, task checkboxes, Dev Agent Record, Status)
+- `docs/implementation-artifacts/sprint-status.yaml` (1-1 status; `last_updated`)
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-17 | Story 1-1 implemented: hand-scaffolded Next.js 16 app, functional-core/imperative-shell source tree with boundary READMEs, pinned toolchain, Tailwind v4 (empty theme), Vitest with one test-first pure domain unit (`blankToNull`), ESLint flat-config baseline. All four gates (build/typecheck/lint/test) green. Status → review. |
+| 2026-07-17 | Code-review fixes: (1) scoped `tsconfig` `exclude` to tooling dirs (`.claude`, `_bmad`, `.bmad-loop`, `design-artifacts`, `docs`) so the `typecheck` gate mirrors the ESLint ignores and won't compile non-app `.ts`; (2) added an internal-whitespace test for `blankToNull` so a strip-all-whitespace mutant is killed (matters for 1-2 mutation testing). Gates re-run green; domain suite now 5 tests. |
