@@ -1,0 +1,8 @@
+/*
+ * Global stylesheet — Tailwind CSS v4 pipeline.
+ *
+ * The theme is intentionally EMPTY in Story 1-1: no `@theme` block, no color tokens, no hex
+ * literals. Real design tokens are generated from DESIGN.md frontmatter in Story 1-5 (AD-15) — do
+ * not hand-author them here. This file exists so Tailwind compiles into `next build` from day one.
+ */
+@import "tailwindcss";
