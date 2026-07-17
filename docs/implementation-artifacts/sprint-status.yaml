@@ -58,7 +58,7 @@ development_status:
   # Epic 1 — Foundation & Deployable Skeleton (foundational; enables CAP-1..CAP-11)
   epic-1: in-progress
   1-1-project-scaffold-and-source-tree: done
-  1-2-ci-pipeline-and-gates: ready-for-dev
+  1-2-ci-pipeline-and-gates: done
   1-3-data-model-and-migrations: backlog
   1-4-money-currency-domain-primitives: backlog
   1-5-design-token-build: backlog

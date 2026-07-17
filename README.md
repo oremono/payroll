@@ -32,8 +32,32 @@ npm install
 | `npm run lint` | Lint with the ESLint CLI (`eslint .`) |
 | `npm run test` | Run the Vitest unit suite once |
 | `npm run test:watch` | Run Vitest in watch mode |
+| `npm run test:coverage` | Vitest with the coverage floor on `src/domain` + `src/application` |
+| `npm run test:mutation` | Stryker mutation testing over `src/domain` (a survivor fails) |
+| `npm run test:a11y` | Playwright + axe accessibility pass over the built app |
 
-The four gates that must stay green: **`build`**, **`typecheck`**, **`lint`**, **`test`**.
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push (any branch) and every pull request to `master`
+(Node 24, `npm ci`). A failing gate blocks merge once the checks are marked **required** in branch
+protection.
+
+| Gate | Local command | Enforces |
+| --- | --- | --- |
+| Lint (import-boundary + purity) | `npm run lint` | Layer import direction; the pure-core ban on the clock (`Date`/`performance`), randomness (`Math.random`/`crypto`), `process.env`, dynamic `import()`, and `fs`/Prisma/Next imports (Law 2, Law 6 / AD-1); the repo-wide `Math.random` ban (AD-14, `src/adapters/prng.ts` exempt) |
+| Typecheck | `npm run typecheck` | `tsc --noEmit` |
+| Build | `npm run build` | The production build compiles — a named gate, not a side effect of another job |
+| Unit + coverage floor | `npm run test:coverage` | Fast deterministic unit suite + per-path coverage floors on `domain` (100) and `application` (90) (AD-23) |
+| Mutation testing | `npm run test:mutation` | A surviving mutant over `src/domain` fails the build (AD-23) |
+| Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9) |
+
+**Branch protection:** require these status checks on `master` — **`Lint · Typecheck · Build ·
+Unit + Coverage`**, **`Mutation testing (domain)`**, and **`Accessibility (axe)`** (the job names
+in `ci.yml`). Configuring branch protection is a repository-admin action in GitHub settings, not
+part of the code.
+
+The `test:mutation` and `test:a11y` gates need extra local setup on first run: Stryker downloads
+nothing, but the axe gate needs a browser — run `npx playwright install chromium` once.
 
 ## Source tree
 
@@ -55,8 +79,9 @@ tests/           # domain/application unit tests
 ```
 
 Each `src/*` layer carries a `README.md` stating exactly what it may import. Dependencies point
-inward: `domain ← application ← adapters/ui`. The ESLint rule that mechanically enforces this lands
-in Story 1-2; until then the layer READMEs are the contract.
+inward: `domain ← application ← adapters/ui`. This is mechanically enforced in CI by the
+`import/no-restricted-paths` zones and the pure-core purity rules in `eslint.config.mjs` (Story
+1-2) — a violating import or a stray `Date.now()` in the core fails `npm run lint`.
 
 ## Testing
 

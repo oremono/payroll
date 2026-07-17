@@ -27,6 +27,15 @@ next-env.d.ts
 coverage/
 .vitest/
 
+# mutation testing (Stryker) — root-anchored so a future src/**/reports/ feature dir stays tracked
+/reports/
+/.stryker-tmp/
+
+# playwright (accessibility gate) — root-anchored for the same reason
+/test-results/
+/playwright-report/
+/.playwright/
+
 # environment (keep .env.example if added)
 .env
 .env.*
