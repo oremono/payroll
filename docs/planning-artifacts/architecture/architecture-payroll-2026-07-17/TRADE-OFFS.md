@@ -143,7 +143,23 @@ The spine's Deferred section is half the contract. The entries that matter:
 
 ---
 
-## 9. How the review changed this document's own claims
+## 9. How this gets built: test-first, feature by feature
+
+Two decisions govern *process* rather than structure. They earn a place here because the assessment weighs test quality and commit history, and because a wrong build order can reintroduce a divergence the structure worked to remove.
+
+**Test-first is the standard (AD-23).** Every domain and application unit is written red-before-green: a failing test precedes the code that satisfies it. The SPEC does not merely ask for tests — it asks for tests that are *fast and deterministic, fixed seed, no wall clock*. Tests written after the fact tend to describe the code that exists rather than the behavior that was wanted; they ratify bugs instead of catching them. Writing the test first is the cheapest way to keep the test honest, and the functional core (§1) is what makes it painless — no DB, no clock, no network to stand up.
+
+The honest part is the enforcement. **CI cannot prove a test was written first** — it only sees the final tree. So this rule splits: red-before-green ordering is XP discipline enforced in *review* (the commit sequence has to show it), while CI enforces two things it genuinely can — a coverage floor on `src/domain` and `src/application`, and **mutation testing** over the domain. Mutation testing is the real teeth: it perturbs the domain code and checks that some test fails; a surviving mutant is, by definition, a line no test actually pins down — exactly the gap test-first exists to close. Claiming CI verifies TDD would have been a comfortable overclaim; it verifies coverage and mutation-resistance, and the ordering is a reviewed practice.
+
+**Delivery is vertical slices, backend before frontend (AD-24).** The system ships one capability at a time, and within a capability the backend story lands before the frontend story. The alternative — build every schema, then every use-case, then every screen — demonstrates nothing until the end and, worse, invites the AD-20 answer payload to be designed twice: once by the backend that produces it and once, differently, by the React component that consumes it. That is the precise drift AD-20 exists to kill, and a horizontal build order would smuggle it back in through sequencing. Backend-first means the boundary payload is finalized and green *before* any component depends on it; the frontend then consumes a fixed contract and adds nothing to it.
+
+"Backend done" is a gate, not a mood: the domain and application suites green under AD-23, **plus** at least one adapter integration test running against a real disposable Postgres 18 (a Neon branch or a local instance — never a mock, because the thing most worth testing at that seam is whether Prisma and the schema actually agree), **plus** the AD-20 payload finalized. Those integration tests run under Vitest but live outside the AD-23 domain suite, so the core suite stays clock-free and DB-free. The first slice is not a capability at all — it is the foundational app shell (the import-boundary lint of AD-1, the token build of AD-15, the two route handlers of AD-21), so every capability slice afterward lands on rails that are already standing.
+
+**What this costs.** Backend-first briefly means a capability has working logic and passing tests but nothing on screen — a slice looks half-finished mid-flight. For a demo-graded take-home that is a real tension, and the mitigation is that slices are small: a capability is backend-then-frontend over a short arc, not a backend milestone weeks ahead of any UI. The payoff is that no screen is ever built against a payload that later moves.
+
+---
+
+## 10. How the review changed this document's own claims
 
 Worth stating plainly, since the assessment asks how AI was used and whether correctness held.
 
