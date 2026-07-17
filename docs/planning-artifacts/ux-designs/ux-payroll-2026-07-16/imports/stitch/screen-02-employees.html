@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ACME HR - Employees</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#e0e3e5",
+                      "surface-tint": "#545f73",
+                      "surface-dim": "#d8dadc",
+                      "background": "#f7f9fb",
+                      "secondary-fixed": "#d3e4fe",
+                      "surface-container-highest": "#e0e3e5",
+                      "tertiary-container": "#0d0093",
+                      "on-secondary-fixed": "#0b1c30",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed-dim": "#c0c1ff",
+                      "on-tertiary-container": "#7f82ff",
+                      "tertiary-fixed": "#e1e0ff",
+                      "surface-container-low": "#f2f4f6",
+                      "error-container": "#ffdad6",
+                      "on-tertiary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#3c475a",
+                      "primary": "#091426",
+                      "inverse-on-surface": "#eff1f3",
+                      "inverse-surface": "#2d3133",
+                      "surface": "#f7f9fb",
+                      "on-surface": "#191c1e",
+                      "outline-variant": "#c5c6cd",
+                      "on-secondary": "#ffffff",
+                      "on-primary-container": "#8590a6",
+                      "inverse-primary": "#bcc7de",
+                      "surface-bright": "#f7f9fb",
+                      "surface-container-high": "#e6e8ea",
+                      "primary-fixed-dim": "#bcc7de",
+                      "outline": "#75777d",
+                      "on-error-container": "#93000a",
+                      "on-surface-variant": "#45474c",
+                      "on-tertiary-fixed-variant": "#2f2ebe",
+                      "secondary-container": "#d0e1fb",
+                      "secondary": "#505f76",
+                      "primary-container": "#1e293b",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "on-secondary-container": "#54647a",
+                      "on-background": "#191c1e",
+                      "on-primary-fixed": "#111c2d",
+                      "primary-fixed": "#d8e3fb",
+                      "surface-container": "#eceef0",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "tertiary": "#040057",
+                      "on-tertiary-fixed": "#07006c",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "12px",
+                      "container-margin": "24px",
+                      "cell-padding-v": "8px",
+                      "unit": "4px",
+                      "cell-padding-h": "12px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "number-md": [
+                              "JetBrains Mono"
+                      ],
+                      "number-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "number-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "number-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #f7f9fb; }
+        .font-number-md { font-family: 'JetBrains Mono', monospace; }
+        .font-number-sm { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Thin scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex h-screen overflow-hidden antialiased">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-64 border-r border-outline-variant dark:border-outline bg-surface dark:bg-surface-container-low flex flex-col py-4 z-20 shrink-0">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary text-xl" style="font-variation-settings: 'FILL' 1;">dataset</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed leading-tight">ACME HR</h1>
+<p class="text-label-caps font-label-caps text-on-surface-variant uppercase tracking-wider">Salary Management</p>
+</div>
+</div>
+<ul class="flex flex-col gap-1 px-3 flex-1 overflow-y-auto">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">home</span>
+<span>Home</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-secondary-container dark:bg-primary-container text-on-secondary-container dark:text-on-primary-container font-semibold opacity-90 transition-opacity duration-100 text-body-md font-body-md" href="#">
+<span class="material-symbols-outlined text-lg">group</span>
+<span>Employees</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">equalizer</span>
+<span>Gender Insights</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">payments</span>
+<span>Payroll Totals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">pending_actions</span>
+<span>Overdue for Review</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">upload_file</span>
+<span>Import</span>
+</a>
+</li>
+<li class="mt-auto">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-150 text-body-md font-body-md group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-primary transition-colors duration-150">settings</span>
+<span>Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area Wrapper -->
+<div class="ml-64 flex flex-col flex-1 h-full w-[calc(100%-16rem)] relative">
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 border-b border-outline-variant dark:border-outline bg-surface dark:bg-surface-container-low flex justify-between items-center px-6 z-10">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed">Employees</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 cursor-pointer active:opacity-70 group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">calendar_today</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant group-hover:text-primary transition-colors">As of 16 Jul 2026</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">arrow_drop_down</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-outline-variant cursor-pointer active:opacity-70">
+<img alt="User Account Profile" class="w-full h-full object-cover" data-alt="A small, professional headshot photo of an HR manager, modern corporate lighting, subtle neutral background, high resolution, soft focus." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXFFMrn7d-2L5grzwSSBVOu9k7jzLdn5F7J0y7o0dX2tv0fBYKkP-PO12AMWQS_H8AhOqoXf4nCSYFxIXEfOaMKsb5o8V6N2kfN7hp7kZ2rtjLPRDwfjnIuGqt89nU03xkmQaprKfPIrwfJNFFCHwtCbxSmYshSC_CCMGmyZ8wv4FPshrGdPVc2Xwt34c3lLARS_uNGKuhKHfgrIWplQb7j8drg5gGCb5GnUUC1pKlnMbmUXVrGSWj3SeBazVk2oK2fW5PPmXBcHhZ"/>
+</div>
+</div>
+</header>
+<!-- Main WorkspaceCanvas -->
+<main class="flex-1 overflow-y-auto mt-16 p-container-margin bg-background">
+<div class="max-w-7xl mx-auto w-full">
+<!-- Action Bar (Search, Filters, Add) -->
+<div class="flex items-center justify-between gap-4 mb-4">
+<div class="flex items-center gap-3 flex-1">
+<div class="relative w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full h-9 pl-9 pr-3 rounded border border-outline-variant bg-surface-lowest text-body-md font-body-md text-on-surface placeholder-on-surface-variant focus:border-primary focus:ring-0 focus:outline-none transition-colors" placeholder="Search 10,000 employees... (Press / to focus)" type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="h-9 px-3 border border-outline-variant rounded bg-surface-lowest hover:bg-surface-container-low transition-colors text-body-sm font-body-sm text-on-surface flex items-center gap-2">
+                                Role <span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_drop_down</span>
+</button>
+<button class="h-9 px-3 border border-outline-variant rounded bg-surface-lowest hover:bg-surface-container-low transition-colors text-body-sm font-body-sm text-on-surface flex items-center gap-2">
+                                Level <span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_drop_down</span>
+</button>
+<button class="h-9 px-3 border border-outline-variant rounded bg-surface-lowest hover:bg-surface-container-low transition-colors text-body-sm font-body-sm text-on-surface flex items-center gap-2">
+                                Country <span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_drop_down</span>
+</button>
+</div>
+</div>
+<button class="h-9 px-4 bg-primary-container text-on-primary rounded font-body-sm text-body-sm hover:bg-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span> Add employee
+                    </button>
+</div>
+<!-- Data Table -->
+<div class="bg-surface-lowest border border-outline-variant rounded overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant text-label-caps font-label-caps text-on-surface-variant uppercase">
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-48">Name</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-40">Role</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-24">Level</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-24">Country</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-20 text-center">Gender</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold w-32">Hire Date</th>
+<th class="px-cell-padding-h py-cell-padding-v font-semibold text-right">Current Salary</th>
+</tr>
+</thead>
+<tbody class="text-body-md font-body-md text-on-surface">
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="px-cell-padding-h py-0 truncate font-medium">Eleanor Vance</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">Staff Engineer</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">IC5</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="US Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden">
+<!-- Placeholder for flag -->
+</span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">US</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">F</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2021-04-12</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">$185,000 USD</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors h-[36px] bg-amber-50/30">
+<td class="px-cell-padding-h py-0 truncate font-medium flex items-center gap-2 h-full">
+                                        Sarah Jenkins 
+                                        <span class="inline-flex items-center px-1.5 h-4 bg-[#fef3c7] text-[#92400e] text-[10px] font-bold tracking-wider rounded-[2px] uppercase">Outlier</span>
+</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">Director of Eng</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">M7</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="UK Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden"></span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">UK</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">F</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2018-11-05</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">£245,000 GBP</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="px-cell-padding-h py-0 truncate font-medium">Rahul Sharma</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">Product Manager</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">M4</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="IN Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden"></span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">IN</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">M</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2022-01-18</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">₹32,50,000 INR</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="px-cell-padding-h py-0 truncate font-medium">Marcus Mueller</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">Data Scientist</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">IC3</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="DE Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden"></span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">DE</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">M</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2020-09-01</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">€82,400 EUR</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="px-cell-padding-h py-0 truncate font-medium">Carlos Silva</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">UX Designer</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">IC2</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="BR Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden"></span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">BR</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">M</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2023-03-15</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">R$142,000 BRL</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-[36px]">
+<td class="px-cell-padding-h py-0 truncate font-medium">Yuki Tanaka</td>
+<td class="px-cell-padding-h py-0 truncate text-on-surface-variant">Account Executive</td>
+<td class="px-cell-padding-h py-0"><span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded-[2px] text-[11px] font-number-sm">IC4</span></td>
+<td class="px-cell-padding-h py-0">
+<div class="flex items-center gap-1.5">
+<span aria-label="JP Flag" class="w-4 h-3 bg-surface-variant inline-block shrink-0 rounded-[1px] overflow-hidden"></span>
+<span class="text-on-surface-variant text-body-sm font-number-sm">JP</span>
+</div>
+</td>
+<td class="px-cell-padding-h py-0 text-center text-on-surface-variant">F</td>
+<td class="px-cell-padding-h py-0 text-on-surface-variant font-number-sm">2019-07-22</td>
+<td class="px-cell-padding-h py-0 text-right font-number-md">¥11,500,000 JPY</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer / Pagination -->
+<div class="px-4 py-3 border-t border-outline-variant bg-surface flex items-center justify-between">
+<span class="text-body-sm font-body-sm text-on-surface-variant">
+                            Showing <span class="font-number-sm font-medium text-on-surface">1–50</span> of <span class="font-number-sm font-medium text-on-surface">10,000</span> employees
+                        </span>
+<div class="flex items-center gap-1">
+<button class="w-7 h-7 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+</button>
+<button class="w-7 h-7 flex items-center justify-center rounded bg-primary-container text-on-primary font-number-sm text-body-sm">1</button>
+<button class="w-7 h-7 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-low font-number-sm text-body-sm">2</button>
+<span class="w-7 h-7 flex items-center justify-center text-on-surface-variant font-number-sm text-body-sm">...</span>
+<button class="w-7 h-7 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-low font-number-sm text-body-sm">9</button>
+<button class="w-7 h-7 flex items-center justify-center rounded text-on-surface-variant hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+        // Simple script to handle search focus via keyboard
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                const searchInput = document.querySelector('input[type="text"]');
+                if (searchInput) searchInput.focus();
+            }
+        });
+    </script>
+</body></html>

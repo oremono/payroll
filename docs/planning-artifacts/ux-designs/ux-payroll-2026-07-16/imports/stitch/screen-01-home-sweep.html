@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ACME HR - The Sweep</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "background": "#f7f9fb",
+                      "surface-tint": "#545f73",
+                      "surface-dim": "#d8dadc",
+                      "surface-variant": "#e0e3e5",
+                      "error": "#ba1a1a",
+                      "tertiary-container": "#0d0093",
+                      "on-secondary-fixed": "#0b1c30",
+                      "secondary-fixed": "#d3e4fe",
+                      "surface-container-highest": "#e0e3e5",
+                      "tertiary-fixed": "#e1e0ff",
+                      "tertiary-fixed-dim": "#c0c1ff",
+                      "on-tertiary-container": "#7f82ff",
+                      "on-primary-fixed-variant": "#3c475a",
+                      "on-error": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-low": "#f2f4f6",
+                      "error-container": "#ffdad6",
+                      "primary": "#091426",
+                      "inverse-on-surface": "#eff1f3",
+                      "surface-bright": "#f7f9fb",
+                      "on-primary-container": "#8590a6",
+                      "inverse-primary": "#bcc7de",
+                      "on-surface": "#191c1e",
+                      "outline-variant": "#c5c6cd",
+                      "on-secondary": "#ffffff",
+                      "inverse-surface": "#2d3133",
+                      "surface": "#f7f9fb",
+                      "secondary-container": "#d0e1fb",
+                      "secondary": "#505f76",
+                      "primary-container": "#1e293b",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "on-surface-variant": "#45474c",
+                      "on-tertiary-fixed-variant": "#2f2ebe",
+                      "primary-fixed-dim": "#bcc7de",
+                      "outline": "#75777d",
+                      "on-error-container": "#93000a",
+                      "surface-container-high": "#e6e8ea",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "surface-container": "#eceef0",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "tertiary": "#040057",
+                      "on-tertiary-fixed": "#07006c",
+                      "on-primary-fixed": "#111c2d",
+                      "primary-fixed": "#d8e3fb",
+                      "on-secondary-container": "#54647a",
+                      "on-background": "#191c1e"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "12px",
+                      "cell-padding-v": "8px",
+                      "unit": "4px",
+                      "cell-padding-h": "12px",
+                      "container-margin": "24px"
+              },
+              "fontFamily": {
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "number-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "number-md": [
+                              "JetBrains Mono"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "number-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "number-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .hatch-pattern {
+                background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.03) 4px, rgba(0,0,0,0.03) 8px);
+            }
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-64 border-r border-outline-variant bg-surface flex flex-col py-container-margin px-gutter z-20">
+<div class="mb-8 px-3">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">ACME HR</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Salary Management</p>
+</div>
+<ul class="flex-1 space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-primary font-bold border-r-2 border-primary hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span>Home</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">groups</span>
+<span>Employees</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">transgender</span>
+<span>Gender Insights</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">payments</span>
+<span>Payroll Totals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">priority_high</span>
+<span>Overdue for Review</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">upload_file</span>
+<span>Import</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined text-lg">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-64 h-16 border-b border-outline-variant bg-surface flex justify-between items-center px-container-margin z-10">
+<div class="flex items-center">
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface hidden md:block">the sweep (v3)</h2>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="font-number-sm text-number-sm">As of 16 Jul 2026</span>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="ml-64 pt-16 min-h-screen p-container-margin grid grid-cols-1 xl:grid-cols-12 gap-6">
+<!-- Top Metrics Row -->
+<section class="xl:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">TOTAL HEADCOUNT</h3>
+<p class="font-number-md text-number-md text-primary text-2xl font-bold">10,000</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">COUNTRIES</h3>
+<p class="font-number-md text-number-md text-primary text-2xl font-bold">14</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-1">TOTAL PAYROLL</h3>
+<div class="flex flex-col">
+<p class="font-number-md text-number-md text-primary text-2xl font-bold">$1.2B USD equivalent</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">converted at rates pinned 01 Jul 2026</p>
+</div>
+</div>
+</section>
+<!-- Main Content Column -->
+<div class="xl:col-span-8 flex flex-col gap-6">
+<!-- The Findings (Outliers) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded shadow-sm">
+<div class="flex justify-between items-center p-4 border-b border-outline-variant">
+<h2 class="font-headline-md text-headline-md font-semibold text-primary">The Findings (Outliers)</h2>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 border border-outline-variant rounded text-on-surface hover:bg-surface-container-low transition-colors font-body-sm text-body-sm font-medium">Export CSV</button>
+<button class="px-3 py-1.5 bg-primary-container text-on-primary rounded hover:bg-primary transition-colors font-body-sm text-body-sm font-medium">Review All</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b-2 border-outline-variant bg-surface-container-lowest">
+<th class="py-2 px-4 font-label-caps text-label-caps text-on-surface-variant font-semibold">EMPLOYEE</th>
+<th class="py-2 px-4 font-label-caps text-label-caps text-on-surface-variant font-semibold">ROLE · LOCATION</th>
+<th class="py-2 px-4 font-label-caps text-label-caps text-on-surface-variant font-semibold text-right">PEER GROUP</th>
+<th class="py-2 px-4 font-label-caps text-label-caps text-on-surface-variant font-semibold text-right">VARIANCE</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors group h-10">
+<td class="py-2 px-4 font-body-md text-body-md text-primary font-medium">Sarah Jenkins</td>
+<td class="py-2 px-4 font-body-sm text-body-sm text-on-surface-variant">VP Engineering · UK</td>
+<td class="py-2 px-4 font-number-sm text-number-sm text-on-surface-variant text-right">42 peers</td>
+<td class="py-2 px-4 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#B45309] border border-[#FEF3C7]">+28.4% above median</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group h-10">
+<td class="py-2 px-4 font-body-md text-body-md text-primary font-medium">Michael Chang</td>
+<td class="py-2 px-4 font-body-sm text-body-sm text-on-surface-variant">L3 Product · US</td>
+<td class="py-2 px-4 font-number-sm text-number-sm text-on-surface-variant text-right">18 peers</td>
+<td class="py-2 px-4 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#B45309] border border-[#FEF3C7]">-25.2% below median</span>
+</td>
+</tr>
+<tr class="h-10">
+<td class="p-2" colspan="4">
+<div class="bg-[#F1F5F9] hatch-pattern border border-outline-variant rounded px-4 py-2 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="font-body-md text-body-md text-on-surface-variant font-medium">Elena Rossi</span>
+<span class="font-body-sm text-body-sm text-outline">L6 Legal · IT</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Only 3 peers — too few to compare fairly</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group h-10">
+<td class="py-2 px-4 font-body-md text-body-md text-primary font-medium">David O'Connor</td>
+<td class="py-2 px-4 font-body-sm text-body-sm text-on-surface-variant">L5 Sales · IE</td>
+<td class="py-2 px-4 font-number-sm text-number-sm text-on-surface-variant text-right">24 peers</td>
+<td class="py-2 px-4 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#B45309] border border-[#FEF3C7]">+26.1% above median</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group h-10">
+<td class="py-2 px-4 font-body-md text-body-md text-primary font-medium">Aisha Patel</td>
+<td class="py-2 px-4 font-body-sm text-body-sm text-on-surface-variant">L4 Engineering · IN</td>
+<td class="py-2 px-4 font-number-sm text-number-sm text-on-surface-variant text-right">156 peers</td>
+<td class="py-2 px-4 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#B45309] border border-[#FEF3C7]">-24.8% below median</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Side Column -->
+<div class="xl:col-span-4 flex flex-col gap-6">
+<!-- Review Status Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm flex flex-col justify-between h-32">
+<p class="font-body-md text-body-md text-on-surface">41 people are currently overdue for their scheduled compensation review</p>
+<a class="font-body-md text-body-md font-medium text-primary hover:underline flex items-center gap-1 w-max" href="#">
+                    View overdue list 
+                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+<!-- Distribution Pulse Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 shadow-sm flex flex-col gap-6">
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">GENDER BY LEVEL</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L1</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[55%]" title="Female: 55%"></div>
+<div class="bg-outline-variant w-[45%]" title="Male: 45%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L2</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[48%]" title="Female: 48%"></div>
+<div class="bg-outline-variant w-[52%]" title="Male: 52%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L3</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[40%]" title="Female: 40%"></div>
+<div class="bg-outline-variant w-[60%]" title="Male: 60%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L4</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[32%]" title="Female: 32%"></div>
+<div class="bg-outline-variant w-[68%]" title="Male: 68%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L5</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[25%]" title="Female: 25%"></div>
+<div class="bg-outline-variant w-[75%]" title="Male: 75%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">L6</span>
+<div class="flex-1 flex h-2 rounded overflow-hidden">
+<div class="bg-primary w-[18%]" title="Female: 18%"></div>
+<div class="bg-outline-variant w-[82%]" title="Male: 82%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="border-t border-outline-variant pt-6">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4">TOP 5 PAYROLL BY COUNTRY</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">US</span>
+<div class="flex-1 bg-surface-container h-2 rounded overflow-hidden">
+<div class="bg-secondary w-[80%] h-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">UK</span>
+<div class="flex-1 bg-surface-container h-2 rounded overflow-hidden">
+<div class="bg-secondary w-[45%] h-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">IN</span>
+<div class="flex-1 bg-surface-container h-2 rounded overflow-hidden">
+<div class="bg-secondary w-[35%] h-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">DE</span>
+<div class="flex-1 bg-surface-container h-2 rounded overflow-hidden">
+<div class="bg-secondary w-[25%] h-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-6 font-number-sm text-number-sm text-on-surface-variant">JP</span>
+<div class="flex-1 bg-surface-container h-2 rounded overflow-hidden">
+<div class="bg-secondary w-[15%] h-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

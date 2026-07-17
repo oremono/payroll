@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Employee Details - Tomas Berg | ACME HR</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline": "#75777d",
+                      "surface-bright": "#f7f9fb",
+                      "on-secondary-container": "#54647a",
+                      "inverse-on-surface": "#eff1f3",
+                      "surface-variant": "#e0e3e5",
+                      "primary-fixed-dim": "#bcc7de",
+                      "on-tertiary-container": "#7f82ff",
+                      "surface-container-high": "#e6e8ea",
+                      "secondary-fixed": "#d3e4fe",
+                      "surface-tint": "#545f73",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#45474c",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#d0e1fb",
+                      "secondary": "#505f76",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "inverse-surface": "#2d3133",
+                      "on-primary": "#ffffff",
+                      "surface-container-low": "#f2f4f6",
+                      "surface-container": "#eceef0",
+                      "on-primary-container": "#8590a6",
+                      "tertiary-container": "#0d0093",
+                      "primary-container": "#1e293b",
+                      "on-error-container": "#93000a",
+                      "error": "#ba1a1a",
+                      "on-surface": "#191c1e",
+                      "on-secondary-fixed": "#0b1c30",
+                      "on-tertiary-fixed-variant": "#2f2ebe",
+                      "on-secondary": "#ffffff",
+                      "on-primary-fixed": "#111c2d",
+                      "background": "#f7f9fb",
+                      "error-container": "#ffdad6",
+                      "surface-dim": "#d8dadc",
+                      "on-background": "#191c1e",
+                      "outline-variant": "#c5c6cd",
+                      "surface": "#f7f9fb",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "primary": "#091426",
+                      "on-primary-fixed-variant": "#3c475a",
+                      "primary-fixed": "#d8e3fb",
+                      "on-tertiary-fixed": "#07006c",
+                      "inverse-primary": "#bcc7de",
+                      "tertiary-fixed-dim": "#c0c1ff",
+                      "tertiary-fixed": "#e1e0ff",
+                      "tertiary": "#040057",
+                      "surface-container-highest": "#e0e3e5",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "container-margin": "24px",
+                      "unit": "4px",
+                      "gutter": "12px",
+                      "cell-padding-h": "12px",
+                      "cell-padding-v": "8px"
+              },
+              "fontFamily": {
+                      "number-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "number-md": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "number-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "number-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen flex">
+<!-- SideNavBar -->
+<aside class="bg-surface-container-lowest h-screen w-64 fixed left-0 top-0 border-r border-outline-variant flex flex-col h-full py-gutter px-cell-padding-h z-50">
+<div class="mb-8 mt-4 pl-4 pr-4">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">ACME HR</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Salary Management</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">home</span>
+                Home
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-primary font-bold border-r-2 border-primary bg-surface-container-low transition-colors rounded-l" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">badge</span>
+                Employees
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">diversity_3</span>
+                Gender Insights
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+                Payroll Totals
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">history_toggle_off</span>
+                Overdue for Review
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">upload_file</span>
+                Import
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-low transition-colors rounded" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+                Settings
+            </a>
+</nav>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 ml-64 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest h-12 w-full sticky top-0 z-40 border-b border-outline-variant flex items-center justify-between px-gutter pr-container-margin pl-container-margin">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface">Salary Management for ACME HR</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm cursor-pointer hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    As of 16 Jul 2026
+                </div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px] cursor-pointer hover:text-primary transition-colors">help_outline</span>
+<img class="w-7 h-7 rounded-full object-cover border border-outline-variant cursor-pointer hover:opacity-80 transition-opacity" data-alt="A small, professional circular avatar showing a corporate silhouette in a bright minimalist light mode style. The avatar should be crisp and clean, suitable for a modern HR web application. Very simple, professional, grey and white tones with subtle soft lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8kQ5G_GI9A3Q9RvJqXgIjfWwQq2ft8DPj5mjGi1IvuJZRekvDqGwGMWTYuBR7o58bwFAGPzPYFu-3PihZwDpdSRsJJ_I28mUFMIS_DVNTuwvKE215vTRQQyCaKIAdeQ_aE1YgKHnTLuKxCcd8jyfc7xzgxi1bzckjVJ1sb-h53EL49TxrI3OjaCDWjobsfHcY3HUQpOe_qCklbpi2Pv8VdnQ3oIiy4E5bUR8M5pzog0V7oNq62tz--Rt3czL33pPMcHqN6j6w4ZSf"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 p-container-margin max-w-7xl mx-auto w-full">
+<!-- Breadcrumbs & Header Actions -->
+<div class="flex items-start justify-between mb-8">
+<div>
+<nav class="flex text-on-surface-variant font-body-sm text-body-sm mb-4">
+<ol class="flex items-center space-x-2">
+<li><a class="hover:text-primary transition-colors" href="#">Employees</a></li>
+<li><span class="mx-1">/</span></li>
+<li class="text-on-surface font-medium">Tomas Berg</li>
+</ol>
+</nav>
+<div class="flex items-end gap-4"><img alt="Tomas Berg" class="w-16 h-16 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida/AP1WRLvm1VWs14CI1tVARgs1gVvCRoVJ69S0vM5S8HDDn0ljPMDOlST_hb7qVsCIyT4fBT4Q667HY1MazbpHeFGnBe81foY8L0VoTZ0don5UqG594DnIMPtPsrE-nWRkdQBeT6Les0eLqVBzG236IoR98bWqiI1_YKa7AJrLamLe9UlN0MJfoMsY6jcm51x6PzpI2YC8y7ETqyixVA5ue2Rg7fObIxlQ3LYuANQqyKDq7dDStcMbQwz1iMS3oPlk"/><div class="mb-1"><h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">Tomas Berg</h2><p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2"><span>Data Scientist</span> <span class="w-1 h-1 rounded-full bg-outline-variant"></span><span>L6</span> <span class="w-1 h-1 rounded-full bg-outline-variant"></span><span>Norway</span> <span class="w-1 h-1 rounded-full bg-outline-variant"></span><span class="font-label-caps text-label-caps text-on-surface-variant">MALE</span> <span class="w-1 h-1 rounded-full bg-outline-variant"></span><span>Hire Date: 12 Sep 2019</span></p></div></div>
+</div>
+<div class="flex items-center gap-3 mt-4">
+<button class="px-4 py-2 rounded bg-surface-container-lowest border border-outline text-primary font-body-md text-body-md hover:bg-surface-container-low transition-colors cursor-pointer">
+                        Edit employee
+                    </button>
+<button class="px-4 py-2 rounded bg-primary-container text-on-primary font-body-md text-body-md hover:opacity-90 transition-opacity cursor-pointer">
+                        Record a salary change
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Current Salary Card (Col 1-4) -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-lowest border border-outline-variant rounded-lg p-6 flex flex-col justify-between h-full"><div><h3 class="font-body-md text-body-md text-on-surface-variant mb-2">Current Salary</h3><div class="font-number-md text-[32px] leading-tight font-medium text-on-surface mb-1 tracking-tight">kr 1,240,000 <span class="text-base text-on-surface-variant font-normal">NOK</span></div><p class="font-body-sm text-body-sm text-on-surface-variant">Effective 01 Feb 2025</p></div></div>
+<!-- Peer Comparison Card (Col 5-12) -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-lg p-6 flex flex-col relative overflow-hidden"><div class="absolute right-0 top-0 w-64 h-full opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(#091426 1px, transparent 1px); background-size: 16px 16px;"></div><div class="flex justify-between items-start mb-6 relative z-10"><div><h3 class="font-body-md text-body-md text-on-surface-variant mb-1">Peer Comparison</h3><p class="font-body-sm text-body-sm text-on-surface font-medium">Data Scientist · L6 · Norway</p></div><button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-low transition-colors text-on-surface-variant border border-transparent hover:border-outline-variant cursor-pointer" title="Copy answer"><span class="material-symbols-outlined text-[18px]">content_copy</span></button></div><div class="flex-1 flex flex-col justify-center relative z-10"><div class="bg-[#F1F5F9] border border-outline-variant p-6 rounded-lg"><h4 class="font-body-md text-on-surface mb-2 font-normal">No comparison — only 3 peers.</h4><p class="font-body-sm text-on-surface-variant">This peer group has 3 people. Below 5, a median would be noise dressed as an answer, so we don't compute one.</p></div></div></div>
+<!-- Salary Timeline (Col 1-12) -->
+<div class="col-span-12 bg-surface-container-lowest border border-outline-variant rounded-lg p-6 mt-2"><h3 class="font-body-md text-body-md text-on-surface-variant mb-4">Salary Timeline</h3><div class="w-full text-left"><div class="grid grid-cols-3 font-body-sm text-body-sm text-on-surface-variant border-b border-outline-variant/50 pb-2 mb-4 px-2"><div>Effective Date</div><div>Salary (NOK)</div><div>% Change</div></div><div class="space-y-1"><div class="grid grid-cols-3 font-body-sm text-body-sm text-on-surface items-center py-2 px-2 hover:bg-surface-container-low transition-colors rounded"><div>01 Feb 2025</div><div class="font-number-sm text-number-sm">kr 1,240,000 NOK</div><div class="font-number-sm text-number-sm text-on-surface">+8%</div></div><div class="w-full h-px bg-outline-variant/20 my-0.5"></div><div class="grid grid-cols-3 font-body-sm text-body-sm text-on-surface items-center py-2 px-2 hover:bg-surface-container-low transition-colors rounded"><div>01 Feb 2023</div><div class="font-number-sm text-number-sm">kr 1,148,000 NOK</div><div class="font-number-sm text-number-sm text-on-surface">+10%</div></div><div class="w-full h-px bg-outline-variant/20 my-0.5"></div><div class="grid grid-cols-3 font-body-sm text-body-sm text-on-surface items-center py-2 px-2 hover:bg-surface-container-low transition-colors rounded"><div>12 Sep 2019</div><div class="font-number-sm text-number-sm">kr 1,040,000 NOK</div><div class="font-number-sm text-number-sm text-on-surface-variant">(Hire)</div></div></div></div></div>
+</div>
+</main>
+</div>
+</body></html>

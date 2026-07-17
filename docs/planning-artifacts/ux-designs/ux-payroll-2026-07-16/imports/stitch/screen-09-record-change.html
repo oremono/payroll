@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Record a salary change - Priya Nair</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-tertiary-container": "#7f82ff",
+                "on-secondary-fixed": "#0b1c30",
+                "secondary-fixed-dim": "#b7c8e1",
+                "background": "#f7f9fb",
+                "on-error": "#ffffff",
+                "on-primary-fixed-variant": "#3c475a",
+                "on-primary-fixed": "#111c2d",
+                "tertiary-fixed": "#e1e0ff",
+                "tertiary-fixed-dim": "#c0c1ff",
+                "on-error-container": "#93000a",
+                "secondary-container": "#d0e1fb",
+                "on-surface": "#191c1e",
+                "tertiary": "#040057",
+                "primary-container": "#1e293b",
+                "on-background": "#191c1e",
+                "tertiary-container": "#0d0093",
+                "outline": "#75777d",
+                "surface-container-highest": "#e0e3e5",
+                "secondary": "#505f76",
+                "on-tertiary-fixed": "#07006c",
+                "inverse-surface": "#2d3133",
+                "on-primary-container": "#8590a6",
+                "on-primary": "#ffffff",
+                "primary-fixed": "#d8e3fb",
+                "on-tertiary-fixed-variant": "#2f2ebe",
+                "surface-container": "#eceef0",
+                "surface-dim": "#d8dadc",
+                "outline-variant": "#c5c6cd",
+                "inverse-primary": "#bcc7de",
+                "on-secondary": "#ffffff",
+                "surface-bright": "#f7f9fb",
+                "surface-tint": "#545f73",
+                "surface-variant": "#e0e3e5",
+                "surface-container-lowest": "#ffffff",
+                "inverse-on-surface": "#eff1f3",
+                "on-surface-variant": "#45474c",
+                "surface": "#f7f9fb",
+                "primary-fixed-dim": "#bcc7de",
+                "primary": "#091426",
+                "surface-container-high": "#e6e8ea",
+                "secondary-fixed": "#d3e4fe",
+                "on-secondary-fixed-variant": "#38485d",
+                "error": "#ba1a1a",
+                "on-tertiary": "#ffffff",
+                "on-secondary-container": "#54647a",
+                "surface-container-low": "#f2f4f6",
+                "error-container": "#ffdad6"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "gutter": "12px",
+                "cell-padding-v": "8px",
+                "container-margin": "24px",
+                "unit": "4px",
+                "cell-padding-h": "12px"
+        },
+        "fontFamily": {
+                "number-sm": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "Hanken Grotesk"
+                ],
+                "number-md": [
+                        "JetBrains Mono"
+                ],
+                "label-caps": [
+                        "Hanken Grotesk"
+                ],
+                "headline-lg": [
+                        "Hanken Grotesk"
+                ],
+                "headline-md": [
+                        "Hanken Grotesk"
+                ],
+                "body-sm": [
+                        "Hanken Grotesk"
+                ]
+        },
+        "fontSize": {
+                "number-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "number-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-caps": [
+                        "11px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-md": [
+                        "18px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- Background Screen (Dimmed/Blurred) -->
+<div class="flex flex-col w-full h-full absolute inset-0 z-0">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline flex justify-between items-center w-full px-container-margin h-12 flex-shrink-0">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">ACME HR</div>
+<div class="flex items-center gap-4">
+<span class="text-on-surface-variant dark:text-on-secondary-container">As of 16 Jul 2026</span>
+</div>
+</nav>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-surface-container-low dark:bg-on-primary-container border-r border-outline-variant dark:border-outline flex flex-col h-full py-4 px-2 w-64 flex-shrink-0 hidden md:flex">
+<div class="mb-8 px-4">
+<h2 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed">ACME HR</h2>
+<p class="text-on-surface-variant font-body-sm text-body-sm">Salary Management</p>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-primary dark:text-primary-fixed font-bold bg-secondary-container dark:bg-secondary-fixed-dim scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-label-caps text-label-caps">Employees</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-label-caps text-label-caps">Gender Insights</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-caps text-label-caps">Payroll Totals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">event_busy</span>
+<span class="font-label-caps text-label-caps">Overdue for Review</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">upload_file</span>
+<span class="font-label-caps text-label-caps">Import</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-secondary-fixed-variant hover:bg-surface-container-high dark:hover:bg-on-secondary-fixed-variant transition-all scale-95 active:scale-90 transition-transform mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Background Content (Priya Nair Details) -->
+<main class="flex-1 p-container-margin overflow-y-auto filter blur-sm opacity-50 transition-all duration-300">
+<div class="max-w-5xl mx-auto space-y-8 pointer-events-none">
+<!-- Header Area -->
+<div class="flex items-start justify-between border-b border-outline-variant pb-6">
+<div class="flex items-center gap-6">
+<img class="w-20 h-20 rounded-full object-cover border border-outline-variant" data-alt="A professional corporate headshot of a female software engineer, soft lighting, neutral background, minimalist aesthetic, confident expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoVkY3IC0xJu9cNZziNOx5GWGn3ZXBek24QI4vvr5wwSNV3qDx9iMxq-28QHR0PnQ1CMyix3eiE2Kq1j3-_culMIWu9UzswNr5DoifyNFK07jMA5zJCTly_A5h7qC52J-HvqAhCIdx7ipm2gD6G7CepeWhXtzWMmHzrXJDIOP30ajqjgFhocY0i8_weEYssR6smXLtCRwvGXaudd6rWR7L-rv_p2w8kELJ-4_ntaad0XGtJbjRpHOYE4nceQupfZ9sv3zWXkAcag0H"/>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary">Priya Nair</h1>
+<p class="text-on-surface-variant text-body-md mt-1">Software Engineer L4 · Engineering Dept · India (Remote)</p>
+<div class="flex gap-2 mt-3">
+<span class="inline-flex items-center px-2 py-1 bg-surface-container-high text-on-surface text-label-caps font-label-caps rounded">Full Time</span>
+<span class="inline-flex items-center px-2 py-1 bg-surface-container-high text-on-surface text-label-caps font-label-caps rounded">Comp-ratio: 0.98</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Salary Timeline Table -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary">Salary Timeline</h3>
+</div>
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-bright text-on-surface-variant font-label-caps text-label-caps">
+<th class="px-6 py-3 font-normal">Effective Date</th>
+<th class="px-6 py-3 font-normal">Event Type</th>
+<th class="px-6 py-3 font-normal">Base Salary (INR)</th>
+<th class="px-6 py-3 font-normal">% Change</th>
+<th class="px-6 py-3 font-normal">Approval</th>
+</tr>
+</thead>
+<tbody class="text-body-md divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors group relative bg-secondary-container bg-opacity-20">
+<td class="px-6 py-4 font-number-md text-number-md text-primary">16 Jul 2026</td>
+<td class="px-6 py-4">Merit Increase</td>
+<td class="px-6 py-4 font-number-md text-number-md">₹21,50,000 INR</td>
+<td class="px-6 py-4 font-number-md text-number-md text-primary">+8.5%</td>
+<td class="px-6 py-4 text-on-surface-variant text-body-sm">Pending</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-number-md text-number-md">01 Jan 2025</td>
+<td class="px-6 py-4">Market Adjustment</td>
+<td class="px-6 py-4 font-number-md text-number-md">₹19,80,000 INR</td>
+<td class="px-6 py-4 font-number-md text-number-md">+4.2%</td>
+<td class="px-6 py-4 text-on-surface-variant text-body-sm">Approved by S. Lee</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-number-md text-number-md">15 Aug 2023</td>
+<td class="px-6 py-4">Hire</td>
+<td class="px-6 py-4 font-number-md text-number-md">₹19,00,000 INR</td>
+<td class="px-6 py-4 font-number-md text-number-md text-on-surface-variant">-</td>
+<td class="px-6 py-4 text-on-surface-variant text-body-sm">System</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+</div>
+</div>
+<!-- Overlay / Scrim -->
+<div class="fixed inset-0 bg-primary bg-opacity-20 z-40 transition-opacity backdrop-blur-[2px]"></div>
+<!-- Right Side Panel / Modal -->
+<div aria-labelledby="slide-over-title" aria-modal="true" class="fixed inset-y-0 right-0 w-full max-w-md bg-surface-container-lowest border-l border-outline-variant shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0" role="dialog">
+<div class="flex-1 flex flex-col overflow-y-auto">
+<!-- Panel Header -->
+<div class="px-6 py-6 border-b border-outline-variant bg-surface-bright">
+<h2 class="font-headline-lg text-headline-lg text-primary" id="slide-over-title">Record a salary change</h2>
+<p class="mt-2 text-body-md text-on-surface-variant">Priya Nair · Software Engineer L4 · India</p>
+</div>
+<!-- Form Content -->
+<div class="px-6 py-8 flex-1 flex flex-col gap-8">
+<!-- Field 1: New Salary -->
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface" for="new_salary">New Salary</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 text-on-surface-variant font-number-md">₹</span>
+<input autofocus="" class="block w-full pl-8 pr-12 py-2.5 bg-surface-bright border border-outline-variant rounded text-primary font-number-md focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none" id="new_salary" name="new_salary" placeholder="21,50,000" type="text"/>
+<span class="absolute inset-y-0 right-0 flex items-center pr-3 text-on-surface-variant font-number-md">INR</span>
+</div>
+<p class="text-body-sm text-on-surface-variant mt-1">current: ₹21,50,000 INR</p>
+</div>
+<!-- Field 2: Effective Date -->
+<div class="flex flex-col gap-2">
+<label class="font-label-caps text-label-caps text-on-surface" for="effective_date">Effective Date</label>
+<div class="relative">
+<input class="block w-full px-3 py-2.5 bg-surface-bright border border-outline-variant rounded text-primary font-number-md focus:ring-1 focus:ring-primary focus:border-primary transition-colors outline-none cursor-pointer" id="effective_date" name="effective_date" type="text" value="16 Jul 2026"/>
+<span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+</span>
+</div>
+</div>
+<!-- Footnote -->
+<div class="mt-auto pt-8 border-t border-outline-variant border-dashed">
+<div class="flex gap-3 text-on-surface-variant text-body-sm bg-surface-container-low p-4 rounded border border-outline-variant">
+<span class="material-symbols-outlined text-[18px] shrink-0 mt-0.5">info</span>
+<p>This appends a new record to Priya's salary timeline. Past records are never changed.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel Footer / Actions -->
+<div class="px-6 py-5 border-t border-outline-variant bg-surface-bright flex flex-col gap-4">
+<div class="flex gap-3 justify-end w-full">
+<button class="px-5 py-2.5 text-on-surface font-body-md font-medium border border-outline-variant rounded hover:bg-surface-container-low transition-colors outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-surface-bright" type="button">Cancel</button>
+<button class="px-5 py-2.5 bg-primary text-on-primary font-body-md font-medium rounded shadow-sm hover:bg-primary-container transition-colors outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-surface-bright" type="button">Record change</button>
+</div>
+<!-- Keyboard Hint -->
+<div class="text-center w-full pb-1">
+<span class="text-label-caps font-label-caps text-outline">Enter to save · Esc to cancel</span>
+</div>
+</div>
+</div>
+</div>
+</body></html>

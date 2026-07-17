@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ACME HR - Salary Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed-variant": "#2f2ebe",
+                        "tertiary-fixed": "#e1e0ff",
+                        "on-background": "#191c1e",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-secondary-container": "#54647a",
+                        "on-error": "#ffffff",
+                        "background": "#f7f9fb",
+                        "surface-container-low": "#f2f4f6",
+                        "tertiary-fixed-dim": "#c0c1ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#111c2d",
+                        "tertiary-container": "#0d0093",
+                        "inverse-primary": "#bcc7de",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-tint": "#545f73",
+                        "on-tertiary-fixed": "#07006c",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "surface-container-high": "#e6e8ea",
+                        "on-secondary-fixed": "#0b1c30",
+                        "secondary-container": "#d0e1fb",
+                        "primary-fixed-dim": "#bcc7de",
+                        "on-surface-variant": "#45474c",
+                        "surface-dim": "#d8dadc",
+                        "on-tertiary-container": "#7f82ff",
+                        "primary-fixed": "#d8e3fb",
+                        "primary-container": "#1e293b",
+                        "on-primary-container": "#8590a6",
+                        "tertiary": "#040057",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eceef0",
+                        "secondary": "#505f76",
+                        "error-container": "#ffdad6",
+                        "surface": "#f7f9fb",
+                        "surface-bright": "#f7f9fb",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-primary-fixed-variant": "#3c475a",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "on-surface": "#191c1e",
+                        "surface-variant": "#e0e3e5",
+                        "outline-variant": "#c5c6cd",
+                        "on-secondary": "#ffffff",
+                        "primary": "#091426",
+                        "outline": "#75777d",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "cell-padding-h": "12px",
+                        "container-margin": "24px",
+                        "gutter": "12px",
+                        "cell-padding-v": "8px"
+                    },
+                    "fontFamily": {
+                        "number-md": ["JetBrains Mono"],
+                        "body-md": ["Hanken Grotesk"],
+                        "number-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "number-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "number-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined[data-weight="fill"] { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-lowest border-r border-outline-variant fixed left-0 top-0 h-full w-64 flex flex-col py-spacing-container-margin px-spacing-cell-padding-h z-20">
+<div class="mb-8 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-sm">domain</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary">ACME HR</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Salary Management</p>
+</div>
+</div>
+<ul class="flex flex-col gap-1 mt-4">
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                    Home
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="badge">badge</span>
+                    Employees
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="diversity_3">diversity_3</span>
+                    Gender Insights
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                    Payroll Totals
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-bold border-r-4 border-primary transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="notification_important" data-weight="fill">notification_important</span>
+                    Overdue for Review
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="upload_file">upload_file</span>
+                    Import
+                </a>
+</li>
+<li class="mt-auto">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-secondary-fixed-variant hover:bg-surface-container-low transition-colors duration-150 font-body-md text-body-md cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-64 flex flex-col h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest h-16 fixed top-0 right-0 left-64 border-b border-outline-variant flex justify-between items-center px-spacing-container-margin z-10">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-md text-headline-md font-bold text-primary">Overdue for review — no salary change since…</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-md border border-outline-variant">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">calendar_today</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium cursor-default">As of 16 Jul 2026</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed hover:bg-primary-fixed-dim transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 mt-16 p-spacing-container-margin overflow-y-auto bg-background">
+<div class="max-w-7xl mx-auto space-y-6">
+<!-- Filters & Summary -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Time since last change</span>
+<div class="h-4 w-px bg-outline-variant mx-2"></div>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant font-body-sm text-body-sm hover:bg-surface-container-low transition-colors">1 year</button>
+<button class="px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant font-body-sm text-body-sm hover:bg-surface-container-low transition-colors">18 months</button>
+<button class="px-4 py-1.5 rounded-full border border-primary bg-primary text-on-primary font-body-sm text-body-sm font-medium">2 years</button>
+<button class="px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant font-body-sm text-body-sm hover:bg-surface-container-low transition-colors">3 years</button>
+<button class="px-4 py-1.5 rounded-full border border-outline-variant text-on-surface-variant font-body-sm text-body-sm flex items-center gap-1 hover:bg-surface-container-low transition-colors">
+                                    Custom date <span class="material-symbols-outlined text-sm">arrow_drop_down</span>
+</button>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-secondary-container">
+<span class="font-bold text-on-surface">41 employees'</span> most recent salary record predates 16 Jul 2024.
+                        </p>
+</div>
+</div>
+<!-- Table Container -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
+<!-- Table Toolbar -->
+<div class="px-6 py-4 border-b border-outline-variant flex justify-end bg-surface-bright">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded bg-surface-container-lowest hover:bg-surface-container-low text-on-surface-variant font-body-md text-body-md transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                            Export CSV
+                        </button>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b-2 border-surface-variant">
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider sticky left-0 bg-surface-container-low z-10 w-64">Employee Name</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Role</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Level</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Country</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider text-right">Current Salary</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider text-right">Most Recent Record</th>
+<th class="px-spacing-cell-padding-h py-spacing-cell-padding-v font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider text-right">Time Since</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface">
+<tr class="border-b border-surface-variant hover:bg-surface-container-low transition-colors group cursor-pointer h-10">
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low z-10 font-medium">Eleanor Vance</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Senior Data Scientist</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-number-sm text-number-sm">IC4</span></td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">United States</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right font-number-md text-number-md">$185,000 USD</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right text-on-surface-variant">12 Apr 2022</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#fffbeb] text-[#b45309] font-number-md text-number-md border border-[#fde68a]">4y 3m</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-low transition-colors group cursor-pointer h-10">
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low z-10 font-medium">Arthur Pendelton</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Principal Engineer</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-number-sm text-number-sm">IC6</span></td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">United Kingdom</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right font-number-md text-number-md">£142,000 GBP</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right text-on-surface-variant">05 Sep 2022</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#fffbeb] text-[#b45309] font-number-md text-number-md border border-[#fde68a]">3y 10m</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-low transition-colors group cursor-pointer h-10">
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low z-10 font-medium">Mariah Gomez</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Product Manager</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-number-sm text-number-sm">M2</span></td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Canada</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right font-number-md text-number-md">$135,000 CAD</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right text-on-surface-variant">18 Nov 2022</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#fffbeb] text-[#b45309] font-number-md text-number-md border border-[#fde68a]">3y 8m</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-low transition-colors group cursor-pointer h-10">
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low z-10 font-medium">David Chen</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Frontend Developer</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-number-sm text-number-sm">IC3</span></td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">United States</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right font-number-md text-number-md">$145,000 USD</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right text-on-surface-variant">02 Feb 2023</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#fffbeb] text-[#b45309] font-number-md text-number-md border border-[#fde68a]">3y 5m</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-low transition-colors group cursor-pointer h-10">
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low z-10 font-medium">Sarah Jenkins</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">HR Business Partner</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-number-sm text-number-sm">IC4</span></td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-on-surface-variant">Australia</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right font-number-md text-number-md">$160,000 AUD</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right text-on-surface-variant">15 May 2023</td>
+<td class="px-spacing-cell-padding-h py-1 whitespace-nowrap text-right">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#fffbeb] text-[#b45309] font-number-md text-number-md border border-[#fde68a]">3y 2m</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-surface-bright flex items-center justify-between border-t border-outline-variant">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Showing 1-5 of 41 records</span>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 rounded border border-outline-variant flex items-center justify-center text-outline disabled:opacity-50 cursor-not-allowed" disabled="">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded bg-primary text-on-primary font-body-sm text-body-sm">1</button>
+<button class="w-8 h-8 rounded border border-outline-variant text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm transition-colors">2</button>
+<button class="w-8 h-8 rounded border border-outline-variant text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm transition-colors">3</button>
+<span class="text-on-surface-variant">...</span>
+<button class="w-8 h-8 rounded border border-outline-variant text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm transition-colors">9</button>
+<button class="w-8 h-8 rounded border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

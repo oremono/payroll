@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ACME HR - Gender Insights</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#1e293b",
+                        "secondary-container": "#d0e1fb",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#3c475a",
+                        "background": "#f7f9fb",
+                        "surface-tint": "#545f73",
+                        "primary": "#091426",
+                        "on-tertiary-fixed-variant": "#2f2ebe",
+                        "tertiary-fixed": "#e1e0ff",
+                        "surface-container-high": "#e6e8ea",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "surface-bright": "#f7f9fb",
+                        "outline-variant": "#c5c6cd",
+                        "on-secondary-fixed": "#0b1c30",
+                        "on-surface-variant": "#45474c",
+                        "secondary": "#505f76",
+                        "primary-fixed": "#d8e3fb",
+                        "on-surface": "#191c1e",
+                        "tertiary-container": "#0d0093",
+                        "inverse-on-surface": "#eff1f3",
+                        "surface-variant": "#e0e3e5",
+                        "on-background": "#191c1e",
+                        "primary-fixed-dim": "#bcc7de",
+                        "on-tertiary-fixed": "#07006c",
+                        "surface": "#f7f9fb",
+                        "on-tertiary-container": "#7f82ff",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#111c2d",
+                        "inverse-primary": "#bcc7de",
+                        "surface-dim": "#d8dadc",
+                        "on-primary-container": "#8590a6",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#040057",
+                        "tertiary-fixed-dim": "#c0c1ff",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#f2f4f6",
+                        "inverse-surface": "#2d3133",
+                        "surface-container": "#eceef0",
+                        "outline": "#75777d",
+                        "on-secondary-container": "#54647a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "12px",
+                        "cell-padding-v": "8px",
+                        "cell-padding-h": "12px",
+                        "container-margin": "24px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Hanken Grotesk"],
+                        "number-md": ["JetBrains Mono"],
+                        "body-md": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "number-sm": ["JetBrains Mono"],
+                        "label-caps": ["Hanken Grotesk"],
+                        "body-sm": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "number-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "number-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-primary dark:bg-primary-container h-screen w-64 fixed left-0 top-0 border-r border-outline-variant dark:border-on-primary-fixed-variant flex flex-col h-full py-gutter px-gutter z-50">
+<div class="mb-8 px-4 py-2">
+<h1 class="font-headline-lg text-headline-lg font-bold text-on-primary dark:text-on-primary-fixed">ACME HR</h1>
+<p class="font-label-caps text-label-caps text-on-primary-container uppercase mt-1">Salary Management</p>
+</div>
+<div class="flex-1 overflow-y-auto space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">home</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Home</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">group</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Employees</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 bg-on-primary-fixed-variant/50 text-secondary-fixed font-bold border-r-2 border-secondary-fixed opacity-90 transition-opacity duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-body-md text-body-md">Gender Insights</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">payments</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Payroll Totals</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">pending_actions</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Overdue for Review</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">upload_file</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Import</span>
+</a>
+</div>
+<div class="mt-auto pt-4 border-t border-on-primary-fixed-variant/30">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-primary-container dark:text-on-primary-fixed-variant hover:bg-on-primary-fixed-variant dark:hover:bg-on-secondary-fixed-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-on-primary transition-colors">settings</span>
+<span class="font-body-md text-body-md group-hover:text-on-primary transition-colors">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Workspace -->
+<div class="ml-64 flex flex-col flex-1 h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-container h-16 flex items-center justify-between px-container-margin w-full border-b border-outline-variant dark:border-on-primary-fixed-variant shrink-0 z-40">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md text-primary font-bold">Gender Insights</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-on-surface-variant bg-surface-container-low px-3 py-1.5 rounded border border-outline-variant/30">
+<span class="material-symbols-outlined text-[18px]">calendar_month</span>
+<span class="font-number-md text-number-md">As of 16 Jul 2026</span>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-container-margin bg-background">
+<div class="mb-8 max-w-5xl">
+<h2 class="font-headline-lg text-headline-lg text-primary mb-2">Gender Insights — Org-wide Distribution</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">Clustering: where women are in the org, not how they are paid within a group — see peer groups for that.</p>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-8 max-w-7xl items-start">
+<!-- Left Column: Visual -->
+<div class="xl:col-span-7 bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-6">
+<div class="flex justify-between items-center mb-6 border-b border-outline-variant/20 pb-4">
+<h3 class="font-headline-md text-headline-md text-primary">Headcount Distribution</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-primary-container rounded-sm"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">MALE</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-tertiary-container rounded-sm"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">FEMALE</span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Chart Row L1 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L1</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 51.5%;" title="Male: 412"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 48.5%;" title="Female: 388"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">800 total</div>
+</div>
+<!-- Chart Row L2 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L2</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 53%;" title="Male: 350"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 47%;" title="Female: 310"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">660 total</div>
+</div>
+<!-- Chart Row L3 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L3</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 56%;" title="Male: 280"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 44%;" title="Female: 220"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">500 total</div>
+</div>
+<!-- Chart Row L4 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L4</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 60%;" title="Male: 210"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 40%;" title="Female: 140"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">350 total</div>
+</div>
+<!-- Divider for levels -->
+<div class="h-[2px] bg-outline-variant/30 w-full my-6"></div>
+<!-- Chart Row L5 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L5</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 65.3%;" title="Male: 160"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 34.7%;" title="Female: 85"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">245 total</div>
+</div>
+<!-- Chart Row L6 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L6</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 74%;" title="Male: 120"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 26%;" title="Female: 42"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">162 total</div>
+</div>
+<!-- Chart Row L7 HIGHLIGHT -->
+<div class="flex items-center gap-4 group relative bg-tertiary-fixed/30 -mx-4 px-4 py-2 rounded">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L7</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 90.3%;" title="Male: 84"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 9.7%;" title="Female: 9"></div>
+</div>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 font-label-caps text-label-caps text-tertiary-container flex items-center gap-1 bg-surface-container-lowest px-2 py-1 rounded border border-tertiary-container/30 shadow-sm z-10">
+<span class="material-symbols-outlined text-[14px]">warning</span> stark clustering
+                            </div>
+</div>
+<!-- Chart Row L8 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">L8</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 93.7%;" title="Male: 45"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 6.3%;" title="Female: 3"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">48 total</div>
+</div>
+<!-- Divider for levels -->
+<div class="h-[2px] bg-outline-variant/30 w-full my-6"></div>
+<!-- Chart Row M1 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">M1</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 63.1%;" title="Male: 60"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 36.9%;" title="Female: 35"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">95 total</div>
+</div>
+<!-- Chart Row M2 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">M2</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 71.4%;" title="Male: 30"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 28.6%;" title="Female: 12"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">42 total</div>
+</div>
+<!-- Chart Row M3 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0">M3</div>
+<div class="flex-1 flex h-6 rounded overflow-hidden">
+<div class="bg-primary-container transition-all" style="width: 88.2%;" title="Male: 15"></div>
+<div class="bg-tertiary-container transition-all border-l border-surface-container-lowest" style="width: 11.8%;" title="Female: 2"></div>
+</div>
+<div class="w-24 font-number-sm text-number-sm text-on-surface-variant text-right shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">17 total</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Data Table -->
+<div class="xl:col-span-5 bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden flex flex-col h-full max-h-[800px]">
+<div class="p-6 pb-4 border-b border-outline-variant/20 bg-surface-container-lowest sticky top-0 z-10">
+<h3 class="font-headline-md text-headline-md text-primary">Raw Demographics</h3>
+</div>
+<div class="flex-1 overflow-y-auto">
+<table class="w-full text-left border-collapse">
+<thead class="sticky top-0 bg-surface-container-lowest z-10 shadow-[0_1px_0_0_#e2e8f0]">
+<tr>
+<th class="px-cell-padding-h py-cell-padding-v font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant/20 w-16">Lvl</th>
+<th class="px-cell-padding-h py-cell-padding-v font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant/20 text-right">Male</th>
+<th class="px-cell-padding-h py-cell-padding-v font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant/20 text-right">Female</th>
+<th class="px-cell-padding-h py-cell-padding-v font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant/20 text-right w-20">% F</th>
+</tr>
+</thead>
+<tbody class="font-number-sm text-number-sm text-primary divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container-low transition-colors h-10 group">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L1</td>
+<td class="px-cell-padding-h py-1 text-right">412</td>
+<td class="px-cell-padding-h py-1 text-right">388</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">48.5%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L2</td>
+<td class="px-cell-padding-h py-1 text-right">350</td>
+<td class="px-cell-padding-h py-1 text-right">310</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">47.0%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L3</td>
+<td class="px-cell-padding-h py-1 text-right">280</td>
+<td class="px-cell-padding-h py-1 text-right">220</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">44.0%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L4</td>
+<td class="px-cell-padding-h py-1 text-right">210</td>
+<td class="px-cell-padding-h py-1 text-right">140</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">40.0%</td>
+</tr>
+<tr class="bg-surface-container h-1 border-y border-outline-variant/20"><td class="p-0" colspan="4"></td></tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L5</td>
+<td class="px-cell-padding-h py-1 text-right">160</td>
+<td class="px-cell-padding-h py-1 text-right">85</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">34.7%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L6</td>
+<td class="px-cell-padding-h py-1 text-right">120</td>
+<td class="px-cell-padding-h py-1 text-right">42</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">25.9%</td>
+</tr>
+<tr class="bg-tertiary-fixed/20 hover:bg-tertiary-fixed/30 transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-tertiary-container font-medium flex items-center gap-1">L7 <div class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></div></td>
+<td class="px-cell-padding-h py-1 text-right">84</td>
+<td class="px-cell-padding-h py-1 text-right">9</td>
+<td class="px-cell-padding-h py-1 text-right text-tertiary-container font-medium">9.7%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">L8</td>
+<td class="px-cell-padding-h py-1 text-right">45</td>
+<td class="px-cell-padding-h py-1 text-right">3</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">6.2%</td>
+</tr>
+<tr class="bg-surface-container h-1 border-y border-outline-variant/20"><td class="p-0" colspan="4"></td></tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">M1</td>
+<td class="px-cell-padding-h py-1 text-right">60</td>
+<td class="px-cell-padding-h py-1 text-right">35</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">36.8%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">M2</td>
+<td class="px-cell-padding-h py-1 text-right">30</td>
+<td class="px-cell-padding-h py-1 text-right">12</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">28.6%</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors h-10">
+<td class="px-cell-padding-h py-1 text-on-surface-variant font-medium">M3</td>
+<td class="px-cell-padding-h py-1 text-right">15</td>
+<td class="px-cell-padding-h py-1 text-right">2</td>
+<td class="px-cell-padding-h py-1 text-right text-on-surface-variant">11.8%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

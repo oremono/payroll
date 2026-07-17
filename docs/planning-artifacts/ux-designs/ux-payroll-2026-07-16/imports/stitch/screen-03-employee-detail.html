@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Employee Detail - Priya Nair - Salary Management for ACME HR</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#75777d",
+                    "on-primary-fixed": "#111c2d",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary": "#040057",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface-tint": "#545f73",
+                    "on-secondary-container": "#54647a",
+                    "inverse-primary": "#bcc7de",
+                    "on-background": "#191c1e",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "tertiary-fixed-dim": "#c0c1ff",
+                    "background": "#f7f9fb",
+                    "outline-variant": "#c5c6cd",
+                    "primary-container": "#1e293b",
+                    "primary": "#091426",
+                    "on-surface-variant": "#45474c",
+                    "on-secondary-fixed": "#0b1c30",
+                    "on-surface": "#191c1e",
+                    "tertiary-fixed": "#e1e0ff",
+                    "on-secondary": "#ffffff",
+                    "surface-container": "#eceef0",
+                    "on-tertiary-fixed-variant": "#2f2ebe",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e0e3e5",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "tertiary-container": "#0d0093",
+                    "on-tertiary-container": "#7f82ff",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f2f4f6",
+                    "surface": "#f7f9fb",
+                    "on-error": "#ffffff",
+                    "secondary": "#505f76",
+                    "on-tertiary-fixed": "#07006c",
+                    "surface-bright": "#f7f9fb",
+                    "inverse-surface": "#2d3133",
+                    "primary-fixed-dim": "#bcc7de",
+                    "on-primary-fixed-variant": "#3c475a",
+                    "on-primary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#8590a6",
+                    "secondary-container": "#d0e1fb",
+                    "primary-fixed": "#d8e3fb",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-dim": "#d8dadc",
+                    "surface-container-high": "#e6e8ea"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "12px",
+                    "cell-padding-v": "8px",
+                    "cell-padding-h": "12px",
+                    "container-margin": "24px"
+            },
+            "fontFamily": {
+                    "headline-lg": [
+                            "Hanken Grotesk"
+                    ],
+                    "number-sm": [
+                            "JetBrains Mono"
+                    ],
+                    "label-caps": [
+                            "Hanken Grotesk"
+                    ],
+                    "body-sm": [
+                            "Hanken Grotesk"
+                    ],
+                    "number-md": [
+                            "JetBrains Mono"
+                    ],
+                    "headline-md": [
+                            "Hanken Grotesk"
+                    ],
+                    "body-md": [
+                            "Hanken Grotesk"
+                    ]
+            },
+            "fontSize": {
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "number-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "number-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-lowest dark:bg-surface-container-lowest text-primary dark:text-primary-fixed font-body-md text-body-md h-screen w-64 fixed left-0 top-0 border-r border-outline-variant dark:border-outline-variant flex flex-col py-gutter px-cell-padding-h z-50">
+<div class="mb-8 pl-cell-padding-h">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed tracking-tight">ACME HR</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Salary Management</p>
+</div>
+<ul class="flex flex-col gap-1 w-full flex-grow">
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">home</span>
+<span>Home</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-primary font-bold border-r-2 border-primary bg-surface-container-low cursor-pointer active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">badge</span>
+<span>Employees</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">diversity_3</span>
+<span>Gender Insights</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+<span>Payroll Totals</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">history_toggle_off</span>
+<span>Overdue for Review</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">upload_file</span>
+<span>Import</span>
+</a>
+</li>
+<li class="mt-auto mb-4">
+<a class="flex items-center gap-3 px-cell-padding-h py-2 rounded text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span>Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex flex-col w-full ml-64 h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest h-12 w-full sticky top-0 z-40 border-b border-outline-variant flex items-center justify-between px-gutter shrink-0">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface">Salary Management for ACME HR</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-on-surface-variant border border-outline-variant rounded px-3 py-1 cursor-pointer hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="font-body-sm text-body-sm">As of 16 Jul 2026</span>
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</div>
+<div class="flex items-center gap-3 ml-2">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Page Content Workspace -->
+<main class="flex-1 overflow-y-auto bg-background p-container-margin">
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant mb-6">
+<a class="hover:text-primary transition-colors hover:underline" href="#">Employees</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface">Priya Nair</span>
+</nav>
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pb-6 border-b border-outline-variant">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Priya Nair</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        Software Engineer · L4 · India · FEMALE · Hire Date: 03 Mar 2021
+                    </p>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<button class="px-4 py-2 border border-outline-variant rounded font-body-md text-body-md font-medium text-on-surface hover:bg-surface-container-low transition-colors">
+                        Edit employee
+                    </button>
+<button class="px-4 py-2 bg-primary-container text-white rounded font-body-md text-body-md font-medium hover:bg-primary-container/90 transition-colors">
+                        Record a salary change
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- CURRENT SALARY Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-6 flex flex-col shadow-sm">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4 tracking-wider">CURRENT SALARY</h3>
+<div class="flex-grow flex flex-col justify-center py-4">
+<span class="font-number-md text-[32px] leading-[40px] font-medium text-on-surface tracking-tight">₹21,50,000 INR</span>
+</div>
+<div class="mt-auto pt-4 border-t border-surface-variant text-on-surface-variant font-body-sm text-body-sm">
+                        Effective 01 Apr 2024
+                    </div>
+</div>
+<!-- PEER COMPARISON Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-6 flex flex-col shadow-sm group">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">PEER COMPARISON</h3>
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy answer">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="space-y-4 flex-grow">
+<div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-1">Peer group</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Software Engineer · L4 · India</p>
+</div>
+<div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-1">Peer Median</p>
+<div class="flex items-center gap-3">
+<span class="font-number-md text-number-md text-on-surface font-medium">₹23,40,000 INR</span>
+<span class="bg-[#FEF3C7] text-[#92400E] px-2 py-0.5 rounded text-[11px] font-medium tracking-wide">8% under peer median</span>
+</div>
+</div>
+<div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-1">Range</p>
+<p class="font-number-sm text-number-sm text-on-surface-variant">₹18,20,000 – ₹29,50,000 INR across 9 peers</p>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-surface-variant text-on-surface-variant font-body-sm text-body-sm">
+                        Based on 9 peers as of 16 Jul 2026
+                    </div>
+</div>
+<!-- SALARY TIMELINE Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-6 flex flex-col shadow-sm">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase mb-4 tracking-wider">SALARY TIMELINE</h3>
+<div class="flex-grow space-y-0">
+<!-- Record 1 -->
+<div class="flex items-center justify-between py-3 border-b border-surface-variant group hover:bg-surface-container-low -mx-4 px-4 transition-colors">
+<span class="font-number-sm text-number-sm text-on-surface-variant w-28">01 Apr 2024</span>
+<div class="flex items-center justify-end gap-3 flex-1">
+<span class="font-number-md text-number-md text-on-surface font-medium">₹21,50,000 INR</span>
+<span class="font-number-sm text-number-sm text-primary bg-primary-fixed px-1.5 rounded w-12 text-right">+9%</span>
+</div>
+</div>
+<!-- Record 2 -->
+<div class="flex items-center justify-between py-3 border-b border-surface-variant group hover:bg-surface-container-low -mx-4 px-4 transition-colors">
+<span class="font-number-sm text-number-sm text-on-surface-variant w-28">01 Apr 2023</span>
+<div class="flex items-center justify-end gap-3 flex-1">
+<span class="font-number-md text-number-md text-on-surface font-medium">₹19,70,000 INR</span>
+<span class="font-number-sm text-number-sm text-primary bg-primary-fixed px-1.5 rounded w-12 text-right">+12%</span>
+</div>
+</div>
+<!-- Record 3 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-low -mx-4 px-4 transition-colors">
+<span class="font-number-sm text-number-sm text-on-surface-variant w-28">03 Mar 2021</span>
+<div class="flex items-center justify-end gap-3 flex-1">
+<span class="font-number-md text-number-md text-on-surface font-medium">₹17,60,000 INR</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant w-12 text-right italic">Hire</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
