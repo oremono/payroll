@@ -1,0 +1,131 @@
+# generated: 2026-07-17 22:31
+# last_updated: 2026-07-17 22:31
+# project: payroll
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/docs/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+#
+# NOTE ON STORY DERIVATION (2026-07-17):
+# Story rows are derived from the epic-level structure in epics.md — each capability
+# epic explicitly holds a backend story then a frontend story (epics.md line 115),
+# Epic 12 is backend-only, and Epic 1's foundation workstreams are enumerated from its
+# description. No story files exist yet, so every story is 'backlog'. Run create-story
+# (bmad-create-story) to elaborate acceptance criteria; the keys/titles below may firm up then.
+
+generated: 2026-07-17 22:31
+last_updated: 2026-07-17 22:31
+project: payroll
+project_key: NOKEY
+tracking_system: file-system
+story_location: docs/implementation-artifacts
+
+development_status:
+  # Epic 1 — Foundation & Deployable Skeleton (foundational; enables CAP-1..CAP-11)
+  epic-1: backlog
+  1-1-project-scaffold-and-source-tree: backlog
+  1-2-ci-pipeline-and-gates: backlog
+  1-3-data-model-and-migrations: backlog
+  1-4-money-currency-domain-primitives: backlog
+  1-5-design-token-build: backlog
+  1-6-app-shell-and-as-of-control: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2 — CAP-1 Bulk Import
+  epic-2: backlog
+  2-1-bulk-import-backend: backlog
+  2-2-bulk-import-ui: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3 — CAP-2 Employee CRUD
+  epic-3: backlog
+  3-1-employee-crud-backend: backlog
+  3-2-employee-crud-ui: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4 — CAP-3 Record a Salary Change
+  epic-4: backlog
+  4-1-record-salary-change-backend: backlog
+  4-2-record-salary-change-ui: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5 — CAP-4 Salary Timeline
+  epic-5: backlog
+  5-1-salary-timeline-backend: backlog
+  5-2-salary-timeline-ui: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6 — CAP-5 Peer Comparison or Refusal
+  epic-6: backlog
+  6-1-peer-comparison-backend: backlog
+  6-2-peer-comparison-ui: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7 — CAP-6 Outliers & Threshold
+  epic-7: backlog
+  7-1-outliers-threshold-backend: backlog
+  7-2-outliers-threshold-ui: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8 — CAP-7 Gender Gap or Refusal
+  epic-8: backlog
+  8-1-gender-gap-backend: backlog
+  8-2-gender-gap-ui: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9 — CAP-8 Gender Distribution by Level
+  epic-9: backlog
+  9-1-gender-distribution-backend: backlog
+  9-2-gender-distribution-ui: backlog
+  epic-9-retrospective: optional
+
+  # Epic 10 — CAP-9 Payroll Totals
+  epic-10: backlog
+  10-1-payroll-totals-backend: backlog
+  10-2-payroll-totals-ui: backlog
+  epic-10-retrospective: optional
+
+  # Epic 11 — CAP-10 Overdue for Review
+  epic-11: backlog
+  11-1-overdue-backend: backlog
+  11-2-overdue-ui: backlog
+  epic-11-retrospective: optional
+
+  # Epic 12 — CAP-11 Seed 10,000 (backend-only, no frontend surface)
+  epic-12: backlog
+  12-1-seed-population-backend: backlog
+  epic-12-retrospective: optional
