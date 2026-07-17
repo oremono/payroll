@@ -45,7 +45,7 @@ graph TB
     NEXT["<b>Next.js 16 application</b><br/>TypeScript · React 19 · RSC<br/><i>Serves every surface. Runs the<br/>fairness math in-process.</i>"]
   end
 
-  subgraph NEON["Neon"]
+  subgraph NEON["Neon · aws-ap-southeast-1 (Singapore)"]
     PG[("<b>PostgreSQL 18</b><br/><i>employee · salary_record<br/>role · level · country · currency<br/>fx_rate · settings</i>")]
   end
 
@@ -150,7 +150,7 @@ Three properties fall out of this shape, and each maps to a promise the product 
 ```mermaid
 graph TB
   subgraph PROD["Production"]
-    V1["Vercel<br/><i>Next.js 16</i>"] --> N1[("Neon primary<br/><i>Postgres 18</i>")]
+    V1["Vercel<br/><i>Next.js 16</i>"] --> N1[("Neon primary<br/><i>Postgres 18 · ap-southeast-1</i>")]
   end
   subgraph PREV["Preview — per PR"]
     V2["Vercel preview"] --> N2[("Neon branch<br/><i>inherits parent major</i>")]
@@ -166,6 +166,6 @@ graph TB
   style N1 fill:#334155,color:#ffffff
 ```
 
-Postgres major is pinned to 18 in all three environments — a Neon branch inherits its parent's major, and local must match, or a query behaves differently in the one place nobody looks.
+Postgres major is pinned to 18 in all three environments — a Neon branch inherits its parent's major, and local must match, or a query behaves differently in the one place nobody looks. Region is `aws-ap-southeast-1` (Singapore) — Neon has no India region; synthetic data (AD-14) imposes no residency constraint, so Singapore (nearest region) is used.
 
 No staging tier: one user, no real data, no auth (a SPEC non-goal, and the one deferral that must flip before this touches a real salary record). **Seeding is never a deploy side effect** — it is an explicit command, always.
