@@ -292,3 +292,4 @@ TDD evidence (AC8): the `blankToNull` spec was committed **before** its implemen
 | Date | Change |
 | --- | --- |
 | 2026-07-17 | Story 1-1 implemented: hand-scaffolded Next.js 16 app, functional-core/imperative-shell source tree with boundary READMEs, pinned toolchain, Tailwind v4 (empty theme), Vitest with one test-first pure domain unit (`blankToNull`), ESLint flat-config baseline. All four gates (build/typecheck/lint/test) green. Status → review. |
+| 2026-07-17 | Code-review fixes: (1) scoped `tsconfig` `exclude` to tooling dirs (`.claude`, `_bmad`, `.bmad-loop`, `design-artifacts`, `docs`) so the `typecheck` gate mirrors the ESLint ignores and won't compile non-app `.ts`; (2) added an internal-whitespace test for `blankToNull` so a strip-all-whitespace mutant is killed (matters for 1-2 mutation testing). Gates re-run green; domain suite now 5 tests. |

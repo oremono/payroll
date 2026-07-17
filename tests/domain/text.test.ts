@@ -15,6 +15,10 @@ describe('blankToNull', () => {
     expect(blankToNull('Sales')).toBe('Sales');
   });
 
+  it('preserves internal whitespace — trims edges only, never strips within', () => {
+    expect(blankToNull('  Cost Center 12  ')).toBe('Cost Center 12');
+  });
+
   it('collapses a whitespace-only string to null (the other branch)', () => {
     expect(blankToNull('   ')).toBeNull();
   });
