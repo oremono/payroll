@@ -25,7 +25,7 @@ This is the **first story of Epic 1 (Foundation & Deployable Skeleton)** and the
 - A minimal App Router root layout + placeholder page that renders.
 - Tailwind CSS v4 pipeline installed and **compiling** with a placeholder (empty) theme — no hex literals, no hand-authored tokens.
 - Vitest installed and configured; **one real test-first pure domain unit** proving the runner, path aliases, and the `domain` layer resolve.
-- Baseline ESLint config so `next lint` runs.
+- Baseline ESLint (flat config, `eslint-config-next`) run via the ESLint CLI.
 - `.gitignore` extended for a Node/Next project; `README.md` with setup + run instructions.
 - Green `npm run build`, `npm run dev` (boots), `npm run typecheck`, `npm run test`.
 
@@ -71,11 +71,11 @@ This is the **first story of Epic 1 (Foundation & Deployable Skeleton)** and the
    ```
    Empty layer directories are kept in git via a boundary `README.md` (preferred over `.gitkeep`) that states the layer's allowed-imports rule verbatim from the dependency table.
 4. **Dependency direction is documented at each layer.** Each of `src/domain`, `src/application`, `src/adapters`, `src/app`, `src/ui` carries a short README stating what it may import (per the table in Dev Notes). `clock.ts` and `prng.ts` are documented as the sole sanctioned homes for `Date.now()` and randomness respectively.
-5. **TypeScript strict + path aliases.** `tsconfig.json` has `"strict": true` (and `noUncheckedIndexedAccess` on), targets the Next 16 baseline, and defines path aliases: `@/domain/*`, `@/application/*`, `@/adapters/*`, `@/app/*`, `@/ui/*` (and `@/*` → `src/*`). `npm run typecheck` (`tsc --noEmit`) passes.
+5. **TypeScript strict + path aliases.** `tsconfig.json` has `"strict": true` and `"noUncheckedIndexedAccess": true`, uses the Next 16 module settings (`"module": "esnext"`, `"moduleResolution": "bundler"`, `"jsx": "preserve"`, `"target": "ES2022"` or later), and defines path aliases: `@/domain/*`, `@/application/*`, `@/adapters/*`, `@/app/*`, `@/ui/*` (and `@/*` → `src/*`). `npm run typecheck` (`tsc --noEmit`) passes.
 6. **App boots and builds.** A minimal `src/app/layout.tsx` + `src/app/page.tsx` render a placeholder ("Salary Management for ACME HR" heading is fine). `npm run build` (`next build`) completes with no errors; `npm run dev` (`next dev`) serves the placeholder page at `/`.
 7. **Tailwind v4 compiles with no tokens.** The Tailwind v4 pipeline (via `@tailwindcss/postcss` or the Next-integrated path) is wired so the global stylesheet compiles into `next build`. The theme is intentionally empty/placeholder — **no hex color literal appears anywhere in `src/`** (AD-15 forbids it; real tokens are generated in 1-5).
-8. **Test runner is real and used test-first.** Vitest is configured (`vitest.config.ts`) resolving the same path aliases as `tsconfig`. There is at least one **pure domain unit written test-first** — a trivial, total function in `src/domain/` (e.g. an app-identity/version constant or an obviously-pure helper) with a test in `tests/` that imports it via the `@/domain/*` alias. The commit sequence shows the test landing before or with the code (red → green). `npm run test` passes and touches no DB, clock, or network.
-9. **Scripts exist.** `package.json` scripts include at least: `dev`, `build`, `start`, `lint`, `typecheck`, `test` (and `test:watch` optional). `lint` runs the Next/ESLint baseline clean.
+8. **Test runner is real and used test-first.** Vitest is configured (`vitest.config.ts`) resolving the same path aliases as `tsconfig`. There is at least one **pure domain unit written test-first** — a genuinely *behavioral*, total function in `src/domain/` (a small input-guard/normalizer with at least one branch, so the test asserts behavior rather than mirroring a constant) with a test in `tests/` that imports it via the `@/domain/*` alias. The commit sequence shows the test landing before or with the code (red → green). `npm run test` passes and touches no DB, clock, or network.
+9. **Scripts exist.** `package.json` scripts include at least: `dev`, `build`, `start`, `lint`, `typecheck`, `test` (and `test:watch` optional). `lint` invokes the **ESLint CLI** (`eslint .`) — **not** `next lint`, which is removed in Next 16 — using `eslint-config-next` in flat config, and runs clean.
 10. **Hygiene.** `.gitignore` ignores `node_modules/`, `.next/`, `.env*` (keep `.env.example` if added), coverage output, and OS/editor cruft, **without** removing the existing BMAD entries. `README.md` documents prerequisites (Node 24), install, and the four commands above. `package-lock.json` is committed.
 
 ## Tasks / Subtasks
@@ -90,23 +90,23 @@ This is the **first story of Epic 1 (Foundation & Deployable Skeleton)** and the
   - [ ] Add a boundary `README.md` to each `src/*` layer stating its allowed imports.
   - [ ] Create `src/adapters/clock.ts` and `src/adapters/prng.ts` as documented placeholder seams (a typed stub that throws "not implemented in 1-1" or an empty export is fine — they are wired in later stories; keep them import-free of domain rules they don't yet need).
 - [ ] **Task 3 — TypeScript config** (AC: 5)
-  - [ ] Write `tsconfig.json`: strict, `noUncheckedIndexedAccess`, Next 16 module/target settings, and the `@/*` path aliases.
+  - [ ] Write `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `module: esnext`, `moduleResolution: bundler`, `jsx: preserve`, `target: ES2022`+, and the `@/*` path aliases.
   - [ ] Wire `typecheck` script; confirm it passes on the skeleton.
 - [ ] **Task 4 — App Router skeleton** (AC: 6)
   - [ ] `src/app/layout.tsx` (root layout, imports the global stylesheet) and `src/app/page.tsx` (placeholder).
-  - [ ] Next config file as needed for `src/app` routing.
+  - [ ] `next.config.ts` as needed for `src/app` routing.
   - [ ] Verify `next build` and `next dev`.
 - [ ] **Task 5 — Tailwind v4 pipeline (empty theme)** (AC: 7)
-  - [ ] Install/wire Tailwind v4 + PostCSS integration for Next 16.
+  - [ ] Install/wire Tailwind v4 + PostCSS integration for Next 16 (`@tailwindcss/postcss` in `postcss.config.mjs`).
   - [ ] Global stylesheet with Tailwind layers, **no hex literals / no token values** — placeholder only.
   - [ ] Confirm styles compile into the build.
 - [ ] **Task 6 — Vitest + first test-first domain unit** (AC: 8)
   - [ ] Add `vitest.config.ts` with path-alias resolution mirroring tsconfig.
-  - [ ] **Write the failing test first** in `tests/` against a not-yet-existing pure `src/domain/` function; watch it fail for the right reason.
+  - [ ] **Write the failing test first** in `tests/` against a not-yet-existing pure, branching `src/domain/` helper; watch it fail for the right reason.
   - [ ] Implement the minimal domain function to go green; commit in an order that shows red-before-green.
   - [ ] Confirm `npm run test` is green and DB/clock/network-free.
 - [ ] **Task 7 — ESLint baseline & README** (AC: 9, 10)
-  - [ ] Baseline ESLint (Next config, flat config for ESLint 9 if that's what Next 16 ships); `lint` runs clean. Do NOT author the import-boundary rule (that's 1-2).
+  - [ ] Baseline ESLint in flat config (`eslint.config.mjs`) using `eslint-config-next`; `lint` script runs `eslint .` clean. Do NOT use `next lint` (removed in Next 16), and do NOT author the import-boundary rule (that's 1-2).
   - [ ] Write `README.md` (prereqs, install, dev/build/typecheck/test).
 - [ ] **Task 8 — Final verification** (AC: 6, 9)
   - [ ] Run all four gates locally: `build`, `typecheck`, `lint`, `test` — all green. Record outcomes in the Dev Agent Record.
