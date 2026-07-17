@@ -38,3 +38,18 @@ jobs:
         run: npm run build
       - name: Unit tests + coverage floor
         run: npm run test:coverage
+
+  # Mutation testing over src/domain (AD-23): a surviving mutant fails the gate.
+  mutation:
+    name: Mutation testing (domain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Mutation testing
+        run: npm run test:mutation
