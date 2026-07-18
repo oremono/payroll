@@ -35,6 +35,7 @@ npm install
 | `npm run test:coverage` | Vitest with the coverage floor on `src/domain` + `src/application` |
 | `npm run test:mutation` | Stryker mutation testing over `src/domain` (a survivor fails) |
 | `npm run test:a11y` | Playwright + axe accessibility pass over the built app |
+| `npm run test:smoke` | Playwright reachability check; set `PLAYWRIGHT_BASE_URL` to probe a deployed URL |
 | `npm run test:integration` | Integration suite against a **real** Postgres 18 (see § Database) |
 | `npm run db:generate` | Regenerate the Prisma client (also wired to `postinstall`) |
 | `npm run db:migrate` | Create + apply a migration locally (`prisma migrate dev`) |
@@ -107,9 +108,8 @@ invariants cannot be expressed declaratively (Prisma 7.8.0 has no `@@check`, and
 The reference tables (`role`, `level`, `country`, `currency`) and `settings` ship **empty**; their
 values arrive in Story 1-4.
 
-> **Deployed environments** run `prisma migrate deploy` **at build**. Wiring that into Vercel/Neon
-> is a later deployment story — the command and the intent are recorded here, the plumbing is not
-> built yet.
+Deployed environments run `prisma migrate deploy` **at build** — see [§ Deployment &
+environments](#deployment--environments).
 
 The generated Prisma client is written to `src/adapters/db/generated/` (git-ignored, and excluded
 from ESLint, coverage, Stryker, and `tsc`). The Prisma 7 generator emits TypeScript **source**, so
@@ -129,7 +129,7 @@ protection.
 | Build | `npm run build` | The production build compiles — a named gate, not a side effect of another job |
 | Unit + coverage floor | `npm run test:coverage` | Fast deterministic unit suite + per-path coverage floors on `domain` (100) and `application` (90) (AD-23) |
 | Mutation testing | `npm run test:mutation` | A surviving mutant over `src/domain` fails the build (AD-23) |
-| Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9) |
+| Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9). Scoped to `e2e/accessibility.spec.ts` — it must **not** widen to other specs |
 | Integration (Postgres 18) | `npm run test:integration` | The schema's DB-enforced invariants — append-only `salary_record`, the positive-amount CHECK, single-row `settings` — against a real disposable Postgres 18, never a mock (AD-24) |
 
 **Branch protection:** require these status checks on `master` — **`Lint · Typecheck · Build ·
@@ -139,6 +139,132 @@ repository-admin action in GitHub settings, not part of the code.
 
 The `test:mutation` and `test:a11y` gates need extra local setup on first run: Stryker downloads
 nothing, but the axe gate needs a browser — run `npx playwright install chromium` once.
+
+`.github/workflows/preview.yml` is a **second, separate** workflow (see [§ Deployment &
+environments](#the-preview-pipeline)). It is not part of the required-check set above and must not
+be merged into `ci.yml`: the four gates decide merge eligibility, and coupling them to Vercel or
+Neon availability would change what they assert. If a deploy check is ever added to branch
+protection, update the required-check list above.
+
+## Deployment & environments
+
+Vercel (Next.js preset, Node 24) on top of Neon PostgreSQL **18**, region `aws-ap-southeast-1`.
+
+**Production:** <https://payroll-iota-coral.vercel.app>
+
+| Environment | Trigger | Database |
+| --- | --- | --- |
+| **Production** | Push to `master` (Vercel's Git integration) | The Neon project's default branch, `production` |
+| **Preview** | `.github/workflows/preview.yml` on every PR to `master` | A Neon branch named `pr-<number>`, created per PR and deleted on close |
+| **Local** | `npm run dev` | The Docker Postgres 18 on port 55432 (§ Database) |
+
+### Migrations run at build
+
+`vercel.json` sets:
+
+```json
+{ "buildCommand": "prisma generate && prisma migrate deploy && next build" }
+```
+
+In `vercel.json` rather than the dashboard Build Command, so the deploy contract is reviewable in
+the diff instead of living as invisible project state. `prisma generate` appears here **as well as**
+in `postinstall`, and both must stay: Vercel restores `node_modules` from cache *before* install, so
+an unchanged lockfile means `postinstall` never fires while `schema.prisma` has changed — the
+documented "outdated Prisma Client" failure. `postinstall` remains because CI, local installs, and
+`npm ci --omit=dev` all depend on it.
+
+`installCommand` is deliberately **not** set: overriding it makes Vercel select the oldest available
+package-manager version, and the default `npm install` is what fires `postinstall`.
+
+> **Story 1-5 seam.** The AD-15 design-token build step will need its own stage in `buildCommand`,
+> ahead of `next build`. Nothing is built for it here. JSON has no comments, which is why this note
+> lives in the README.
+
+### Two URLs, two roles, two endpoints
+
+| Variable | Role | Neon endpoint | Consumed by |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | `neondb_owner` | **direct** (unpooled) | `prisma.config.ts` → `migrate deploy` at build |
+| `DATABASE_URL_APP` | `payroll_app` | **pooled** (`-pooler` in the host) | `src/adapters/db/client.ts` at runtime |
+
+Both differences are correctness constraints, not preferences:
+
+- **Migrations need the direct endpoint.** Neon's pooler runs PgBouncer in *transaction* mode,
+  handing a connection to another client between statements. That discards session state —
+  including session-level advisory locks, the exact mechanism a migration runner uses to serialize
+  itself against a concurrent migrator.
+- **Runtime needs the restricted role.** PostgreSQL lets a table owner bypass privilege checks, so
+  connecting as the owner would silently reduce the append-only `REVOKE UPDATE, DELETE` to a
+  no-op (Law 5 / AD-18). `client.ts` therefore **requires** `DATABASE_URL_APP` with no fallback to
+  `DATABASE_URL` — a fallback would restore that silent failure the moment the variable went
+  missing.
+- **Runtime wants the pooled endpoint**, because every serverless instance otherwise opens its own
+  pool. PgBouncer is the real pool; `APP_POOL_MAX` (5) in `client.ts` only bounds the sockets one
+  instance opens toward it.
+
+Both carry `sslmode=require` — Neon rejects non-TLS connections outright.
+
+### Bootstrap runs once per Neon project, not per branch
+
+`prisma/sql/bootstrap-roles.sql` was run **once** against the `production` branch. It is deliberately
+**not** re-run per preview branch: a Neon branch is a copy-on-write clone that inherits its parent's
+Postgres roles *and their passwords*, so `payroll_app` already exists, with the same credential, on
+every branch.
+
+This is exactly what lets the two-role split survive a branch-per-PR model. Role creation is
+cluster-scoped and inherited; the schema-scoped `USAGE`/`GRANT`/`REVOKE` live in the migration and
+are re-applied by every `migrate deploy`.
+
+The ordering is unforgiving on a **fresh** project: the `AP002` guard in
+`20260718163326_append_only_and_checks` fails `migrate deploy` with `P3018` if `payroll_app` does
+not exist yet, leaving the migration history poisoned. Bootstrap first, always.
+
+### The preview pipeline
+
+`.github/workflows/preview.yml`, deliberately separate from `ci.yml` so the four required checks
+keep their meaning and merge eligibility never depends on Vercel or Neon being up.
+
+Per PR it creates (or reuses) Neon branch `pr-<number>`, then reproduces `ci.yml`'s integration
+sequence **in full and in order** against it — `migrate deploy` → `migrate diff --exit-code` →
+`npm run test:integration` — before deploying. Running only the tests would prove nothing about
+migrations: the branch is a clone that already carries the parent's schema, so on a PR that *adds* a
+migration the suite would exercise a stale schema and the first real `migrate deploy` on Neon would
+be the Vercel build, after the gate.
+
+Preview deploys are **CI-driven, not Git-driven.** `vercel.json`'s `ignoreCommand` blocks Vercel's
+automatic build for every ref except `master`, so a preview can never start before its Neon branch
+and environment variables exist. (Per-branch `git.deploymentEnabled` entries do *not* work for this:
+they are an opt-**out** map — unspecified branches default to `true` — so they cannot express
+deny-by-default.) Preview values are passed per-deployment via `vercel deploy --build-env` / `--env`
+rather than persisted with `vercel env add`, so no per-branch state accumulates in the Vercel
+project.
+
+**Branch quota.** Neon caps branches per project (commonly 10 on free plans). Cleanup on PR close is
+the primary mechanism; branches also carry a 7-day `expires_at` as a backstop, because the `closed`
+event never fires for a git branch deleted outside a PR. To clean up orphans by hand:
+
+```bash
+npx neonctl branches list  --project-id "$NEON_PROJECT_ID"
+npx neonctl branches delete pr-<number> --project-id "$NEON_PROJECT_ID"
+```
+
+### Why the native Neon/Vercel integration is NOT installed
+
+Neither the Neon-managed nor the Vercel-managed native integration is used. It injects its own
+`DATABASE_URL` as a **pooled owner** URL, which is wrong on both axes at once — pooled breaks
+`migrate deploy`, and owner-at-runtime voids AD-18 layer A. It also **silently overrides** a
+deployment's preview environment variables with no failure signal, **fails setup outright** if
+`DATABASE_URL` already exists on the project, and cannot express a second role at all. The
+Vercel-managed variant additionally ties branch lifetime to Vercel's deployment retention (6 months
+by default) rather than to the PR.
+
+### No health-check endpoint
+
+There is none, and none may be added: AD-21 fixes the route-handler count at exactly two (the CAP-1
+multipart upload and CSV export), and neither exists yet. Reachability is proven by
+`e2e/smoke.spec.ts` against the deployed URL; deployed *database* connectivity is proven by the
+preview pipeline running the real integration suite against the Neon branch — a stronger claim than
+any health route could make.
 
 ## Source tree
 
