@@ -4,7 +4,7 @@ baseline_commit: 83fd9ab087535722e87c34aaed3b9d4d680ce8f6
 
 # Story 1.3: Data Model and Migrations
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -112,41 +112,41 @@ This is the **third story of Epic 1 (Foundation & Deployable Skeleton)**. Story 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Install & pin Prisma 7.8.0, and stand up `prisma.config.ts`** (AC: 1, 1a)
-  - [ ] Add `prisma@7.8.0` (devDep), `@prisma/client@7.8.0` + `@prisma/adapter-pg@7.8.0` (deps), exact pins; `npm install`; commit `package-lock.json`.
-  - [ ] Create `prisma.config.ts` with `import "dotenv/config"` and the URL from `process.env.DATABASE_URL`. Create `.env` locally (git-ignored) and commit `.env.example`.
-  - [ ] Add `prisma generate` to `postinstall` (and/or a `db:generate` script); confirm `typecheck`/`build` see the client.
-  - [ ] Decide + record the generator `output` path; add it to **all five**: `.gitignore`, ESLint `ignores`, coverage `exclude`, Stryker `ignorePatterns`, **and `tsconfig.json` `exclude`**.
-- [ ] **Task 2 — Author `schema.prisma`** (AC: 2)
-  - [ ] `datasource db { provider = "postgresql" }` — **no `url`** (Prisma 7) — plus `generator client { provider = "prisma-client", output = … }`.
-  - [ ] All eight models with exact types/keys/relations and `@@map` snake_case names; `Gender` enum; `DATE`/`TIMESTAMPTZ`/`BIGSERIAL`/UUID mappings per *Schema*.
-  - [ ] Decide the index question (Dev Notes → *Indexes*) and record the answer either way.
-  - [ ] `npx prisma validate` clean.
-- [ ] **Task 3 — Generate the base migration** (AC: 3)
-  - [ ] `prisma migrate dev --name init` against a disposable Postgres 18; inspect the emitted `snake_case` SQL.
-  - [ ] Confirm `migrate deploy` on a fresh DB yields no drift (`migrate status` clean).
-- [ ] **Task 4 — Runtime role, append-only (REVOKE + trigger), positive CHECK (raw SQL)** (AC: 4, 5, 10)
-  - [ ] Provision the runtime application role per *Role provisioning* — `DO $$ … pg_roles … $$`, never `CREATE ROLE IF NOT EXISTS`. **Run `prisma migrate dev` twice on the same cluster** to prove shadow-DB replay is idempotent (prisma#6581).
-  - [ ] Implement **both** Decision-2 layers as SQL in a migration (`--create-only` edit or a dedicated migration): the `REVOKE UPDATE, DELETE` against the runtime role, **and** the `BEFORE UPDATE OR DELETE` trigger that raises. Confirm the trigger does not fire on `INSERT`.
-  - [ ] Add `CHECK (amount_minor > 0)` and the `settings` single-row guard (AC 6) as SQL.
-  - [ ] **Prove red first:** integration assertions for REVOKE + CHECK fail on the pre-constraint schema; watch them fail for the right reason; then add the SQL and go green. Record it.
-- [ ] **Task 5 — Prisma client singleton** (AC: 7)
-  - [ ] `src/adapters/db/client.ts` — `globalThis`-guarded singleton wrapping `new PrismaClient({ adapter })`, with the `PrismaPg` adapter constructed **inside** the guard. Import from the generated path, not `@prisma/client`.
-  - [ ] Keep construction lazy / module-local so a build without `DATABASE_URL` (the `check` and `a11y` jobs) does not crash.
-  - [ ] **Extend** the purity zone's restricted imports to the generated path + `@prisma/adapter-pg`, then prove it bites with a temporary domain fixture (delete after). Mind the flat-config replace-not-merge trap.
-- [ ] **Task 6 — Integration harness (separate Vitest project)** (AC: 8, 10)
-  - [ ] Add `vitest.integration.config.ts` (or a project) with `include` pointing at the integration dir (e.g. `tests/integration/**`), and **narrow the unit config's `include`** so it no longer matches it — verify, don't assume.
-  - [ ] Write the round-trip + REVOKE + CHECK test (AC 8); add `test:integration` script requiring `DATABASE_URL`. Handle `updated_at` in raw inserts (see AC 8).
-  - [ ] Confirm `npm run test` (unit) does **not** pick it up and stays DB-free, and that coverage is unchanged.
-- [ ] **Task 7 — CI integration job** (AC: 9)
-  - [ ] Add a `services: postgres:18` job (with `pg_isready` health check) to `ci.yml` that sets `DATABASE_URL` in `env:`, provisions the runtime role, runs `prisma migrate deploy`, then `test:integration`.
-  - [ ] Mirror the house job conventions: `node-version-file: .nvmrc`, `cache: npm`, `npm ci`, `timeout-minutes`, named steps, an AD citation comment.
-  - [ ] Ensure `prisma generate` runs before `typecheck`/`build`; **re-verify `check` and `a11y` still pass** now that `postinstall` runs in them and `a11y` builds the app with no database.
-- [ ] **Task 8 — Env, docs, hygiene** (AC: 1, 1a, 10)
-  - [ ] `.env.example` with a documented `DATABASE_URL` (no real secret).
-  - [ ] `README.md`: schema/migration/integration commands (both tables), the new required check name, disposable-Postgres-18 + role setup, the `migrate deploy`-at-build intent (deploy wiring itself is later).
-- [ ] **Task 9 — Final verification** (AC: 3, 4, 5, 8, 9)
-  - [ ] Run every gate locally green: `lint`, `typecheck`, `test` (unit+coverage), `test:mutation`, `test:a11y`, `test:integration`, `build`. Record outcomes in the Dev Agent Record.
+- [x] **Task 1 — Install & pin Prisma 7.8.0, and stand up `prisma.config.ts`** (AC: 1, 1a)
+  - [x] Add `prisma@7.8.0` (devDep), `@prisma/client@7.8.0` + `@prisma/adapter-pg@7.8.0` (deps), exact pins; `npm install`; commit `package-lock.json`.
+  - [x] Create `prisma.config.ts` with `import "dotenv/config"` and the URL from `process.env.DATABASE_URL`. Create `.env` locally (git-ignored) and commit `.env.example`.
+  - [x] Add `prisma generate` to `postinstall` (and/or a `db:generate` script); confirm `typecheck`/`build` see the client.
+  - [x] Decide + record the generator `output` path; add it to **all five**: `.gitignore`, ESLint `ignores`, coverage `exclude`, Stryker `ignorePatterns`, **and `tsconfig.json` `exclude`**.
+- [x] **Task 2 — Author `schema.prisma`** (AC: 2)
+  - [x] `datasource db { provider = "postgresql" }` — **no `url`** (Prisma 7) — plus `generator client { provider = "prisma-client", output = … }`.
+  - [x] All eight models with exact types/keys/relations and `@@map` snake_case names; `Gender` enum; `DATE`/`TIMESTAMPTZ`/`BIGSERIAL`/UUID mappings per *Schema*.
+  - [x] Decide the index question (Dev Notes → *Indexes*) and record the answer either way.
+  - [x] `npx prisma validate` clean.
+- [x] **Task 3 — Generate the base migration** (AC: 3)
+  - [x] `prisma migrate dev --name init` against a disposable Postgres 18; inspect the emitted `snake_case` SQL.
+  - [x] Confirm `migrate deploy` on a fresh DB yields no drift (`migrate status` clean).
+- [x] **Task 4 — Runtime role, append-only (REVOKE + trigger), positive CHECK (raw SQL)** (AC: 4, 5, 10)
+  - [x] Provision the runtime application role per *Role provisioning* — `DO $$ … pg_roles … $$`, never `CREATE ROLE IF NOT EXISTS`. **Run `prisma migrate dev` twice on the same cluster** to prove shadow-DB replay is idempotent (prisma#6581).
+  - [x] Implement **both** Decision-2 layers as SQL in a migration (`--create-only` edit or a dedicated migration): the `REVOKE UPDATE, DELETE` against the runtime role, **and** the `BEFORE UPDATE OR DELETE` trigger that raises. Confirm the trigger does not fire on `INSERT`.
+  - [x] Add `CHECK (amount_minor > 0)` and the `settings` single-row guard (AC 6) as SQL.
+  - [x] **Prove red first:** integration assertions for REVOKE + CHECK fail on the pre-constraint schema; watch them fail for the right reason; then add the SQL and go green. Record it.
+- [x] **Task 5 — Prisma client singleton** (AC: 7)
+  - [x] `src/adapters/db/client.ts` — `globalThis`-guarded singleton wrapping `new PrismaClient({ adapter })`, with the `PrismaPg` adapter constructed **inside** the guard. Import from the generated path, not `@prisma/client`.
+  - [x] Keep construction lazy / module-local so a build without `DATABASE_URL` (the `check` and `a11y` jobs) does not crash.
+  - [x] **Extend** the purity zone's restricted imports to the generated path + `@prisma/adapter-pg`, then prove it bites with a temporary domain fixture (delete after). Mind the flat-config replace-not-merge trap.
+- [x] **Task 6 — Integration harness (separate Vitest project)** (AC: 8, 10)
+  - [x] Add `vitest.integration.config.ts` (or a project) with `include` pointing at the integration dir (e.g. `tests/integration/**`), and **narrow the unit config's `include`** so it no longer matches it — verify, don't assume.
+  - [x] Write the round-trip + REVOKE + CHECK test (AC 8); add `test:integration` script requiring `DATABASE_URL`. Handle `updated_at` in raw inserts (see AC 8).
+  - [x] Confirm `npm run test` (unit) does **not** pick it up and stays DB-free, and that coverage is unchanged.
+- [x] **Task 7 — CI integration job** (AC: 9)
+  - [x] Add a `services: postgres:18` job (with `pg_isready` health check) to `ci.yml` that sets `DATABASE_URL` in `env:`, provisions the runtime role, runs `prisma migrate deploy`, then `test:integration`.
+  - [x] Mirror the house job conventions: `node-version-file: .nvmrc`, `cache: npm`, `npm ci`, `timeout-minutes`, named steps, an AD citation comment.
+  - [x] Ensure `prisma generate` runs before `typecheck`/`build`; **re-verify `check` and `a11y` still pass** now that `postinstall` runs in them and `a11y` builds the app with no database.
+- [x] **Task 8 — Env, docs, hygiene** (AC: 1, 1a, 10)
+  - [x] `.env.example` with a documented `DATABASE_URL` (no real secret).
+  - [x] `README.md`: schema/migration/integration commands (both tables), the new required check name, disposable-Postgres-18 + role setup, the `migrate deploy`-at-build intent (deploy wiring itself is later).
+- [x] **Task 9 — Final verification** (AC: 3, 4, 5, 8, 9)
+  - [x] Run every gate locally green: `lint`, `typecheck`, `test` (unit+coverage), `test:mutation`, `test:a11y`, `test:integration`, `build`. Record outcomes in the Dev Agent Record.
 
 ## Dev Notes
 
@@ -436,8 +436,187 @@ One caveat to record: Prisma emits `BIGSERIAL` (a sequence + `nextval` default),
 
 ### Agent Model Used
 
+Claude Opus 4.8 (`claude-opus-4-8[1m]`) via Claude Code, `bmad-dev-story` workflow.
+
 ### Debug Log References
+
+Local environment: Node 22.22.0 (below the pinned Node 24 — `EBADENGINE` warnings expected per
+1-1/1-2; Prisma 7.8.0's engine requirement `^20.19 || ^22.12 || >=24` is satisfied). PostgreSQL 18
+via `docker run postgres:18` on host port 55432, plus a second throwaway container on 55433 used
+to simulate the CI job in a clean room.
+
+**TDD evidence (AC 10) — red observed before green.** The constraint assertions were written
+against the post-`init`, pre-constraint schema and run three times:
+
+1. *First red, discarded as dishonest.* 7 failed / 2 passed — but the two "passes" were false: the
+   runtime role had no table grants yet, so `INSERT` was denied outright and the CHECK assertions
+   passed on `permission denied for table salary_record` rather than on the constraint. A pass for
+   the wrong reason is not a pass.
+2. *True red.* `SELECT, INSERT, UPDATE, DELETE` were temporarily granted so the missing constraints
+   were the only thing left to fail on. Result: 7 failed, every one of them
+   `AssertionError: promise resolved ... instead of rejecting` — `UPDATE` and `DELETE` succeeded as
+   both the runtime role and the owner, `amount_minor = 0` and `-1` were both accepted, and a
+   second `settings` row was accepted.
+3. *Green.* After `20260718163326_append_only_and_checks`: **9/9 passing.**
+
+**Two real defects found by the suite during development, both fixed:**
+
+- The teardown could not delete `salary_record` — the trigger blocks `DELETE` for *every* role
+  including the owner. The schema was right and the test's assumption was wrong; teardown now does
+  no row cleanup and documents why (see Completion Notes).
+- `GRANT USAGE ON SCHEMA public` was initially in `bootstrap-roles.sql`. Because it is
+  schema-scoped, dropping and recreating the schema silently revoked it: the runtime role's
+  `search_path` collapsed to `{pg_catalog}` and every query failed with `relation "salary_record"
+  does not exist` — *while `prisma migrate status` reported a healthy database*. 6 integration
+  failures on a rebuilt schema that passed on a fresh one. Moved into the migration, where it
+  replays. Commit `c91b526`.
+
+**Replay safety (prisma#6581).** Verified three ways: `migrate dev` run twice (no shadow DB
+needed — already in sync); a forced schema change so `migrate dev --create-only` *did* build a
+shadow database and replay the full history including the `GRANT`/`REVOKE` (no `P3006`, probe then
+discarded); and `migrate deploy` replayed twice against the same cluster with the role persisting.
+Note `prisma migrate reset` is **blocked for AI agents** by Prisma 7 ("detected that it was invoked
+by Claude Code") — `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` was used instead.
+
+**CI-only breakage caught by local simulation.** The role-provisioning step originally ran
+`psql "$DATABASE_URL" -f …`. `psql` rejects Prisma's `?schema=public` with `invalid URI query
+parameter: "schema"`, so the step would have failed on GitHub. Fixed to pass connection parameters
+explicitly (`PGPASSWORD` + `-h/-U/-d`). The whole job was then re-run against a clean container:
+bootstrap → `migrate deploy` → 9/9 green.
+
+**Final gate run (all local, Task 9):** `lint` PASS · `typecheck` PASS · `build` PASS ·
+`test:coverage` PASS (5 tests, 100% on the pure core) · `test:mutation` PASS (100.00, 5 killed, 0
+survived) · `test:a11y` PASS (1 test) · `test:integration` PASS (9 tests) · `prisma migrate status`
+clean. `npm ci` from scratch verified to regenerate the client via `postinstall`.
 
 ### Completion Notes List
 
+**Decisions recorded (the story asked for each of these explicitly):**
+
+- **Runtime role name: `payroll_app`.** AD-18 names only "the application database role" as a
+  category — no literal name appears in the spine, so this is chosen here and is now the name CI,
+  `.env.example`, and the migration all use.
+- **Role provisioning lives outside migrations** — `prisma/sql/bootstrap-roles.sql`, `DO`-block
+  guarded (PostgreSQL has no `CREATE ROLE IF NOT EXISTS`; that syntax does not exist). Roles are
+  cluster-wide and outlive the shadow database, so a bare `CREATE ROLE` in a migration dies on
+  replay with `P3006`. Only the database-scoped `CONNECT` grant stays in bootstrap; **everything
+  schema-scoped (`USAGE`, table grants, the `REVOKE`) is in the migration**, because a schema
+  rebuild silently revokes schema-scoped privileges — see the Debug Log defect.
+- **The `REVOKE` is load-bearing, not decorative.** The migration grants the other seven tables
+  full DML and `salary_record` only `SELECT, INSERT`, then issues the literal
+  `REVOKE UPDATE, DELETE`. So `salary_record`'s restriction is specific and provable rather than an
+  accident of never having granted, and the revoke also strips privileges a prior grant may have
+  left on an existing database. Verified: `payroll_app`'s privileges on `salary_record` are exactly
+  `INSERT, SELECT`.
+- **The trigger is an addition, not a spine requirement.** AD-18 adopted revoked grants and did not
+  take up F-3's rule/trigger alternative; `review-verify-round2.md` records F-3 as CLOSED by AD-18.
+  The `BEFORE UPDATE OR DELETE` trigger is rk's ratified addition (Decision 2) and is **never** a
+  substitute for the revoke — both ship. It exists because a table owner bypasses privilege checks
+  entirely, so the revoke alone is silently void whenever the app connects as the owner (the Neon
+  default) while every test still passes green. The suite asserts rejection as the owner precisely
+  so layer B is proven independently rather than masked by layer A firing first.
+- **Indexes (the story required an answer either way): two added.**
+  `salary_record (employee_id, effective_from)` — the current-salary resolver reads an employee's
+  records in `(effective_from, seq)` order on every comparison, for every employee in the as-of
+  population; and `employee (role_code, level_code, country_code)` — the peer-identity triple,
+  grouped on every comparison. AD-16 loads the full as-of population per request and AD-12 forbids
+  caching, over 10,000 employees, so both are read on every request. Deliberately **not** added: an
+  index on `salary_record.effective_from` alone (subsumed by the composite), and anything on
+  `gender` (low cardinality, and gender is never part of peer identity).
+- **`updated_at` is `@default(now()) @updatedAt`.** `@updatedAt` is set by the Prisma *client*, not
+  the database, so a raw SQL `INSERT` omitting a `NOT NULL updated_at` fails outright — and the
+  role-switching assertions must use raw SQL, since they connect outside Prisma. Declaring the
+  default in the schema (rather than hand-adding it to the migration) means the DB carries a real
+  `DEFAULT CURRENT_TIMESTAMP` with **no Prisma drift**. Logged in `deferred-work.md`.
+- **Reference-table `id` takes `@default(dbgenerated("gen_random_uuid()"))`; `employee.id` does
+  not.** AD-10 binds only `employee.id` to the id port, and the story permits other tables a DB
+  default. `employee.id` therefore has no default at all — neither `gen_random_uuid()` nor
+  `@default(uuid(7))`, since the latter is Prisma generating the id rather than the id port.
+- **Unit/integration separation via `exclude`, not a narrowed `include`.** `vitest.config.ts` keeps
+  `include: ['tests/**/*.{test,spec}.ts']` and adds
+  `exclude: [...configDefaults.exclude, 'tests/integration/**']`. Equivalent guarantee, and it
+  fails loudly rather than silently if the integration directory is renamed. **Verified, not
+  assumed:** `npm run test` reports 5 tests (unchanged), never the 9 integration tests, and passes
+  with `DATABASE_URL` unset entirely.
+- **Reference-table `is_active` semantics** (the story asked these be documented): it gates
+  **pickability**, never **visibility**. An inactive row is rejected for *new* writes (import per
+  AD-7, and the create/edit form's select options) but still resolves for existing employees — an
+  employee on a retired role keeps their peer group and their place in every count. Filtering
+  inactive rows out of *statistics* would reintroduce the exact AD-16 population divergence
+  Decision 3 exists to avoid.
+- **The integration suite does not clean up `salary_record`,** and that is the invariant working
+  rather than a gap: the trigger blocks `DELETE` for every role including the owner, and the
+  employee/reference rows cannot go either because the FKs are `ON DELETE RESTRICT`. The only
+  cleanup path would be disabling the trigger, i.e. a documented recipe for bypassing Law 5.
+  Instead every fixture code is uniquely suffixed per run, and AD-24 specifies a *disposable*
+  database. The `settings` test does clean up after itself — `settings` is not append-only, and a
+  stray row would break the single-row CHECK on a later migration (this actually happened once
+  during development).
+
+**Two conflicts inherited by 1-4 — named, not silently resolved (as the story required):**
+
+- **Level cardinality is unresolved.** `reconcile-stitch.md` line 97 flags two incompatible level
+  vocabularies in the mocks (Settings/Gender Insights: L1–L8 + M1–M3 = **11**; Employees/Overdue
+  chips: IC2–IC6 + M2/M4/M7), while the addendum sizes the grid at **6**. Structure-only 1-3 is
+  unaffected — `level` is just a table, and `rank` orders whatever wins — but **1-4 cannot draft
+  level values until this is decided.**
+- **Is `country` a reference table, and does import reject on it?** SPEC line 77 names only role
+  and level as seeded reference tables, while epics.md line 63 and AD-6 both require a `country`
+  reference (currency derives from it) — so modeling it here is right, and 1-3 builds the FK. But
+  `reconcile-stitch.md` §4 item 6 and EXPERIENCE.md Note 4 leave **import rejection on country**
+  open, and SPEC CAP-1 mandates role/level rejection only. The **rejection semantics are Epic 2's
+  open question**, not this schema's.
+
+**Also surfaced, logged to `deferred-work.md`, deliberately not absorbed:** the Repository contract
+(epics.md line 64) and Deployment/NFR11 (line 68) are both bound to Epic 1 but owned by **no** story
+in 1-1…1-6; `TRUNCATE` bypasses row-level triggers (not a runtime hole — `payroll_app` never
+receives the `TRUNCATE` privilege — but worth knowing).
+
+**Scope held:** nothing was seeded (Decision 1) — the reference tables and `settings` ship empty and
+the suite builds its own fixtures. No `peer_group` table, no outlier/findings table, no
+dismissal/seen state, no auth/user tables, no `image_url`, no UNIQUE on `employee.name`, no
+`is_active` on `employee`/`salary_record`, no `updated_at` on `salary_record`, no banned vocabulary
+(`snapshot`/`compaRatio`/`payBand`), and no Vercel/Neon deploy wiring.
+
 ### File List
+
+**Created**
+
+- `prisma.config.ts`
+- `prisma/schema.prisma`
+- `prisma/migrations/migration_lock.toml`
+- `prisma/migrations/20260718163008_init/migration.sql`
+- `prisma/migrations/20260718163326_append_only_and_checks/migration.sql`
+- `prisma/sql/bootstrap-roles.sql`
+- `src/adapters/db/client.ts`
+- `tests/integration/schema.test.ts`
+- `vitest.integration.config.ts`
+- `.env.example`
+
+**Modified**
+
+- `package.json` (Prisma 7.8.0 + `pg` pins; `postinstall`, `test:integration`, `db:*` scripts)
+- `package-lock.json`
+- `.gitignore` (generated client)
+- `tsconfig.json` (generated client in `exclude`)
+- `eslint.config.mjs` (generated client in `ignores`; purity `no-restricted-imports` extended)
+- `stryker.config.json` (generated client in `ignorePatterns`)
+- `vitest.config.ts` (integration excluded from the unit suite; generated client in coverage exclude)
+- `.github/workflows/ci.yml` (the `Integration (Postgres 18)` job)
+- `README.md` (§ Database; commands, CI gate table, required checks, § Testing)
+- `prisma/README.md`
+- `src/adapters/db/README.md`
+- `docs/implementation-artifacts/deferred-work.md`
+- `docs/implementation-artifacts/sprint-status.yaml`
+- `docs/implementation-artifacts/1-3-data-model-and-migrations.md`
+
+**Generated, not committed:** `src/adapters/db/generated/**` (git-ignored; rebuilt by `postinstall`)
+
+### Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-18 | Prisma 7.8.0 installed and pinned; `prisma.config.ts` created (v7 moved the connection URL out of `schema.prisma`); full eight-table `schema.prisma` authored; generated client excluded from all five gates and the purity lint extended to catch a v7-shaped leak (`59ca141`) |
+| 2026-07-18 | Initial migration generated; append-only enforced in both ratified layers (`REVOKE` + `BEFORE UPDATE OR DELETE` trigger), `CHECK (amount_minor > 0)`, and the `settings` single-row guard added as hand-authored SQL; AD-24 integration harness added against real Postgres 18, red observed before green (`03e9273`) |
+| 2026-07-18 | CI gains the `Integration (Postgres 18)` job; README documents the database, the two-role split, and the fourth required check. Local job simulation caught that `psql` rejects Prisma's `?schema=public` (`47338e1`) |
+| 2026-07-18 | Fixed a silent privilege bug: schema-scoped `GRANT USAGE ON SCHEMA public` moved from the role bootstrap into the migration, so a schema rebuild no longer blinds the runtime role (`c91b526`) |
