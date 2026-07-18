@@ -60,7 +60,11 @@ Thumbs.db
 .idea/
 .vscode/
 
-# vercel cli
+# vercel cli — created by `vercel deploy` / `vercel pull`; holds local project linkage
 .vercel/
-.vercel
-.env*
+
+# NOTE: the Vercel CLI also appends `.vercel` and `.env*` here. Both were removed (story 1-7):
+# `.vercel` is redundant with `.vercel/`, and `.env*` sits AFTER the `!.env.example` negation
+# above, so — last matching pattern wins — it silently re-ignored .env.example. That file only
+# survived because it was already tracked; in a fresh clone `git add .env.example` would have been
+# refused. If the CLI re-appends this block, delete it again rather than negating around it.
