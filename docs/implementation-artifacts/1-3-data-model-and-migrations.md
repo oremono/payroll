@@ -53,7 +53,7 @@ This is the **third story of Epic 1 (Foundation & Deployable Skeleton)**. Story 
 
 ## Acceptance Criteria
 
-1. **Prisma installed and pinned.** `prisma@7.8.0` (CLI, devDependency), `@prisma/client@7.8.0` (dependency), and **`@prisma/adapter-pg@7.8.0` (dependency — Prisma 7 requires a driver adapter)** are added with **exact** versions (no `^`/`~`; the house style is exact pins throughout). `package-lock.json` is committed. No Story-1-1/1-2 pin is upgraded without a recorded decision. A `postinstall` (currently absent — create it) runs `prisma generate` so the client is present for `typecheck`/`build`; Prisma 7 **never** auto-generates, so any schema change without an explicit `generate` leaves a stale client.
+1. **Prisma installed and pinned.** `prisma@7.8.0` (~~CLI, devDependency~~ → **`dependency`, amended 2026-07-18, see below**), `@prisma/client@7.8.0` (dependency), and **`@prisma/adapter-pg@7.8.0` (dependency — Prisma 7 requires a driver adapter)** are added with **exact** versions (no `^`/`~`; the house style is exact pins throughout). `package-lock.json` is committed. No Story-1-1/1-2 pin is upgraded without a recorded decision. A `postinstall` (currently absent — create it) runs `prisma generate` so the client is present for `typecheck`/`build`; Prisma 7 **never** auto-generates, so any schema change without an explicit `generate` leaves a stale client.
 
 1a. **`prisma.config.ts` exists and is the single source of the connection URL.** A root `prisma.config.ts` supplies `url` (from `process.env.DATABASE_URL`) and begins with `import "dotenv/config"` — Prisma 7 does **not** auto-load `.env`, and the `PRISMA_*` escape-hatch env vars (`PRISMA_SKIP_POSTINSTALL_GENERATE`, etc.) were all removed in 7.0.0. Every CLI invocation (`migrate dev`, `migrate deploy`, `generate`, `validate`) and CI job resolves its URL through this file. Note `prisma migrate deploy` has **no `--url` flag** in v7 — CI cannot pass the URL on the command line.
 
@@ -500,16 +500,19 @@ clean. `npm ci` from scratch verified to regenerate the client via `postinstall`
 
 ### Completion Notes List
 
-**⚠️ Deviation from AC 1 — `prisma` and `dotenv` are runtime `dependencies`, not devDependencies.**
-AC 1 specifies `prisma@7.8.0` as a **devDependency**. Code review found that this combination is
+**✅ RATIFIED by rk 2026-07-18 — AC 1 amended: `prisma` and `dotenv` are runtime `dependencies`.**
+The AC text above now carries the amendment, so the criterion and the code agree. Original finding
+and evidence below.
+
+AC 1 specified `prisma@7.8.0` as a **devDependency**. Code review found that this combination is
 broken: `postinstall` runs `prisma generate`, the generated client is git-ignored and therefore
 **required** at runtime, so any production-style install must be able to generate it. With both
 packages in `devDependencies`, `npm ci --omit=dev` fails outright — reproduced, exit 1,
 `Cannot find module 'dotenv/config'` (`prisma.config.ts` imports it). Verified fixed in both
 directions: the same install now succeeds and emits the client. `dotenv` moves for the same reason
-— `prisma.config.ts` needs it whenever the CLI runs. **This contradicts an explicit AC and needs
-rk's ratification**; the alternative (keep them dev-only and commit the generated client, or drop
-`postinstall`) trades one problem for a worse one.
+— `prisma.config.ts` needs it whenever the CLI runs. The alternatives rk weighed and declined:
+commit the generated client (thousands of generated files in every diff) or drop `postinstall`
+(a silent failure whenever someone forgets to generate).
 
 **Findings from code review (2026-07-18), all fixed — see the Debug Log for the reproductions:**
 
