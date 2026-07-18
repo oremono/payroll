@@ -31,8 +31,13 @@ BEGIN
 END
 $$;
 
--- The runtime role connects and reads the schema, but owns nothing: it must NOT be the migration
--- role. `prisma migrate dev` requires CREATEDB for its shadow database, which this role
--- deliberately lacks — a second reason the two roles can never be the same one.
+-- The runtime role connects but owns nothing: it must NOT be the migration role. `prisma migrate
+-- dev` requires CREATEDB for its shadow database, which this role deliberately lacks — a second
+-- reason the two roles can never be the same one.
+--
+-- CONNECT is database-scoped, so it survives a schema drop and belongs here. USAGE ON SCHEMA
+-- public deliberately does NOT live here: it is schema-scoped, so recreating the schema silently
+-- revokes it and the runtime role goes blind — `relation "salary_record" does not exist` — even
+-- though `prisma migrate status` reports a healthy database. It lives in the migration instead,
+-- alongside the table grants, so it is re-applied every time the schema is rebuilt.
 GRANT CONNECT ON DATABASE payroll TO payroll_app;
-GRANT USAGE ON SCHEMA public TO payroll_app;

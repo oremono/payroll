@@ -60,6 +60,15 @@ CREATE TRIGGER "salary_record_append_only"
 --
 -- GRANT/REVOKE themselves are idempotent and replay safely once the role exists.
 --
+-- USAGE on the schema is a prerequisite for every table grant below — without it the runtime role
+-- cannot even NAME a table, and every query fails with `relation "..." does not exist` rather than
+-- a permission error, while `prisma migrate status` still reports a healthy database.
+--
+-- It is granted HERE, not in bootstrap-roles.sql, precisely because it is schema-scoped: dropping
+-- and recreating the schema (a reset, a rebuild, a fresh deploy) silently revokes it, and only a
+-- grant that replays with the migrations is re-applied.
+GRANT USAGE ON SCHEMA public TO "payroll_app";
+
 -- Tables are enumerated rather than using ALL TABLES IN SCHEMA public, so Prisma's internal
 -- _prisma_migrations table is never granted to the runtime role.
 GRANT SELECT, INSERT, UPDATE, DELETE ON
