@@ -531,6 +531,26 @@ rk's ratification**; the alternative (keep them dev-only and commit the generate
   rows, so a persistent local database would hit duplicate-key failures after ~20 runs. Now the
   full suffix.
 
+**Lower-severity findings, also fixed (second review pass):**
+
+- **`bootstrap-roles.sql` hardcoded the database name** in `GRANT CONNECT ON DATABASE payroll`,
+  which would fail on Neon (default database `neondb`) leaving the role created but unable to
+  connect. Now resolved at runtime via `format('… %I …', current_database())`. Verified against a
+  container whose database is literally named `neondb`: bootstrap → `migrate deploy` → 13/13 green.
+- **The enumerated GRANT list could go stale.** A future migration adding a table and forgetting a
+  grant would produce `permission denied` only in environments connecting as `payroll_app`. New
+  migration `..._runtime_role_default_privileges` adds `ALTER DEFAULT PRIVILEGES` for
+  `SELECT, INSERT` on tables and `USAGE, SELECT` on sequences. **`UPDATE`/`DELETE` are deliberately
+  not inherited** — mutation stays opt-in so a future append-only table cannot silently acquire the
+  rights Law 5 withholds. Not retroactive, which is why `_prisma_migrations` (created before this
+  runs) stays ungranted. Proven: a new owner-created table with no explicit grant is readable and
+  insertable by `payroll_app`, while `UPDATE` and `DELETE` are both denied.
+- **`prisma.config.ts` masked a missing `DATABASE_URL`** behind an empty-string fallback. It now
+  warns, naming the variable. Deliberately a warning and not a throw: `prisma generate` runs in
+  `postinstall` on every install — including the CI jobs that build with no database — and must
+  keep working. Verified both paths: `generate` warns and succeeds; `migrate deploy` warns and then
+  fails on Prisma's own error.
+
 **Root cause worth carrying forward:** every one of these lived in `client.ts` and its absence of
 tests. `schema.test.ts` proved the database invariants with its own hand-rolled `pg` pools and so
 never exercised the client the application ships. `tests/integration/client.test.ts` now closes
@@ -641,6 +661,7 @@ dismissal/seen state, no auth/user tables, no `image_url`, no UNIQUE on `employe
 - `prisma/migrations/migration_lock.toml`
 - `prisma/migrations/20260718163008_init/migration.sql`
 - `prisma/migrations/20260718163326_append_only_and_checks/migration.sql`
+- `prisma/migrations/20260718170934_runtime_role_default_privileges/migration.sql`
 - `prisma/sql/bootstrap-roles.sql`
 - `src/adapters/db/client.ts`
 - `tests/integration/schema.test.ts`
@@ -676,4 +697,6 @@ dismissal/seen state, no auth/user tables, no `image_url`, no UNIQUE on `employe
 | 2026-07-18 | CI gains the `Integration (Postgres 18)` job; README documents the database, the two-role split, and the fourth required check. Local job simulation caught that `psql` rejects Prisma's `?schema=public` (`47338e1`) |
 | 2026-07-18 | Fixed a silent privilege bug: schema-scoped `GRANT USAGE ON SCHEMA public` moved from the role bootstrap into the migration, so a schema rebuild no longer blinds the runtime role (`c91b526`) |
 | 2026-07-18 | rk's rulings recorded: 6 levels, repository port defers to CAP-2/CAP-3, deployment gets a new Epic 1 story (`a087d52`) |
+| 2026-07-18 | CI observed **green remotely** for the first time (run 29653283075) — all four jobs, integration applied migrations and ran both files against the Postgres 18 service |
 | 2026-07-18 | Code-review fixes: the client is now cached unconditionally and connects as `payroll_app` rather than the owner; `prisma`/`dotenv` moved to `dependencies` so `npm ci --omit=dev` works (**deviates from AC 1**); settings-test cleanup moved into `finally`; fixture codes widened. New `tests/integration/client.test.ts` covers the shipped client — integration suite now 13 tests across 2 files |
+| 2026-07-18 | Lower-severity review fixes: `bootstrap-roles.sql` resolves the database name via `current_database()` (verified on a `neondb`-named container); new `..._runtime_role_default_privileges` migration so future tables inherit `SELECT, INSERT` but never `UPDATE`/`DELETE`; `prisma.config.ts` warns on a missing `DATABASE_URL` instead of masking it |

@@ -40,4 +40,13 @@ $$;
 -- revokes it and the runtime role goes blind — `relation "salary_record" does not exist` — even
 -- though `prisma migrate status` reports a healthy database. It lives in the migration instead,
 -- alongside the table grants, so it is re-applied every time the schema is rebuilt.
-GRANT CONNECT ON DATABASE payroll TO payroll_app;
+--
+-- The database NAME is resolved at runtime rather than hardcoded: it is `payroll` locally and in
+-- CI, but Neon's default is `neondb`, and a literal would fail there with `database "payroll" does
+-- not exist` — leaving the role created but unable to connect. `format`/`%I` quotes the identifier
+-- correctly, and EXECUTE is required because GRANT does not accept an expression for the database.
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO payroll_app', current_database());
+END
+$$;

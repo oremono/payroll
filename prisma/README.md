@@ -10,6 +10,13 @@ The data model and its migration history. Authored in Story **1-3**.
   - `..._append_only_and_checks` — everything it cannot: the `UPDATE`/`DELETE` revoke **and** the
     `BEFORE UPDATE OR DELETE` trigger that make `salary_record` append-only (Law 5 / AD-18), the
     `CHECK (amount_minor > 0)` (AD-4), and the single-row `settings` guard (AD-19).
+  - `..._runtime_role_default_privileges` — `ALTER DEFAULT PRIVILEGES` so tables created by future
+    migrations are readable by the runtime role without anyone remembering to grant them.
+
+> **Adding a table in a later migration?** It inherits `SELECT, INSERT` for `payroll_app`
+> automatically (and sequence `USAGE`). `UPDATE`/`DELETE` are deliberately **not** inherited —
+> mutation is opt-in, so a new append-only table cannot silently acquire the rights Law 5 withholds.
+> If the table genuinely needs them, grant them explicitly in that table's own migration.
 - `sql/bootstrap-roles.sql` — provisions the restricted runtime role (`payroll_app`). Run **once
   per cluster, before migrations**. Deliberately not a migration: roles are cluster-wide and
   outlive `migrate dev`'s shadow database (prisma/prisma#6581).
