@@ -1,6 +1,10 @@
+---
+baseline_commit: cc7d4e0af713e41558c22ccbac715eb99cc2c2f6
+---
+
 # Story 1.7: Deployment and Environments
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Sequenced immediately after 1-3, before 1-4 (rk, 2026-07-18). Row order in sprint-status.yaml,
      not the key number, is execution order. -->
@@ -264,10 +268,10 @@ stop and request them rather than fake or skip them. Everything after this secti
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Provision Neon and run the bootstrap** (AC: 3, 6) — *requires the operator steps above*
-  - [ ] Confirm the Neon project is PG **18**, region `aws-ap-southeast-1`, database `neondb`.
-  - [ ] Capture both primary connection strings from the Neon console: direct (owner) and pooled (`-pooler`).
-  - [ ] Run bootstrap once against the primary. Note psql needs a psql-parsable URL — pass parameters
+- [x] **Task 1 — Provision Neon and run the bootstrap** (AC: 3, 6) — *requires the operator steps above*
+  - [x] Confirm the Neon project is PG **18**, region `aws-ap-southeast-1`, database `neondb`.
+  - [x] Capture both primary connection strings from the Neon console: direct (owner) and pooled (`-pooler`).
+  - [x] Run bootstrap once against the primary. Note psql needs a psql-parsable URL — pass parameters
         explicitly, exactly as `ci.yml` does, rather than reusing a Prisma-shaped URL. Take the host verbatim
         from the Neon console (direct hosts look like `ep-<endpoint-id>.<region>.aws.neon.tech`; do not
         hand-construct it):
@@ -277,40 +281,40 @@ stop and request them rather than fake or skip them. Everything after this secti
           -v ON_ERROR_STOP=1 -v payroll_app_password="$PAYROLL_APP_PASSWORD" \
           -f prisma/sql/bootstrap-roles.sql
         ```
-  - [ ] Verify: `\du payroll_app` shows the role with `LOGIN` and **no** `neon_superuser` membership. A
+  - [x] Verify: `\du payroll_app` shows the role with `LOGIN` and **no** `neon_superuser` membership. A
         SQL-created role is deliberately not granted `neon_superuser` — that is the restriction we want.
-  - [ ] Run `npx prisma migrate deploy` locally against the Neon **owner direct** URL. Confirm it applies
+  - [x] Run `npx prisma migrate deploy` locally against the Neon **owner direct** URL. Confirm it applies
         cleanly (no `AP002`, no `P3018`), then `npx prisma migrate status` is clean.
-  - [ ] Verify `ALTER DEFAULT PRIVILEGES` took effect for the *Neon* owner. Migration
+  - [x] Verify `ALTER DEFAULT PRIVILEGES` took effect for the *Neon* owner. Migration
         `20260718170934_runtime_role_default_privileges` keys default privileges to **the role that ran it**;
         locally that was `postgres`, on Neon it is `neondb_owner`. Confirm `payroll_app` can `SELECT` every
         table. If it cannot, record the finding — do not silently re-grant.
 
-- [ ] **Task 2 — Bound the runtime pool, test-first** (AC: 4, 5)
-  - [ ] **Commit A (red):** add the timing assertion of AC 5 to `tests/integration/client.test.ts` — that file
+- [x] **Task 2 — Bound the runtime pool, test-first** (AC: 4, 5)
+  - [x] **Commit A (red):** add the timing assertion of AC 5 to `tests/integration/client.test.ts` — that file
         already exercises the real `getDbClient()` (it exists precisely because `schema.test.ts` uses
         hand-rolled pools and so never tested the shipped client). Push it failing against the current default
         of 10. Do not reach for the owner `Pool` at line 19: it is there to plant fixtures, and connection-count
         introspection is rejected by AC 5.
-  - [ ] **Commit B (green):** `new PrismaPg({ connectionString, max: APP_POOL_MAX })` in
+  - [x] **Commit B (green):** `new PrismaPg({ connectionString, max: APP_POOL_MAX })` in
         `src/adapters/db/client.ts`, with `APP_POOL_MAX = 5` as a module constant and a comment carrying AC 4's
         rationale (PgBouncer is the real pool; this bounds per-instance sockets; `max: 1` rejected and why).
-  - [ ] Keep the adapter construction **inside** `createClient()` — 1-3 put it there deliberately so dev
+  - [x] Keep the adapter construction **inside** `createClient()` — 1-3 put it there deliberately so dev
         hot-reload does not leak a pool per reload. Do not hoist it.
 
-- [ ] **Task 3 — `vercel.json`** (AC: 2, 8)
-  - [ ] `buildCommand` exactly as in AC 2.
-  - [ ] Disable Git auto-deploy for non-`master` branches. **Decision rule — do not escalate to a human:**
+- [x] **Task 3 — `vercel.json`** (AC: 2, 8)
+  - [x] `buildCommand` exactly as in AC 2.
+  - [x] Disable Git auto-deploy for non-`master` branches. **Decision rule — do not escalate to a human:**
         first try `{"git": {"deploymentEnabled": {"master": true}}}` and check against Vercel's current
         `vercel.json` reference whether per-branch entries behave as a deny-by-default allowlist. If they do
         not (i.e. unlisted branches still deploy), fall back to an **Ignored Build Step** that exits non-zero
         for any ref other than `master`, keyed on `$VERCEL_GIT_COMMIT_REF`. Record which mechanism you used
         and what you verified in the Dev Agent Record.
-  - [ ] Add `.vercel/` to `.gitignore` — the CLI creates it on `vercel deploy`/`vercel pull` and it is
+  - [x] Add `.vercel/` to `.gitignore` — the CLI creates it on `vercel deploy`/`vercel pull` and it is
         currently untracked noise at best, committed local project linkage at worst.
-  - [ ] Leave a comment (or a README note, since JSON has no comments) marking where the AD-15 token build
+  - [x] Leave a comment (or a README note, since JSON has no comments) marking where the AD-15 token build
         step will slot in at Story 1-5. Build nothing for it.
-  - [ ] Do **not** set `installCommand` — Vercel's default (`npm install`, driven by the lockfile) runs
+  - [x] Do **not** set `installCommand` — Vercel's default (`npm install`, driven by the lockfile) runs
         `postinstall`, which is what generates the git-ignored Prisma client. Overriding the install command at
         project level makes Vercel pick the *oldest* available package-manager version; leave it alone.
 
@@ -333,13 +337,13 @@ stop and request them rather than fake or skip them. Everything after this secti
         `-pooler` host difference and `sslmode=require`. Local development still points at the Docker
         Postgres 18 on port 55432 — do not change the local defaults.
 
-- [ ] **Task 5 — Preview pipeline** (AC: 7, 8, 10) — new file `.github/workflows/preview.yml`
-  - [ ] Trigger: `pull_request` on `opened`, `synchronize`, `reopened` against `master`. Add a `concurrency`
+- [x] **Task 5 — Preview pipeline** (AC: 7, 8, 10) — new file `.github/workflows/preview.yml`
+  - [x] Trigger: `pull_request` on `opened`, `synchronize`, `reopened` against `master`. Add a `concurrency`
         group keyed on the PR ref with `cancel-in-progress: true`, mirroring `ci.yml:15-17` — without it two
         rapid pushes race on branch creation and deploy.
-  - [ ] Standard preamble, same as every `ci.yml` job: `actions/checkout@v4`, `actions/setup-node@v4` with
+  - [x] Standard preamble, same as every `ci.yml` job: `actions/checkout@v4`, `actions/setup-node@v4` with
         `node-version-file: .nvmrc` and `cache: npm`, `npm ci`.
-  - [ ] **Read `action.yml` at the pinned `@v6` ref before writing the step.** Confirm the exact input and
+  - [x] **Read `action.yml` at the pinned `@v6` ref before writing the step.** Confirm the exact input and
         output names rather than trusting this story's list — v6 renamed them (`username`→`role`,
         `parent`→`parent_branch`, `*_with_pooler`→`*_pooled`) and Neon's own published sample workflow is
         still on v5. Then: `neondatabase/create-branch-action@v6` with `project_id: ${{ vars.NEON_PROJECT_ID }}`,
@@ -354,7 +358,7 @@ stop and request them rather than fake or skip them. Everything after this secti
           project's branch quota.
 
         Idempotent — a re-run on `synchronize` returns the existing branch with `created: false`.
-  - [ ] **Compose `DATABASE_URL_APP` in the workflow** — do **not** ask the Neon API for `payroll_app`'s
+  - [x] **Compose `DATABASE_URL_APP` in the workflow** — do **not** ask the Neon API for `payroll_app`'s
         credentials. The password is known because branches inherit it (AC 6), and whether the API can return
         credentials for a SQL-created role is unverified; composing removes the dependency entirely. The
         action's output is a **full connection URI for `neondb_owner`**, not a bare host, so this is a
@@ -362,13 +366,13 @@ stop and request them rather than fake or skip them. Everything after this secti
         `secrets.PAYROLL_APP_PASSWORD`, and ensure `sslmode=require` is present (AC 3 requires it; the
         action's output may or may not carry it). Mask the composed value with `::add-mask::` before it can
         reach a log.
-  - [ ] **Reproduce `ci.yml:115-124` against the branch, all three steps in order** (AC 10):
+  - [x] **Reproduce `ci.yml:115-124` against the branch, all three steps in order** (AC 10):
         `npx prisma migrate deploy` → `npx prisma migrate diff --from-config-datasource --to-schema
         prisma/schema.prisma --exit-code` → `npm run test:integration`, with `DATABASE_URL` = owner **direct**
         and `DATABASE_URL_APP` = app **pooled**. Any of the three failing must fail the job — this is the gate
         that catches a mis-provisioned branch before the deploy. Do **not** run `bootstrap-roles.sql` here;
         the role is inherited (AC 6), and re-running it per branch is the mistake this story exists to avoid.
-  - [ ] Deploy. The Vercel CLI is **not** a project dependency — invoke it pinned via `npx vercel@<pin>` and
+  - [x] Deploy. The Vercel CLI is **not** a project dependency — invoke it pinned via `npx vercel@<pin>` and
         record the pin. It needs: `--token=${{ secrets.VERCEL_TOKEN }}`, `--yes`, and `VERCEL_ORG_ID` /
         `VERCEL_PROJECT_ID` exported as **environment variables** (the CLI reads them from the environment to
         skip interactive linking — passing them as GitHub `vars` alone does nothing). Pass
@@ -376,25 +380,25 @@ stop and request them rather than fake or skip them. Everything after this secti
         stdout into a step output (`echo "url=$URL" >> "$GITHUB_OUTPUT"`) for the smoke step.
         The build needs only `DATABASE_URL`; `client.ts` is lazy, so the build never touches
         `DATABASE_URL_APP` — that laziness is load-bearing here, do not make the client eager.
-  - [ ] Smoke: `npx playwright install --with-deps chromium` (required — the runner has no browser, exactly as
+  - [x] Smoke: `npx playwright install --with-deps chromium` (required — the runner has no browser, exactly as
         `ci.yml:138-139` handles it), then `npm run test:smoke` with `PLAYWRIGHT_BASE_URL` set to the captured
         URL.
-  - [ ] Second workflow / job on `pull_request: [closed]` → `neondatabase/delete-branch-action@v3` with
+  - [x] Second workflow / job on `pull_request: [closed]` → `neondatabase/delete-branch-action@v3` with
         `branch: pr-${{ github.event.number }}` (input is `branch`; `branch_id` is deprecated). It must fire
         on close **whether or not the PR merged**, and must not fail the run if the branch is already gone.
-  - [ ] Guard against forks: `secrets` are unavailable to fork PRs. Skip the job cleanly rather than failing.
-  - [ ] Note the branch quota in `README § Deployment`: Neon plans cap branches per project (commonly 10 on
+  - [x] Guard against forks: `secrets` are unavailable to fork PRs. Skip the job cleanly rather than failing.
+  - [x] Note the branch quota in `README § Deployment`: Neon plans cap branches per project (commonly 10 on
         free), and the `closed` cleanup does not fire for git branches deleted outside a PR, so orphans
         accumulate. Set a branch TTL/expiry if the action supports one, and document the manual cleanup path.
 
-- [ ] **Task 6 — Smoke check** (AC: 12)
-  - [ ] `playwright.config.ts`: `baseURL` from `process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3100'`;
+- [x] **Task 6 — Smoke check** (AC: 12)
+  - [x] `playwright.config.ts`: `baseURL` from `process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3100'`;
         `webServer` omitted when `PLAYWRIGHT_BASE_URL` is set.
-  - [ ] `e2e/smoke.spec.ts`: navigate to `/`, assert a `200` and that the page renders. Keep it thin — it
+  - [x] `e2e/smoke.spec.ts`: navigate to `/`, assert a `200` and that the page renders. Keep it thin — it
         asserts *reachability*, not content; content is Story 1-6's.
-  - [ ] Narrow `test:a11y` and add `test:smoke` per AC 12, then confirm the `Accessibility (axe)` job runs
+  - [x] Narrow `test:a11y` and add `test:smoke` per AC 12, then confirm the `Accessibility (axe)` job runs
         **only** the axe spec — same scope as before, not merely still-green.
-  - [ ] `e2e/` is inside both gates: `tsconfig.json` includes `**/*.ts` and `eslint.config.mjs` does not
+  - [x] `e2e/` is inside both gates: `tsconfig.json` includes `**/*.ts` and `eslint.config.mjs` does not
         ignore `e2e/`. `smoke.spec.ts` must pass `npm run lint` and `npm run typecheck` — check locally rather
         than discovering it in CI.
 
@@ -410,11 +414,11 @@ stop and request them rather than fake or skip them. Everything after this secti
         devDependencies) and note it in the Dev Agent Record.
   - [ ] Confirm all four existing CI checks are green on `master`.
 
-- [ ] **Task 8 — Documentation** (AC: 15, 9, 13)
-  - [ ] `README § Deployment & environments` — new section per AC 15, including the AC 9 rationale.
-  - [ ] Remove the now-false "plumbing is not built yet" blockquote from `README § Database`.
-  - [ ] `deferred-work.md`: close the pool-sizing item, pointing at this story.
-  - [ ] Record in `deferred-work.md` anything you hit and deliberately did not fix — in particular the
+- [x] **Task 8 — Documentation** (AC: 15, 9, 13)
+  - [x] `README § Deployment & environments` — new section per AC 15, including the AC 9 rationale.
+  - [x] Remove the now-false "plumbing is not built yet" blockquote from `README § Database`.
+  - [x] `deferred-work.md`: close the pool-sizing item, pointing at this story.
+  - [x] Record in `deferred-work.md` anything you hit and deliberately did not fix — in particular the
         integration-fixtures-accumulate item, which preview branches now partly mitigate (each PR gets a fresh
         clone) but do not solve for the primary.
 
@@ -574,8 +578,155 @@ history. AC 5 mandates the red and green commits be separate.
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Claude Code, `bmad-dev-story`), 2026-07-19.
+
 ### Debug Log References
+
+Every claim below is backed by a CI run or a command output, not by narrative.
+
+| Evidence | Where |
+| --- | --- |
+| **Red commit fails `Integration (Postgres 18)`, other three gates pass** | [run 29658638514](https://github.com/oremono/payroll/actions/runs/29658638514) on `3961010` — `AssertionError: expected 1003.42 to be greater than or equal to 1900` |
+| Preview pipeline green end-to-end (branch → migrate → diff → integration → deploy → smoke) | [run 29658480123](https://github.com/oremono/payroll/actions/runs/29658480123), 2m46s |
+| Four required gates green at branch tip | [run 29658480127](https://github.com/oremono/payroll/actions/runs/29658480127) |
+| Four required gates green on `master` after merge | [run 29658726061](https://github.com/oremono/payroll/actions/runs/29658726061) |
+| Neon branch lifecycle create → delete | `Branch pr-1 created successfully`; cleanup [run 29658726129](https://github.com/oremono/payroll/actions/runs/29658726129) deleted `br-withered-flower-azy5bodw`, expiry `2026-07-25` (the 7-day TTL) |
+| `ignoreCommand` blocks Git deploys on non-`master` | PR #1 Vercel check: **"Canceled by Ignored Build Step"** |
+| `migrate deploy` genuinely runs in the Vercel build | Preview deploy log: `4 migrations found in prisma/migrations` / `No pending migrations to apply` |
+| Migrations use the **direct** endpoint | Preview log datasource host `ep-withered-scene-az2n01hp.c-3.ap-southeast-1.aws.neon.tech` — no `-pooler` |
+| Composed URLs never reach a log | Both render as `***` in every step's `env:` block |
+| **Production build FAILS** (the blocker) | `payroll-5zz121ofc` — `Error: Connection url is empty. See https://pris.ly/d/config-url` |
 
 ### Completion Notes List
 
+**Status: BLOCKED on an operator step. Tasks 1–3, 5, 6, 8 are complete and verified; Tasks 4 and 7
+are not.** 13 of 15 ACs are met and evidenced. AC 1 is not met, and AC 3 is met in preview but not
+in production.
+
+#### The blocker (rk's action — I must not do this one)
+
+The production build fails at `prisma migrate deploy` with **`Connection url is empty`**. The Vercel
+`DATABASE_URL` variable exists and is scoped to Production, but **its value does not reach the build
+step**. `vercel env pull --environment=production` returns it as an empty string while non-secret
+system variables in the same pull carry real values.
+
+This is consistent with the variable having been created as **sensitive** — which is exactly what
+Operator Step 5 instructed. That step says `vercel env add` "defaults to sensitive … that is correct
+here." **It is correct for `DATABASE_URL_APP` and wrong for `DATABASE_URL`**, because this story
+moves `migrate deploy` into `buildCommand`, and a sensitive variable is exposed at runtime, not at
+build. AC 3 states the requirement plainly ("`DATABASE_URL` must be a **build-time** variable"); the
+operator step contradicts it. Recording rather than working around, per the story's own instruction.
+
+The fix is one operator command (the value is the Neon **owner, direct** URL already recorded
+outside Vercel):
+
+```bash
+vercel env rm  DATABASE_URL production --yes
+vercel env add DATABASE_URL production --no-sensitive   # paste the owner DIRECT url
+vercel redeploy https://payroll-iota-coral.vercel.app   # or push any commit to master
+```
+
+Leave `DATABASE_URL_APP` sensitive — it is only ever read at runtime, so sensitive is right for it.
+
+If a redeploy still reports `Connection url is empty` after that, the cause is not sensitivity and
+the next thing to check is whether the value itself was stored blank.
+
+**Production is NOT down.** Vercel kept the last good alias; `https://payroll-iota-coral.vercel.app`
+still returns `200`. But it is serving a **pre-story** build, which is why AC 1 cannot be signed off.
+Every future `master` build will fail until the variable is fixed.
+
+#### Three findings where I did not follow the story, and why
+
+1. **`git.deploymentEnabled` cannot express deny-by-default (Task 3).** Task 3's decision rule said
+   to try `{"git": {"deploymentEnabled": {"master": true}}}` first and check the reference. Checked:
+   Vercel documents per-branch entries as an opt-**out** map — *"Unspecified branches default to
+   true"* — so that shape would have left every branch deploying. `{"deploymentEnabled": false}`
+   would also have stopped `master`. Used the story's documented fallback, `ignoreCommand`.
+2. **`ignoreCommand`'s exit codes are inverted from the story's hint.** Task 3 says to exit
+   "non-zero for any ref other than `master`". Vercel's documented semantics are the reverse —
+   **exit 0 ignores the build, exit 1 continues it** — so the literal instruction would have
+   deployed every non-`master` branch and skipped `master`. Implemented to the documented behaviour.
+   Verified live: PR #1's Vercel check reads *"Canceled by Ignored Build Step."*
+3. **`pg` did not need promoting to `dependencies` (Task 7).** Task 7 pre-authorised the promotion.
+   It is not needed: `@prisma/adapter-pg` declares `pg: ^8.16.3` as a **hard dependency, not a
+   peerDependency**, so `npm ls pg --omit=dev` still resolves `pg@8.22.0` under it. Our root entry
+   is a version pin for the integration tests, which import `pg` directly. Made no change.
+
+#### Notes on the rest
+
+- **`ignoreCommand` + CLI deploys.** Vercel's docs do not state whether the Ignored Build Step runs
+  for `vercel deploy`-created deployments. Rather than rest on unverified behaviour, the pipeline
+  passes `--build-env CI_DRIVEN_PREVIEW=1` and `ignoreCommand` honours it — correct either way.
+- **`::add-mask::` is only parsed from stdout.** The natural way to write the URL-composition step
+  (`python3 <<PY >> "$GITHUB_ENV"`) silently discards the mask, because stdout is redirected. Env
+  assignments are appended to `$GITHUB_ENV` from inside Python so the mask can stay on stdout.
+- **`pg_sleep` cannot be selected directly through Prisma** — it returns `void` and the deserializer
+  rejects a void column. Moved into `FROM`. The first red run failed on this, not on the assertion;
+  fixed before the red commit so the recorded failure is the *intended* one.
+- **The pool bound holds on the pooled endpoint**, which is the claim AC 5 rests on: the timing
+  assertion passed against Neon's `-pooler` host in CI (5.3 s for the whole test) as well as against
+  the local container. Cross-region latency (runner in `eastus2`, Neon in `ap-southeast-1`) leaves
+  roughly a 2× margin on the 1.9 s boundary — recorded in `deferred-work.md` with a re-entry path.
+- **`migrate deploy` reported "No pending migrations"** on the preview branch. That is the expected
+  copy-on-write behaviour AC 10 predicts, not a skipped step — the clone already carried the
+  parent's 4 migrations. The drift check (`No difference detected`) is what proves the schema right.
+- **Merged with a merge commit, not a squash** (rk's call, asked explicitly): a squash would have
+  destroyed the red→green pair that AC 5 requires to survive in history.
+- **Fixed in passing:** the Vercel CLI had appended `.env*` to `.gitignore` *after* the
+  `!.env.example` negation. Last-match-wins meant `.env.example` was silently re-ignored; it
+  survived only because it was already tracked, and a fresh clone could not have re-added it.
+- **Branch `evidence/1-7-pool-bound-red`** exists solely to carry the red commit's failing CI run
+  (I pushed all six commits at once, so Actions only ran on the tip and the red artifact would
+  otherwise have been my own uncorroborated account — the exact weakness this practice was adopted
+  to fix). Safe to delete once the story is accepted; the Actions run record survives branch
+  deletion.
+
+#### AC status
+
+| AC | Status |
+| --- | --- |
+| 1 Production reachable | ❌ **Not met** — production serves a pre-story build; the new build fails |
+| 2 Migrations at build from `vercel.json` | ✅ Proven in the preview build |
+| 3 Owner/runtime + direct/pooled split | ⚠️ Proven in preview; **production blocked** by the env var |
+| 4 Pool bounded, justified | ✅ `APP_POOL_MAX = 5` |
+| 5 Delivered test-first in two commits | ✅ Red run 29658638514, green `941c89f` |
+| 6 Bootstrap once per project, proven | ✅ Integration suite green on an un-bootstrapped branch |
+| 7 Neon branch per PR | ✅ `pr-1` created and deleted |
+| 8 Preview is CI-driven | ✅ "Canceled by Ignored Build Step" |
+| 9 Native integration not installed | ✅ Not installed; rationale in README |
+| 10 Branch proven by the integration sequence | ✅ All three steps green on Neon |
+| 11 No health-check route | ✅ None added |
+| 12 Smoke check without widening a11y | ✅ Verified by `--list`, not by staying green |
+| 13 No secret committed | ✅ Diff grepped for host, password, project id — placeholders only |
+| 14 Every existing gate still passes | ✅ Green on branch tip and on `master` |
+| 15 Docs updated to fact | ✅ README § Deployment & environments; `deferred-work.md` closed |
+
 ### File List
+
+| File | Change |
+| --- | --- |
+| `src/adapters/db/client.ts` | Modified — `APP_POOL_MAX = 5`, passed to `PrismaPg` |
+| `tests/integration/client.test.ts` | Modified — behavioural pool-bound timing assertion |
+| `vercel.json` | **Added** — `buildCommand`, `ignoreCommand` |
+| `.github/workflows/preview.yml` | **Added** — Neon branch per PR, gate, deploy, smoke, cleanup |
+| `e2e/smoke.spec.ts` | **Added** — deployed-URL reachability check |
+| `playwright.config.ts` | Modified — `PLAYWRIGHT_BASE_URL`; `webServer` omitted when set |
+| `package.json` | Modified — `test:a11y` narrowed; `test:smoke` added |
+| `.gitignore` | Modified — kept `.vercel/`; removed the CLI-appended `.env*` |
+| `.env.example` | Modified — commented Neon URL shapes (no real values) |
+| `README.md` | Modified — § Deployment & environments; removed the stale § Database blockquote |
+| `docs/implementation-artifacts/deferred-work.md` | Modified — closed pool sizing; recorded new items |
+| `docs/implementation-artifacts/1-7-deployment-and-environments.md` | Modified — this record |
+| `docs/implementation-artifacts/sprint-status.yaml` | Modified — status tracking |
+
+### Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-19 | Pool bound landed test-first as separate red (`3961010`) and green (`941c89f`) commits |
+| 2026-07-19 | `vercel.json` added; Git auto-deploy restricted to `master` via `ignoreCommand` |
+| 2026-07-19 | Preview pipeline added; verified end-to-end on PR #1 |
+| 2026-07-19 | Smoke check added; `test:a11y` narrowed to its own spec |
+| 2026-07-19 | Documentation moved from intent to fact; pool-sizing deferred item closed |
+| 2026-07-19 | Merged to `master` (merge commit `e32172b`); all four gates green on `master` |
+| 2026-07-19 | **Blocked:** production build fails — `DATABASE_URL` not exposed to the Vercel build step |
