@@ -60,7 +60,7 @@ development_status:
   epic-1: in-progress
   1-1-project-scaffold-and-source-tree: done
   1-2-ci-pipeline-and-gates: done
-  1-3-data-model-and-migrations: review
+  1-3-data-model-and-migrations: done
   # Added by correct-course 2026-07-18 (sprint-change-proposal-2026-07-18.md). Epic 1's description
   # promised a deployed application and epics.md bound Deployment + NFR11 to Epic 1, but the
   # original derivation produced no story for it — deployment appeared only in the opening clause.
