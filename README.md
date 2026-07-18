@@ -204,6 +204,20 @@ Both differences are correctness constraints, not preferences:
 
 Both carry `sslmode=require` — Neon rejects non-TLS connections outright.
 
+> **`DATABASE_URL` must be a NON-sensitive Vercel variable.** Vercel's *sensitive* environment
+> variables are exposed at **runtime only, not to the build step** — and `migrate deploy` runs in
+> `buildCommand`. A sensitive `DATABASE_URL` fails the production build with
+> `Error: Connection url is empty`, which names neither the variable nor the reason. `vercel env add`
+> defaults to sensitive, so pass `--no-sensitive` explicitly:
+>
+> ```bash
+> vercel env add DATABASE_URL production --no-sensitive
+> ```
+>
+> `DATABASE_URL_APP` is read only at runtime, so it should stay **sensitive**. The asymmetry is the
+> point: the variable that must be readable at build cannot be sensitive, and the one that must not
+> leak should be. (Hit and fixed during Story 1-7.)
+
 ### Bootstrap runs once per Neon project, not per branch
 
 `prisma/sql/bootstrap-roles.sql` was run **once** against the `production` branch. It is deliberately

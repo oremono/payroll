@@ -4,7 +4,7 @@ baseline_commit: cc7d4e0af713e41558c22ccbac715eb99cc2c2f6
 
 # Story 1.7: Deployment and Environments
 
-Status: in-progress
+Status: review
 
 <!-- Sequenced immediately after 1-3, before 1-4 (rk, 2026-07-18). Row order in sprint-status.yaml,
      not the key number, is execution order. -->
@@ -318,8 +318,8 @@ stop and request them rather than fake or skip them. Everything after this secti
         `postinstall`, which is what generates the git-ignored Prisma client. Overriding the install command at
         project level makes Vercel pick the *oldest* available package-manager version; leave it alone.
 
-- [ ] **Task 4 — Secrets and environment** (AC: 3, 13)
-  - [ ] Confirm with rk that these exist before writing any workflow that consumes them:
+- [x] **Task 4 — Secrets and environment** (AC: 3, 13)
+  - [x] Confirm with rk that these exist before writing any workflow that consumes them:
 
     | Where | Name | Value |
     | --- | --- | --- |
@@ -332,8 +332,8 @@ stop and request them rather than fake or skip them. Everything after this secti
     | Vercel env (Production) | `DATABASE_URL` | owner, **direct**, `sslmode=require` |
     | Vercel env (Production) | `DATABASE_URL_APP` | `payroll_app`, **pooled**, `sslmode=require` |
 
-  - [ ] Preview-scope Vercel env vars are **not** set — preview values are passed per-deployment (Task 5).
-  - [ ] Update `.env.example`: commented Neon URL *shapes* beneath the existing local defaults, showing the
+  - [x] Preview-scope Vercel env vars are **not** set — preview values are passed per-deployment (Task 5).
+  - [x] Update `.env.example`: commented Neon URL *shapes* beneath the existing local defaults, showing the
         `-pooler` host difference and `sslmode=require`. Local development still points at the Docker
         Postgres 18 on port 55432 — do not change the local defaults.
 
@@ -402,17 +402,17 @@ stop and request them rather than fake or skip them. Everything after this secti
         ignore `e2e/`. `smoke.spec.ts` must pass `npm run lint` and `npm run typecheck` — check locally rather
         than discovering it in CI.
 
-- [ ] **Task 7 — Production deploy and verification** (AC: 1, 14)
-  - [ ] Merge to `master`, confirm the production build runs `migrate deploy` (check the build log for the
+- [x] **Task 7 — Production deploy and verification** (AC: 1, 14)
+  - [x] Merge to `master`, confirm the production build runs `migrate deploy` (check the build log for the
         Prisma output) and succeeds.
-  - [ ] Confirm the URL responds `200` and renders the placeholder page.
-  - [ ] Confirm Node **24** in the build log (`.nvmrc` + `engines.node >= 24 <25`), rather than assuming.
-  - [ ] **Verify `pg` resolves in the deployed function.** `pg@8.22.0` and `@types/pg` are
+  - [x] Confirm the URL responds `200` and renders the placeholder page.
+  - [x] Confirm Node **24** in the build log (`.nvmrc` + `engines.node >= 24 <25`), rather than assuming.
+  - [x] **Verify `pg` resolves in the deployed function.** `pg@8.22.0` and `@types/pg` are
         **devDependencies**, but `@prisma/adapter-pg` is a runtime dependency that needs `pg` at runtime. This
         is the same class of trap that put `prisma` and `dotenv` in `dependencies`, and it was not re-checked
         then. If the function cannot resolve `pg`, promote it to `dependencies` (leave `@types/pg` in
         devDependencies) and note it in the Dev Agent Record.
-  - [ ] Confirm all four existing CI checks are green on `master`.
+  - [x] Confirm all four existing CI checks are green on `master`.
 
 - [x] **Task 8 — Documentation** (AC: 15, 9, 13)
   - [x] `README § Deployment & environments` — new section per AC 15, including the AC 9 rationale.
@@ -595,45 +595,57 @@ Every claim below is backed by a CI run or a command output, not by narrative.
 | `migrate deploy` genuinely runs in the Vercel build | Preview deploy log: `4 migrations found in prisma/migrations` / `No pending migrations to apply` |
 | Migrations use the **direct** endpoint | Preview log datasource host `ep-withered-scene-az2n01hp.c-3.ap-southeast-1.aws.neon.tech` — no `-pooler` |
 | Composed URLs never reach a log | Both render as `***` in every step's `env:` block |
-| **Production build FAILS** (the blocker) | `payroll-5zz121ofc` — `Error: Connection url is empty. See https://pris.ly/d/config-url` |
+| Production build initially FAILED | `payroll-5zz121ofc` — `Error: Connection url is empty. See https://pris.ly/d/config-url` |
+| **Production build now GREEN** after rk re-added `DATABASE_URL` non-sensitive | `payroll-nc4szvqmk` — `4 migrations found` / `No pending migrations to apply` / `Build Completed [26s]`, and the `[prisma.config] DATABASE_URL is not set` warning is **absent** |
+| Production migrates over the **direct** endpoint | Production build log datasource host `ep-mute-night-azbvpjd9.c-3…neon.tech` — no `-pooler` |
+| Production serves the 1-1 placeholder | `200`; `<h1>Salary Management for ACME HR</h1>` + `<p>Project scaffold is up and running.</p>`, matching `src/app/page.tsx` |
+| Smoke spec green against **production** | `PLAYWRIGHT_BASE_URL=https://payroll-iota-coral.vercel.app npm run test:smoke` → 1 passed |
 
 ### Completion Notes List
 
-**Status: BLOCKED on an operator step. Tasks 1–3, 5, 6, 8 are complete and verified; Tasks 4 and 7
-are not.** 13 of 15 ACs are met and evidenced. AC 1 is not met, and AC 3 is met in preview but not
-in production.
+**Status: COMPLETE. All 8 tasks done; all 15 ACs met and evidenced.**
 
-#### The blocker (rk's action — I must not do this one)
+#### The one blocker hit, and its resolution
 
-The production build fails at `prisma migrate deploy` with **`Connection url is empty`**. The Vercel
-`DATABASE_URL` variable exists and is scoped to Production, but **its value does not reach the build
-step**. `vercel env pull --environment=production` returns it as an empty string while non-secret
-system variables in the same pull carry real values.
+The first production build failed at `prisma migrate deploy` with **`Connection url is empty`**.
+`DATABASE_URL` existed and was scoped to Production, but its value never reached the **build** step —
+`vercel env pull --environment=production` returned it empty while non-secret system variables in the
+same pull carried real values.
 
-This is consistent with the variable having been created as **sensitive** — which is exactly what
-Operator Step 5 instructed. That step says `vercel env add` "defaults to sensitive … that is correct
-here." **It is correct for `DATABASE_URL_APP` and wrong for `DATABASE_URL`**, because this story
-moves `migrate deploy` into `buildCommand`, and a sensitive variable is exposed at runtime, not at
-build. AC 3 states the requirement plainly ("`DATABASE_URL` must be a **build-time** variable"); the
-operator step contradicts it. Recording rather than working around, per the story's own instruction.
+Cause: the variable had been created as **sensitive**, which is what Operator Step 5 instructs
+(`vercel env add` "defaults to sensitive … that is correct here"). **That is correct for
+`DATABASE_URL_APP` and wrong for `DATABASE_URL`**: this story moves `migrate deploy` into
+`buildCommand`, and Vercel exposes sensitive variables at runtime, not at build. AC 3 states the
+requirement plainly ("`DATABASE_URL` must be a **build-time** variable"), so the operator step and the
+AC contradicted each other. Surfaced rather than worked around, per the story's own instruction that
+operator steps are rk's.
 
-The fix is one operator command (the value is the Neon **owner, direct** URL already recorded
-outside Vercel):
+**rk re-added `DATABASE_URL` as non-sensitive and redeployed; the build is green.** The proof is as
+much in what disappeared as what appeared — the `[prisma.config] DATABASE_URL is not set` warning
+present in the failed build is absent from the successful one.
 
-```bash
-vercel env rm  DATABASE_URL production --yes
-vercel env add DATABASE_URL production --no-sensitive   # paste the owner DIRECT url
-vercel redeploy https://payroll-iota-coral.vercel.app   # or push any commit to master
-```
+⚠️ **Operator Step 5 is still wrong as written** and would reproduce this on any fresh project setup.
+I cannot edit that section (it is outside the sections this workflow may modify), so the correction is
+recorded in `README § Deployment & environments` as a blockquote, with the asymmetry stated
+explicitly: the variable that must be readable at build cannot be sensitive; the one that must not
+leak should be. **Suggest amending Operator Step 5 during review.**
 
-Leave `DATABASE_URL_APP` sensitive — it is only ever read at runtime, so sensitive is right for it.
+Production was never down — Vercel kept the last good alias throughout.
 
-If a redeploy still reports `Connection url is empty` after that, the cause is not sensitivity and
-the next thing to check is whether the value itself was stored blank.
+#### Two Task 7 subtasks discharged by different evidence than the story anticipated
 
-**Production is NOT down.** Vercel kept the last good alias; `https://payroll-iota-coral.vercel.app`
-still returns `200`. But it is serving a **pre-story** build, which is why AC 1 cannot be signed off.
-Every future `master` build will fail until the variable is fixed.
+Both are honest deviations, not skipped checks:
+
+- **"Confirm Node 24 in the build log."** Vercel no longer prints the Node version in the build log —
+  I read the full log and it is simply not there. Confirmed instead by the mechanism Vercel documents
+  as authoritative: `engines.node: ">=24 <25"` in `package.json` *overrides project settings*, and an
+  unsatisfiable range fails the build outright. The build succeeded, so Node ∈ [24, 25). `.nvmrc` is
+  `24`, and the story's own Verified Environment records the project as live on Node 24.x.
+- **"Verify `pg` resolves in the deployed function."** There is currently **no deployed function** —
+  the production build reports both routes as `○ (Static) prerendered as static content`, so nothing
+  server-side runs yet. The check is therefore not merely unperformed but not yet meaningful; it
+  becomes real when Story 1-6 adds a dynamic surface. It is also settled analytically: see finding 3
+  below.
 
 #### Three findings where I did not follow the story, and why
 
@@ -685,9 +697,9 @@ Every future `master` build will fail until the variable is fixed.
 
 | AC | Status |
 | --- | --- |
-| 1 Production reachable | ❌ **Not met** — production serves a pre-story build; the new build fails |
-| 2 Migrations at build from `vercel.json` | ✅ Proven in the preview build |
-| 3 Owner/runtime + direct/pooled split | ⚠️ Proven in preview; **production blocked** by the env var |
+| 1 Production reachable | ✅ `200`, renders the 1-1 placeholder, smoke spec green against production |
+| 2 Migrations at build from `vercel.json` | ✅ Proven in both the preview and production builds |
+| 3 Owner/runtime + direct/pooled split | ✅ Proven in preview and production; production migrates over the direct endpoint |
 | 4 Pool bounded, justified | ✅ `APP_POOL_MAX = 5` |
 | 5 Delivered test-first in two commits | ✅ Red run 29658638514, green `941c89f` |
 | 6 Bootstrap once per project, proven | ✅ Integration suite green on an un-bootstrapped branch |
@@ -730,3 +742,4 @@ Every future `master` build will fail until the variable is fixed.
 | 2026-07-19 | Documentation moved from intent to fact; pool-sizing deferred item closed |
 | 2026-07-19 | Merged to `master` (merge commit `e32172b`); all four gates green on `master` |
 | 2026-07-19 | **Blocked:** production build fails — `DATABASE_URL` not exposed to the Vercel build step |
+| 2026-07-19 | **Unblocked (rk):** `DATABASE_URL` re-added non-sensitive; production build green, `migrate deploy` ran over the direct endpoint, production serves the placeholder. Requirement documented in `README § Deployment & environments`. Story complete → review |
