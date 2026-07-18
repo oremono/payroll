@@ -77,7 +77,7 @@ model Employee {
   hireDate DateTime @map("hire_date") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   role    Role    @relation(fields: [roleCode], references: [code])
   level   Level   @relation(fields: [levelCode], references: [code])
@@ -151,7 +151,7 @@ model Role {
   name      String   @db.Text
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   employees Employee[]
 
@@ -170,7 +170,7 @@ model Level {
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   employees Employee[]
 
@@ -189,7 +189,7 @@ model Country {
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   currency  Currency   @relation(fields: [currencyCode], references: [code])
   employees Employee[]
@@ -212,7 +212,7 @@ model Currency {
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   countries       Country[]
   salaryRecords   SalaryRecord[]
@@ -239,7 +239,7 @@ model FxRate {
   pinnedOn DateTime @map("pinned_on") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   from Currency @relation("FxRateFromCurrency", fields: [fromCurrency], references: [code])
   to   Currency @relation("FxRateToCurrency", fields: [toCurrency], references: [code])
@@ -268,7 +268,7 @@ model Settings {
   reportingCurrency String @map("reporting_currency") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   currency Currency @relation(fields: [reportingCurrency], references: [code])
 
