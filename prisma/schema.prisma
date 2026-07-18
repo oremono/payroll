@@ -130,8 +130,12 @@ model SalaryRecord {
   /// AUDIT ONLY — may NEVER be used as an ordering or tie-break key (AD-8). That is seq's job.
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  employee Employee @relation(fields: [employeeId], references: [id])
-  currency Currency @relation(fields: [currencyCode], references: [code])
+  // onUpdate: Restrict, NOT Prisma's default Cascade. A cascaded update rewrites the referencing
+  // salary_record rows, which fires the append-only trigger and aborts the whole transaction with
+  // "salary_record is append-only" — an error naming a table the caller never touched. Restrict
+  // fails immediately and legibly at the row actually being renamed instead. (Code review 2026-07-18.)
+  employee Employee @relation(fields: [employeeId], references: [id], onUpdate: Restrict)
+  currency Currency @relation(fields: [currencyCode], references: [code], onUpdate: Restrict)
 
   /// The current-salary resolver reads an employee's records ordered by (effective_from, seq) on
   /// every comparison, for every employee in the as-of population. See Completion Notes.
@@ -166,7 +170,11 @@ model Level {
 
   /// Orders the gender-distribution-by-level chart and prevents level inversion. Justified by the
   /// chart's row order, not by a DESIGN.md rule — no UX document mentions a rank explicitly.
-  rank Int @db.Integer
+  ///
+  /// UNIQUE because `ORDER BY rank` with duplicate ranks leaves the tie to the query plan, so the
+  /// chart would reorder itself between page loads — a Law 6 / NFR1 determinism violation that no
+  /// test would catch, since duplicate ranks are valid data. (Code review 2026-07-18.)
+  rank Int @unique @db.Integer
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

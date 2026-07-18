@@ -148,6 +148,50 @@ This is the **third story of Epic 1 (Foundation & Deployable Skeleton)**. Story 
 - [x] **Task 9 — Final verification** (AC: 3, 4, 5, 8, 9)
   - [x] Run every gate locally green: `lint`, `typecheck`, `test` (unit+coverage), `test:mutation`, `test:a11y`, `test:integration`, `build`. Record outcomes in the Dev Agent Record.
 
+### Review Findings
+
+Adversarial code review, 2026-07-18 (Blind Hunter · Edge Case Hunter · Acceptance Auditor, each run
+as a fresh-context subagent because the reviewer authored the diff). 49 raw findings → 20 after
+dedup. Convergence between independent layers is noted per item as `blind+edge`, etc.
+
+**Decisions — all four resolved by rk, 2026-07-18:**
+
+- [x] [Review][Decision] **AC 10's commit-sequence evidence does not exist** — AC 10 requires red-before-green be shown by "the commit sequence"; `03e9273` lands `tests/integration/schema.test.ts` and the constraints migration in the SAME commit, so no commit holds the assertions without the constraints. The Debug Log's three-run narrative is the author's uncorroborated claim, and history is pushed. **RESOLVED: accept the narrative as evidence** — it documents the discarded first red (assertions passing on `permission denied` rather than the constraint) and the exact `resolved instead of rejecting` failures — **and adopt a standing practice: commit the failing test and the fix as SEPARATE commits, so the artifact AC 10 names actually exists.** Recorded to `deferred-work.md` as a practice for every later story. [auditor]
+- [x] [Review][Decision] **AD-6 country immutability has zero mechanical enforcement** — the migration grants `payroll_app` full DML on `employee`, so `UPDATE employee SET country_code=…` succeeds. **RESOLVED: column-level `REVOKE UPDATE(country_code) ON employee FROM payroll_app`** — PostgreSQL supports column-level privileges, so this mirrors AD-18 layer A exactly at one line's cost, leaves every other employee column editable, and makes the invariant mechanical rather than disciplinary. → patch. [blind+edge]
+- [x] [Review][Decision] **`currency.name` is an extra `NOT NULL` column not in the spec** — AC 2 requires the eight tables "**exactly** per Dev Notes → Schema", and that table omits `name` for `currency` while listing it for `role`/`level`/`country`. **RESOLVED: keep it and record the decision** — a currency needs a display name and every sibling reference table has one, so this reads as an omission in the spec table rather than a defect in the code. Story 1-4 must supply a name per currency. → patch (record only). [auditor]
+- [x] [Review][Decision] **Seven defensive CHECKs are absent; scope call** — **RESOLVED: add two now, hand five to 1-4.** Now: `fx_rate.rate > 0` (a zero rate converts every foreign-currency salary to zero, making every such employee a maximal outlier — a wrong answer delivered confidently with provenance receipts) and `UNIQUE` on `level.rank` (duplicate ranks leave chart row order to the query plan — an NFR1 determinism violation that no test would catch, because the seed data is valid to the schema). Deferred to 1-4, which owns the values they constrain: `settings.outlier_threshold_pct` range, `currency.minor_unit_exponent` range, `effective_from >= hire_date`, case-insensitive reference codes, non-empty text. → patch + defer. [blind+edge]
+
+**Patches — all 16 applied and verified, 2026-07-18:**
+
+- [x] [Review][Patch] Runtime-role REVOKE and CHECK assertions use bare `rejects.toThrow()`, so a permission error, connection reset, or SQL typo all satisfy them — the exact "pass for the wrong reason" this story's own Debug Log calls dishonest [tests/integration/schema.test.ts:151,157,187,191] [blind+edge]
+- [x] [Review][Patch] `DELETE FROM settings` is unqualified and will wipe Story 1-4's org config; once 1-4 seeds `id=1` the test's own INSERT also fails on duplicate PK [tests/integration/schema.test.ts:217] [blind+edge]
+- [x] [Review][Patch] `migrate deploy` hard-fails with `P3018` and a poisoned migration history when `bootstrap-roles.sql` was not run first — confirmed empirically; this will block story 1-7's documented migrate-deploy-at-build against a fresh Neon branch [prisma/migrations/20260718163326_append_only_and_checks/migration.sql:65] [blind+edge]
+- [x] [Review][Patch] FK `ON UPDATE CASCADE` into `salary_record` collides with the append-only trigger — confirmed empirically: renaming a currency code aborts with an append-only error naming a table the caller never touched [prisma/migrations/20260718163008_init/migration.sql] [blind+edge]
+- [x] [Review][Patch] `sprint-change-proposal-2026-07-18.md` is self-contradictory — header says APPROVED/APPLIED while §3.3, §4.2 and §5 still say awaiting decision, and §3.1/§4.4 describe sequencing after 1-6 when the repo has 1-7 after 1-3 [docs/planning-artifacts/sprint-change-proposal-2026-07-18.md:7,81,126,171,215] [blind+auditor]
+- [x] [Review][Patch] `client.test.ts` mutation assertions are unscoped (`WHERE amount_minor > 0`) so on an empty table the row-level trigger never fires; the test proves only the privilege check [tests/integration/client.test.ts:44,46] [blind+edge]
+- [x] [Review][Patch] `bootstrap-roles.sql` hardcodes password `payroll_app`, and the `IF NOT EXISTS` guard makes a later corrective run with a real secret a silent no-op [prisma/sql/bootstrap-roles.sql:29] [blind+edge]
+- [x] [Review][Patch] Append-only trigger raises bare `P0001`, so the CAP-2 repository port will have to string-match English text to map it to a typed refusal; use `USING ERRCODE` [prisma/migrations/20260718163326_append_only_and_checks/migration.sql:41] [blind]
+- [x] [Review][Patch] CI never checks migration drift — a schema edit without a matching migration passes every gate [.github/workflows/ci.yml] [blind+edge]
+- [x] [Review][Patch] `afterAll` disconnects the singleton but leaves the dead instance on `globalThis`, so `??=` never rebuilds it [tests/integration/client.test.ts:16] [blind+edge]
+- [x] [Review][Patch] `ALTER DEFAULT PRIVILEGES` comment overclaims that the migration owner "will create every future table"; true only while one role owns migrations [prisma/migrations/20260718170934_runtime_role_default_privileges/migration.sql:26] [blind+edge]
+- [x] [Review][Patch] Stale test count — "the 9 integration tests" when there are 13 [docs/implementation-artifacts/1-3-data-model-and-migrations.md:608] [blind]
+- [x] [Review][Patch] **From Decision 2:** column-level `REVOKE UPDATE(country_code) ON employee FROM payroll_app` — makes AD-6 immutability mechanical [new migration]
+- [x] [Review][Patch] **From Decision 4:** `CHECK (rate > 0)` on `fx_rate` and `UNIQUE` on `level.rank` [new migration]
+- [x] [Review][Patch] **From Decision 3:** record the `currency.name` decision in Completion Notes [docs/implementation-artifacts/1-3-data-model-and-migrations.md]
+- [x] [Review][Patch] **From Decision 1:** record the separate-commits practice for red-before-green evidence [docs/implementation-artifacts/deferred-work.md]
+
+**Deferred (real, not actionable in this story):**
+
+- [x] [Review][Defer] Law 1 (TDD) was violated for `src/adapters/db/client.ts` — shipped in `03e9273` with no test; `client.test.ts` arrived three commits later as review remediation. Root cause of BOTH serious defects. Remediated, recorded for the retrospective [src/adapters/db/client.ts] [auditor]
+- [x] [Review][Defer] No `pg` pool sizing for serverless — Vercel lambdas each opening a default pool will exhaust Neon's connection limit; belongs to story 1-7 [src/adapters/db/client.ts:50] [edge]
+- [x] [Review][Defer] `TRUNCATE` bypasses the row-level append-only trigger — already logged in deferred-work.md; needs a statement-level `BEFORE TRUNCATE` trigger [edge]
+- [x] [Review][Defer] Postgres service health window is a fixed 50s with no retry loop before the psql step [.github/workflows/ci.yml] [edge]
+- [x] [Review][Defer] Integration fixtures accumulate unbounded; the disposable-database assumption is documented but unenforced [tests/integration/schema.test.ts] [edge]
+- [x] [Review][Defer] Requirements-level edits (NFR11 split, epics.md rewrite) ride in a data-model story's branch despite the spec's "do not absorb" instruction — rk ratified, so not unilateral, but the ratification trail is weaker than the ban it overrides [docs/planning-artifacts/epics.md] [auditor]
+- [x] [Review][Defer] AC 1 was amended to match the implementation rather than the implementation reconciled to the AC; the declined alternative (commit the generated client) is now invisible at AC level [docs/implementation-artifacts/1-3-data-model-and-migrations.md:56] [blind]
+
+**Dismissed as noise (2):** gender enum lacking an `UNSPECIFIED` member (Law 3 fixes the values as exactly `MALE`/`FEMALE`); `prisma.config.ts` passing an empty URL through (deliberate — `generate` must work with no database, and it now warns).
+
 ## Dev Notes
 
 ### Standing law (read `docs/project-context.md` first)
@@ -597,6 +641,12 @@ that gap, asserting `current_user = 'payroll_app'`, singleton identity (verified
   role-switching assertions must use raw SQL, since they connect outside Prisma. Declaring the
   default in the schema (rather than hand-adding it to the migration) means the DB carries a real
   `DEFAULT CURRENT_TIMESTAMP` with **no Prisma drift**. Logged in `deferred-work.md`.
+- **`currency.name` is kept, though AC 2's schema table omits it** (ratified by rk after code
+  review, 2026-07-18). AC 2 requires the eight tables "exactly per Dev Notes → Schema", and that
+  table lists `name` for `role`/`level`/`country` but not for `currency`. A currency needs a display
+  name ("US Dollar") exactly as its sibling reference tables do, so this reads as an omission in the
+  spec table rather than a defect in the code. The column is `NOT NULL`, so **Story 1-4 must supply
+  a name for every currency it seeds**.
 - **Reference-table `id` takes `@default(dbgenerated("gen_random_uuid()"))`; `employee.id` does
   not.** AD-10 binds only `employee.id` to the id port, and the story permits other tables a DB
   default. `employee.id` therefore has no default at all — neither `gen_random_uuid()` nor
@@ -605,7 +655,7 @@ that gap, asserting `current_user = 'payroll_app'`, singleton identity (verified
   `include: ['tests/**/*.{test,spec}.ts']` and adds
   `exclude: [...configDefaults.exclude, 'tests/integration/**']`. Equivalent guarantee, and it
   fails loudly rather than silently if the integration directory is renamed. **Verified, not
-  assumed:** `npm run test` reports 5 tests (unchanged), never the 9 integration tests, and passes
+  assumed:** `npm run test` reports 5 tests (unchanged), never the integration tests, and passes
   with `DATABASE_URL` unset entirely.
 - **Reference-table `is_active` semantics** (the story asked these be documented): it gates
   **pickability**, never **visibility**. An inactive row is rejected for *new* writes (import per

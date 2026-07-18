@@ -20,9 +20,15 @@
 -- own migration — the same shape as the previous migration's enumerated grant. Mutation is opt-in;
 -- readability is the default.
 --
--- No FOR ROLE clause: default privileges attach to the current role, which is the migration owner —
--- the same role that will create every future table. Naming a literal owner would break on Neon,
--- where the owner is neondb_owner rather than postgres.
+-- No FOR ROLE clause: default privileges attach to the current role, i.e. whichever role applies
+-- this migration in a given environment. Naming a literal owner would break on Neon, where the
+-- owner is neondb_owner rather than postgres.
+--
+-- CAVEAT (code review 2026-07-18): this covers future tables only while the SAME role keeps
+-- creating them in that environment. If a second superuser ever applies a migration that adds a
+-- table, the defaults keyed to the first role do not apply and payroll_app gets nothing. So this
+-- is a SAFETY NET, not a guarantee — the durable rule is the one in prisma/README.md: every
+-- migration that adds a table states its grants explicitly.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT ON TABLES TO "payroll_app";
 

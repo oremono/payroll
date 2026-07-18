@@ -78,7 +78,11 @@ beforeAll(async () => {
   await owner.query('INSERT INTO level (code, name, rank) VALUES ($1, $2, $3)', [
     LEVEL,
     'Test Level',
-    3,
+    // `rank` is UNIQUE (a determinism guard added by code review), and this suite cannot delete its
+    // fixtures — the employee row references the level with ON DELETE RESTRICT. A hardcoded rank
+    // therefore worked on a fresh database and collided on every subsequent run. Derived per run,
+    // in a band that cannot overlap client.test.ts's.
+    (Math.abs(parseInt(suffix, 16)) % 1_000_000) + 2_000_000,
   ]);
 
   // employee.id has NO database default — the id port generates the UUID in the shell (AD-10), so
@@ -143,18 +147,25 @@ describe('salary_record round-trip', () => {
 });
 
 describe('append-only enforcement (Law 5 / AD-18)', () => {
+  // Both assertions match the SPECIFIC error. A bare `.rejects.toThrow()` here was a review
+  // finding: a permission error for a different privilege, a dropped SELECT grant, a connection
+  // reset, or a typo in the SQL would every one of them satisfy it, and the suite would report
+  // append-only as proven while it had silently regressed. That is the same "passes for the wrong
+  // reason" this story's own Debug Log calls dishonest in its first red run.
   it('rejects UPDATE as the runtime application role', async () => {
     const id = await appendSalary(7_000_00, '2023-01-01');
 
     await expect(
       app.query('UPDATE salary_record SET amount_minor = 1 WHERE id = $1', [id]),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/permission denied/i);
   });
 
   it('rejects DELETE as the runtime application role', async () => {
     const id = await appendSalary(7_100_00, '2023-02-01');
 
-    await expect(app.query('DELETE FROM salary_record WHERE id = $1', [id])).rejects.toThrow();
+    await expect(app.query('DELETE FROM salary_record WHERE id = $1', [id])).rejects.toThrow(
+      /permission denied/i,
+    );
   });
 
   // The two assertions that actually earn their keep. A table OWNER bypasses privilege checks
@@ -183,12 +194,20 @@ describe('append-only enforcement (Law 5 / AD-18)', () => {
 });
 
 describe('positive-amount CHECK (AD-4)', () => {
+  // Matched by constraint NAME, not just "it threw". Bare assertions here would go green if the
+  // CHECK were dropped at the same time as an INSERT or sequence-USAGE grant regressed — the
+  // insert would fail for a privilege reason and AD-4 would read as enforced while zero and
+  // negative salaries were being accepted.
   it('rejects amount_minor = 0', async () => {
-    await expect(appendSalary(0, '2024-01-01')).rejects.toThrow();
+    await expect(appendSalary(0, '2024-01-01')).rejects.toThrow(
+      /salary_record_amount_minor_positive/,
+    );
   });
 
   it('rejects a negative amount_minor', async () => {
-    await expect(appendSalary(-1, '2024-02-01')).rejects.toThrow();
+    await expect(appendSalary(-1, '2024-02-01')).rejects.toThrow(
+      /salary_record_amount_minor_positive/,
+    );
   });
 });
 
@@ -214,7 +233,15 @@ describe('settings is single-row (AD-19)', () => {
       // that make the next `ADD CONSTRAINT ... CHECK (id = 1)` fail with "violated by some row",
       // i.e. a clear test failure turned into a confusing migration failure elsewhere. That
       // exact sequence happened once during development.
-      await owner.query('DELETE FROM settings');
+      //
+      // SCOPED to the rows this test created, never `DELETE FROM settings`. Story 1-4 seeds the
+      // real single row (threshold 20 + reporting currency); an unqualified delete would wipe a
+      // developer's org configuration on any run pointed at their working database, with nothing
+      // linking the empty table back to a test run. The id=2 row is only ever present if the
+      // guard regressed, and is removed here for the same reason.
+      await owner.query('DELETE FROM settings WHERE id IN (1, 2) AND reporting_currency = $1', [
+        CURRENCY,
+      ]);
     }
   });
 });

@@ -4,14 +4,70 @@
 // using its own hand-rolled pg pools, so it never exercised the client the application actually
 // ships. Both bugs in client.ts survived a fully green gate run for that reason. Every assertion
 // here is about the real `getDbClient()`.
-import { afterAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+
+import { Pool } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { getDbClient } from '@/adapters/db/client';
 
 const db = getDbClient();
 
+// An OWNER connection, used only to plant the fixture row the mutation assertions need. The
+// runtime client cannot create reference data on its own here, and — more to the point — a
+// salary_record must EXIST for a FOR EACH ROW trigger to have anything to fire on.
+const owner = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const suffix = randomUUID().slice(0, 8);
+const CURRENCY = `TC${suffix}`.toUpperCase();
+const COUNTRY = `CO${suffix}`.toUpperCase();
+const ROLE = `role-${suffix}`;
+const LEVEL = `level-${suffix}`;
+const employeeId = randomUUID();
+
+beforeAll(async () => {
+  // Without this fixture the mutation assertions below matched zero rows, and a row-level
+  // BEFORE UPDATE/DELETE trigger does not fire when nothing matches — so on a fresh database
+  // (every CI run) they proved only the privilege check, never the trigger. Worse, their meaning
+  // depended on whether an earlier file had left rows behind: exactly the order-dependent confound
+  // this file was created to eliminate. (Code review 2026-07-18.)
+  await owner.query('INSERT INTO currency (code, name, minor_unit_exponent) VALUES ($1, $2, 2)', [
+    CURRENCY,
+    'Client Test Currency',
+  ]);
+  await owner.query('INSERT INTO country (code, name, currency_code) VALUES ($1, $2, $3)', [
+    COUNTRY,
+    'Clientland',
+    CURRENCY,
+  ]);
+  await owner.query('INSERT INTO role (code, name) VALUES ($1, $2)', [ROLE, 'Client Role']);
+  await owner.query('INSERT INTO level (code, name, rank) VALUES ($1, $2, $3)', [
+    LEVEL,
+    'Client Level',
+    // `rank` is UNIQUE, and this suite cannot delete its fixtures, so the value must be unique per
+    // run AND must not overlap schema.test.ts's band (which starts at 2_000_000).
+    (Math.abs(parseInt(suffix, 16)) % 1_000_000) + 1_000,
+  ]);
+  await owner.query(
+    `INSERT INTO employee (id, name, role_code, level_code, country_code, gender, hire_date)
+     VALUES ($1, 'Client Probe', $2, $3, $4, 'FEMALE', '2020-01-01')`,
+    [employeeId, ROLE, LEVEL, COUNTRY],
+  );
+  await owner.query(
+    `INSERT INTO salary_record (id, employee_id, amount_minor, currency_code, effective_from)
+     VALUES ($1, $2, 500000, $3, '2020-01-01')`,
+    [randomUUID(), employeeId, CURRENCY],
+  );
+});
+
 afterAll(async () => {
   await db.$disconnect();
+  // Evict the cached instance too. `getDbClient` caches on globalThis and rebuilds only when the
+  // slot is empty (`??=`), so disconnecting without clearing leaves a DEAD client for any later
+  // file in the same worker — which would fail with a pool-closed error that reads like a database
+  // outage. (Code review 2026-07-18.)
+  delete (globalThis as { prisma?: unknown }).prisma;
+  await owner.end();
 });
 
 describe('the shipped Prisma client', () => {
@@ -39,11 +95,30 @@ describe('the shipped Prisma client', () => {
     // The end-to-end statement of Law 5: not "some restricted role is blocked" but "the shipped
     // client is blocked". Uses a raw statement because the Prisma model API deliberately exposes
     // no update path once the repository port lands.
+    //
+    // Scoped to this file's own fixture row (guaranteed to exist by beforeAll) so the statement
+    // genuinely matches something, and matched against the specific error rather than "it threw".
     await expect(
-      db.$executeRaw`UPDATE salary_record SET amount_minor = 1 WHERE amount_minor > 0`,
-    ).rejects.toThrow();
+      db.$executeRaw`UPDATE salary_record SET amount_minor = 1 WHERE employee_id = ${employeeId}::uuid`,
+    ).rejects.toThrow(/permission denied/i);
 
-    await expect(db.$executeRaw`DELETE FROM salary_record WHERE amount_minor > 0`).rejects.toThrow();
+    await expect(
+      db.$executeRaw`DELETE FROM salary_record WHERE employee_id = ${employeeId}::uuid`,
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('is blocked by the trigger too, not only by the privilege revoke', async () => {
+    // Layer B, proven through the shipped client's own connection rather than a hand-rolled pool.
+    // The owner bypasses the privilege check entirely, so anything it hits is the trigger — and
+    // the custom SQLSTATE AP001 makes that machine-identifiable rather than a string match on
+    // English prose (which is what the repository port will rely on in CAP-2/CAP-3).
+    await expect(
+      owner.query('UPDATE salary_record SET amount_minor = 1 WHERE employee_id = $1', [employeeId]),
+    ).rejects.toMatchObject({ code: 'AP001' });
+
+    await expect(
+      owner.query('DELETE FROM salary_record WHERE employee_id = $1', [employeeId]),
+    ).rejects.toMatchObject({ code: 'AP001' });
   });
 
   it('can read through the generated model API', async () => {

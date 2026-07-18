@@ -78,12 +78,12 @@ schema (1-3, done) and tokens/shell (1-5, 1-6).
 ### 3.1 New story
 
 **Key:** `1-7-deployment-and-environments`
-**Sequenced:** after `1-6`, before `epic-1-retrospective`.
+**Sequenced:** immediately after `1-3`, before `1-4`. *(Final — see the Decisions table. The analysis below originally proposed after `1-6`; rk chose earlier, to de-risk Vercel/Neon provisioning while the migration work is fresh.)*
 
-Rationale for the position: the story should deploy something worth looking at, and the app shell
-(1-6) is the first point at which opening the deployed URL shows anything. It has no hard technical
-dependency on 1-4/1-5, so it *could* move earlier if you want the deploy pipeline proven sooner —
-say the word and I will place it after 1-3 instead.
+Rationale for the position: the story has no hard technical dependency on 1-4/1-5, and placing it
+straight after the data model proves the Vercel/Neon pipeline while the migration work is fresh —
+CI had only just been observed green remotely when this was decided. The trade-off accepted: until
+1-6 lands, the deployed URL shows the default page rather than the app shell.
 
 **Scope sketch** (the story itself is written by `bmad-create-story`, not here): Neon project +
 branch-per-PR provisioning; Vercel project wired to the repo; `prisma migrate deploy` at build;
@@ -98,9 +98,10 @@ also unowned. rk ruled it **defers to its first consumer (CAP-2/CAP-3)**. That r
 lives only in a story's Completion Notes and in `deferred-work.md`; it belongs in `epics.md`, where
 the next planner will look. No new story — an annotation.
 
-### 3.3 ⚠️ NFR11 is over-specified for Epic 1 — needs your decision
+### 3.3 ⚠️ NFR11 is over-specified for Epic 1 — RESOLVED (split approved)
 
-This is the one item that is **not** a rubber stamp, and it is why this proposal is worth reading.
+This was the one item that was **not** a rubber stamp, and it is why this proposal is worth reading.
+It is recorded below as it was argued, with the ruling at the end.
 
 `SPEC.md:81` says only: *"The product is deployed and demonstrable."* `epics.md:51` restates NFR11
 as:
@@ -123,7 +124,7 @@ it is bound to** — binding it to Epic 1 guarantees Epic 1 closes with an unmet
 The alternative — leave NFR11 whole and bound to Epic 1 — means either 1-7 carries acceptance
 criteria it cannot meet, or the epic closes with a known-unmet NFR. Neither is honest.
 
-**This needs rk's ruling; it is a requirements-level correction, not a plan mechanic.**
+**RESOLVED (rk, 2026-07-18): split approved and applied to `epics.md`.** It is a requirements-level correction, not a plan mechanic, which is why it was escalated rather than assumed.
 
 ---
 
@@ -168,7 +169,7 @@ recurring.
 >   7, and 12 — it depends on CAP-5, CAP-6, and the seeded population; it is an acceptance check,
 >   not a build task.* (SPEC; AD deployment table)
 
-**Rationale:** §3.3. Applied only if rk approves the split.
+**Rationale:** §3.3. **Approved and applied.**
 
 ### 4.3 `docs/planning-artifacts/epics.md` — Repository contract annotation
 
@@ -190,10 +191,14 @@ enforcement (story 1-3) is the part that could not wait.*
 **NEW:**
 
 ```yaml
-  1-6-app-shell-and-as-of-control: backlog
-  1-7-deployment-and-environments: backlog
-  epic-1-retrospective: optional
+  1-3-data-model-and-migrations: review
+  1-7-deployment-and-environments: backlog   # <- sequenced here, per the Decisions table
+  1-4-money-currency-domain-primitives: backlog
 ```
+
+The key keeps its `1-7` number because ~24 existing cross-references bind `1-4` to the
+money/currency story; **row order in `sprint-status.yaml`, not the key number, is what
+`create-story` and `dev-story` read as execution order.**
 
 Plus a dated note recording that this row came from a correct-course, not from the original
 derivation.
@@ -212,7 +217,7 @@ Mark the "Deployment / NFR11 is ownerless" entry **resolved**, pointing at story
 | Deliverable | Owner | Status |
 | --- | --- | --- |
 | §4.1, §4.3, §4.4, §4.5 edits | Developer agent | Ready on approval |
-| §4.2 NFR11 split | **rk** | **Awaiting decision** |
+| §4.2 NFR11 split | rk | **Approved 2026-07-18 — applied to `epics.md`** |
 | Story 1-7 authoring | `bmad-create-story` | After 1-4…1-6, or earlier if resequenced |
 
 **Success criteria:** `sprint-status.yaml` holds a `1-7` row; `epics.md` names deployment as an

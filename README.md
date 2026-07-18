@@ -71,10 +71,15 @@ docker run -d --name payroll-pg18 \
   -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=payroll \
   -p 55432:5432 postgres:18
 
-# 2. Provision the restricted runtime role (once per cluster; idempotent)
-docker exec -i payroll-pg18 psql -U postgres -d payroll < prisma/sql/bootstrap-roles.sql
+# 2. Provision the restricted runtime role (once per cluster; idempotent).
+#    The password is required — the script refuses to create a role with a default one, and a
+#    re-run with a different password corrects the existing role rather than silently no-opping.
+PGPASSWORD=postgres psql -h localhost -p 55432 -U postgres -d payroll \
+  -v ON_ERROR_STOP=1 -v payroll_app_password=payroll_app \
+  -f prisma/sql/bootstrap-roles.sql
 
-# 3. Apply migrations
+# 3. Apply migrations — this MUST come after step 2. Migrations grant privileges to payroll_app
+#    and fail fast with a message naming this file if the role does not exist yet.
 npm run db:deploy
 
 # 4. Run the integration suite

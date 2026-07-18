@@ -1,6 +1,27 @@
 -- Database-enforced invariants (Story 1-3). Hand-authored: Prisma 7.8.0 has no declarative CHECK
 -- (`@@check` does not exist) and cannot model GRANT/REVOKE or triggers at all, so this migration
 -- was created with `prisma migrate dev --create-only` and written by hand.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 0. Preflight: the runtime role must exist before anything below can reference it
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Without this guard the first GRANT fails with the bare `role "payroll_app" does not exist`,
+-- Prisma records the migration as FAILED (P3018), and every subsequent deploy refuses to run until
+-- a human executes `prisma migrate resolve` — a build-blocking manual intervention on the exact
+-- code path story 1-7 will wire into the Vercel build against a fresh Neon branch.
+--
+-- This cannot create the role itself: roles are cluster-wide and outlive `migrate dev`'s shadow
+-- database, so a CREATE ROLE here dies on replay with P3006 (prisma/prisma#6581). It can only fail
+-- EARLY and LEGIBLY, naming the fix. (Code review 2026-07-18.)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payroll_app') THEN
+    RAISE EXCEPTION
+      'Runtime role "payroll_app" does not exist. Run prisma/sql/bootstrap-roles.sql against this database BEFORE applying migrations — see README section Database.'
+      USING ERRCODE = 'AP002';
+  END IF;
+END
+$$;
 --
 -- Everything below is an invariant the DATABASE holds, not a promise application code makes. That
 -- is the point: Law 5 and AD-4 are enforced mechanically, not by developer discipline.
