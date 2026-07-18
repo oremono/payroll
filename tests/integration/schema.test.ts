@@ -64,11 +64,14 @@ beforeAll(async () => {
   // `@default(now()) @updatedAt`, which emits a real DB-level DEFAULT CURRENT_TIMESTAMP while
   // keeping the client-side update behaviour, so raw inserts may omit the column safely. (The
   // alternative was to name updated_at in every raw insert forever; recorded in Completion Notes.)
-  await owner.query('INSERT INTO currency (code, name, minor_unit_exponent) VALUES ($1, $2, $3)', [
-    CURRENCY,
-    'Test Currency',
-    2,
-  ]);
+  // `symbol` and `grouping_style` are NOT NULL with no default (Story 1-4) — a currency that
+  // cannot be rendered is not a currency. `¤` is the generic currency sign, so a fixture row is
+  // never mistaken for reference data.
+  await owner.query(
+    `INSERT INTO currency (code, name, minor_unit_exponent, symbol, grouping_style)
+     VALUES ($1, $2, $3, '¤', 'WESTERN')`,
+    [CURRENCY, 'Test Currency', 2],
+  );
   await owner.query('INSERT INTO country (code, name, currency_code) VALUES ($1, $2, $3)', [
     COUNTRY,
     'Testland',
@@ -213,33 +216,28 @@ describe('positive-amount CHECK (AD-4)', () => {
 
 describe('settings is single-row (AD-19)', () => {
   it('rejects a second settings row', async () => {
-    // The table ships EMPTY — the default row is Story 1-4's (Decision 1). This test owns its own
-    // row and removes it, so it leaves the table as it found it.
-    await owner.query(
-      'INSERT INTO settings (id, outlier_threshold_pct, reporting_currency) VALUES (1, 20, $1)',
-      [CURRENCY],
-    );
-
+    // The id=1 row is now REAL org configuration, shipped by Story 1-4's reference-data migration
+    // — this test no longer plants and removes its own. It attempts the only other thing a caller
+    // could try (a second row at id=2) and asserts the CHECK refuses it by name, so a regression
+    // that dropped the guard cannot be masked by the PK conflict that would also occur at id=1.
     try {
       await expect(
         owner.query(
           'INSERT INTO settings (id, outlier_threshold_pct, reporting_currency) VALUES (2, 25, $1)',
           [CURRENCY],
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/settings_single_row/);
     } finally {
       // MUST be in `finally`. If the single-row guard ever regresses, the insert above succeeds,
-      // the assertion throws, and a cleanup placed after it would be skipped — leaving two rows
-      // that make the next `ADD CONSTRAINT ... CHECK (id = 1)` fail with "violated by some row",
-      // i.e. a clear test failure turned into a confusing migration failure elsewhere. That
+      // the assertion throws, and a cleanup placed after it would be skipped — leaving a second
+      // row that makes the next `ADD CONSTRAINT ... CHECK (id = 1)` fail with "violated by some
+      // row", i.e. a clear test failure turned into a confusing migration failure elsewhere. That
       // exact sequence happened once during development.
       //
-      // SCOPED to the rows this test created, never `DELETE FROM settings`. Story 1-4 seeds the
-      // real single row (threshold 20 + reporting currency); an unqualified delete would wipe a
-      // developer's org configuration on any run pointed at their working database, with nothing
-      // linking the empty table back to a test run. The id=2 row is only ever present if the
-      // guard regressed, and is removed here for the same reason.
-      await owner.query('DELETE FROM settings WHERE id IN (1, 2) AND reporting_currency = $1', [
+      // SCOPED to the row this test could have created, never `DELETE FROM settings`: an
+      // unqualified delete would wipe a developer's org configuration on any run pointed at their
+      // working database, with nothing linking the empty table back to a test run.
+      await owner.query('DELETE FROM settings WHERE id = 2 AND reporting_currency = $1', [
         CURRENCY,
       ]);
     }

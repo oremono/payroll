@@ -46,6 +46,20 @@ enum Gender {
   @@map("gender")
 }
 
+/// How a currency's major part is separated by the ONE money formatter (src/domain/money.ts).
+/// WESTERN groups uniformly in threes ($2,150,000); INDIAN holds the last three digits apart and
+/// groups the remainder in twos (₹21,50,000).
+///
+/// This lives on the currency reference row, not in code: grouping is the formatter's job, driven
+/// by data, and `Intl` is banned from the domain because its output depends on the Node ICU build
+/// (Law 6). Story 1-4.
+enum GroupingStyle {
+  WESTERN
+  INDIAN
+
+  @@map("grouping_style")
+}
+
 /// A person in the payroll population. Membership in any as-of population is derived (AD-16:
 /// hire_date <= D AND at least one salary record with effective_from <= D) — hence NO `is_active`
 /// column: a boolean cannot answer "was this person active on 2025-03-01?", and a second
@@ -216,7 +230,18 @@ model Currency {
   name String @db.Text
 
   /// Drives the one money formatter — never a hard-coded 100 (JPY = 0, USD = 2, INR = 2).
+  /// A range CHECK (0 <= exponent <= 4) is added in a migration: a negative exponent would render
+  /// every salary 100x wrong through the single formatter every capability epic consumes.
   minorUnitExponent Int @map("minor_unit_exponent") @db.Integer
+
+  /// The display symbol DESIGN mandates alongside the ISO code on every salary — `₹`, `$`, `¥`.
+  /// Deliberately NOT derived from the code: the mapping is data, and it is not one-to-one (USD
+  /// and CAD share `$`). Story 1-4.
+  symbol String @db.Text
+
+  /// Handed to the formatter with the symbol and exponent, so `src/domain/money.ts` can stay
+  /// import-free (Law 2) and still group correctly. Story 1-4.
+  groupingStyle GroupingStyle @map("grouping_style")
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

@@ -52,6 +52,7 @@ last_updated: 2026-07-19
 project: payroll
 # 1-3 elaborated via create-story 2026-07-18: schema + migrations + append-only REVOKE + integration harness
 # 1-7 elaborated via create-story 2026-07-19: Vercel + Neon, migrate-deploy-at-build, branch-per-PR, pool bound
+# 1-4 implemented 2026-07-19: src/domain/money.ts + reference-data and value-constraint migrations
 project_key: NOKEY
 tracking_system: file-system
 story_location: docs/implementation-artifacts
@@ -70,7 +71,7 @@ development_status:
   # existing cross-references bind 1-4 to the money/currency story; ROW ORDER in this file, not the
   # key number, is what create-story and dev-story read as execution order.
   1-7-deployment-and-environments: in-progress
-  1-4-money-currency-domain-primitives: backlog
+  1-4-money-currency-domain-primitives: done
   1-5-design-token-build: backlog
   1-6-app-shell-and-as-of-control: backlog
   epic-1-retrospective: optional

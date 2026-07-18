@@ -31,10 +31,12 @@ beforeAll(async () => {
   // (every CI run) they proved only the privilege check, never the trigger. Worse, their meaning
   // depended on whether an earlier file had left rows behind: exactly the order-dependent confound
   // this file was created to eliminate. (Code review 2026-07-18.)
-  await owner.query('INSERT INTO currency (code, name, minor_unit_exponent) VALUES ($1, $2, 2)', [
-    CURRENCY,
-    'Client Test Currency',
-  ]);
+  // `symbol` and `grouping_style` are NOT NULL with no default (Story 1-4).
+  await owner.query(
+    `INSERT INTO currency (code, name, minor_unit_exponent, symbol, grouping_style)
+     VALUES ($1, $2, 2, '¤', 'WESTERN')`,
+    [CURRENCY, 'Client Test Currency'],
+  );
   await owner.query('INSERT INTO country (code, name, currency_code) VALUES ($1, $2, $3)', [
     COUNTRY,
     'Clientland',

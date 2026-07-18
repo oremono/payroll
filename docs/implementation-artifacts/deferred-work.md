@@ -15,13 +15,32 @@
   commit be self-consistent: a commit containing a deliberately failing test is self-consistent, it
   simply is not green. **Applies from Story 1-7 onward.**
 
-- **Five value constraints deferred to Story 1-4**, which owns the reference values they constrain
-  (code review 2026-07-18; `fx_rate.rate > 0` and `UNIQUE (level.rank)` were judged load-bearing and
-  landed in 1-3 instead): `settings.outlier_threshold_pct` range CHECK (0 or negative makes outlier
-  detection meaningless), `currency.minor_unit_exponent` range CHECK (a negative exponent renders
-  every salary 100× wrong through the one money formatter), `effective_from >= hire_date`,
-  case-insensitive uniqueness on reference `code` columns (so `usd` and `USD` cannot both exist),
-  and non-empty CHECKs on `employee.name` and the `code` columns.
+- ~~**Five value constraints deferred to Story 1-4**, which owns the reference values they
+  constrain (code review 2026-07-18; `fx_rate.rate > 0` and `UNIQUE (level.rank)` were judged
+  load-bearing and landed in 1-3 instead): `settings.outlier_threshold_pct` range CHECK (0 or
+  negative makes outlier detection meaningless), `currency.minor_unit_exponent` range CHECK (a
+  negative exponent renders every salary 100× wrong through the one money formatter),
+  `effective_from >= hire_date`, case-insensitive uniqueness on reference `code` columns (so `usd`
+  and `USD` cannot both exist), and non-empty CHECKs on `employee.name` and the `code`
+  columns.~~ **CLOSED by story `1-4-money-currency-domain-primitives` (2026-07-19)**, all five in
+  `prisma/migrations/20260718224918_currency_display_and_value_constraints/migration.sql`, each
+  proven by its violating input being refused in `tests/integration/reference-data.test.ts`:
+  - `settings_outlier_threshold_pct_range` — `CHECK (> 0 AND <= 100)`. The upper bound was added
+    beyond the deferral's wording: above 100 the flag can never fire below the median, because
+    distance bottoms out at −100%, so half the control would be dead.
+  - `currency_minor_unit_exponent_range` — `CHECK (>= 0 AND <= 4)`. **Zero is valid and
+    load-bearing** (JPY); 4 is the largest exponent ISO-4217 defines.
+  - `employee_name_not_blank` and `{role,level,country,currency}_code_not_blank` — `btrim(x) <> ''`,
+    so whitespace-only is caught, not merely `''`.
+  - `{role,level,country,currency}_code_lower_key` — UNIQUE expression indexes on `lower(code)`.
+    Chosen over a `citext` column: citext is an extension, changes comparison semantics everywhere
+    including `ORDER BY`, and would read as drift against `String @db.Text`. The plain UNIQUE
+    constraints from `..._init` are kept — they are what the FKs reference.
+  - `effective_from >= hire_date` — a `BEFORE INSERT` **trigger** (`AP004`), not a CHECK: a CHECK
+    sees only its own row and `hire_date` is on another table, and 1-3's migrations are immutable.
+    `INSERT` only, because `salary_record` admits no `UPDATE` at all; the `IS NOT NULL` guard lets
+    the FK raise its own accurate error on a bogus `employee_id`, since FK checks run *after* row
+    triggers.
 
 ## Deferred from: code review of 1-3-data-model-and-migrations (2026-07-18)
 
@@ -73,6 +92,54 @@ Surfaced while wiring deployment, deliberately **not** absorbed.
   resolvable at runtime. **Re-entry:** revisit only if a future `@prisma/adapter-pg` moves `pg` to
   a peerDependency — that would silently reintroduce the trap.
 
+## Deferred from: 1-4-money-currency-domain-primitives (2026-07-19)
+
+Surfaced while landing the money primitive and the reference values, deliberately **not** absorbed.
+The first three are named by the story's own Design Notes as items to record rather than resolve.
+
+- **The taxonomy draft is unratified.** 1-3 Decision 1 authorized the dev agent to *draft* the
+  reference values, and the cardinalities (6 levels / 8 countries / 25 roles / 8 currencies) are
+  ratified — but the specific codes and names are one agent's proposal, now shipped as a data
+  migration to every environment. Levels are `L1` Associate / `L2` Mid / `L3` Senior / `L4` Staff /
+  `M1` Manager / `M2` Director; the 25 roles are job families with no seniority word in any name.
+  Migrations are immutable, so a correction is a *new* migration, not an edit. **Re-entry:** rk
+  reviews `prisma/migrations/20260718225000_reference_data/migration.sql`; anything he changes lands
+  as a follow-up migration, and if names change, `is_active = false` on the retired row rather than
+  a rename — the codes are natural FK targets.
+- **8 countries vs the mocks' "14 countries".** The architecture addendum's grid sizing implies 8
+  and the ratified cardinality is 8, but UX mock copy says 14 in at least one place. 8 shipped,
+  because it is the ratified number. This is a requirements-level conflict, not an implementation
+  choice. **Re-entry:** settle it before CAP-9 (Payroll Totals), which renders the per-country grid
+  and is the first surface where the difference is visible.
+- **May `src/ui` import a pure domain FUNCTION, or only types?** AD-1 says types-only, and the
+  ESLint zone message repeats it. `formatMoney` now exists and is exactly the thing a table cell
+  wants to call. Either the rule bends for pure functions, or the boundary resolves a
+  `CurrencyFormat` and formats in the use-case so the UI receives pre-rendered strings. Nothing in
+  this story forces the answer — no call site exists yet. **Re-entry:** Story 1-6 (app shell) or
+  the first capability frontend, whichever renders a salary first; it pairs with the still-open
+  "`ui → application` types-only is not mechanically enforced" item from the 1-2 review.
+- **Backfilled fixture currencies carry a placeholder `¤` symbol.** The new NOT NULL
+  `currency.symbol` / `currency.grouping_style` columns were added with a temporary default that is
+  then dropped, so pre-existing rows on long-lived databases (the Neon `production` branch, a
+  developer's local container) were backfilled with `¤` / `WESTERN`. Those rows are all
+  uniquely-suffixed integration fixtures — `TC…`, `CO…` — never reference data, and `¤` is
+  deliberately not a real symbol so they cannot be mistaken for one. **Re-entry:** none needed
+  unless a real currency is ever added by direct SQL rather than a migration; the placeholder is a
+  tell that something skipped the migration path.
+- **Every reference `code` column now carries two indexes.** The plain UNIQUE from `..._init` plus
+  the new UNIQUE on `lower(code)`. The plain one is kept because the FKs reference it and dropping
+  it would mean rewriting them. Harmless at these row counts (tens of rows), and both are used —
+  but it is duplication a reader will notice. **Re-entry:** if a reference table ever grows to a
+  size where the write cost matters, migrate the FKs onto the expression index and drop the plain
+  UNIQUE.
+- **Integration count assertions are scoped to the seeded values, not global.** `SELECT count(*)
+  FROM currency` cannot be asserted, because sibling integration files plant fixture rows in the
+  same tables and cannot delete them. The scoped assertions are strictly stronger (they fail on a
+  missing, duplicated, or wrong row), but the story's AC is phrased as "exactly 8 currencies", and
+  that literal form was verified **manually** against a fresh container rather than by the suite.
+  **Re-entry:** this dissolves the moment the outstanding "provision a fresh database per run" item
+  is taken — then the global count becomes assertable and should replace the scoped one.
+
 ## Deferred from: 1-3-data-model-and-migrations (2026-07-18)
 
 Surfaced by this story, deliberately **not** absorbed into it. The first two were sprint-plan gaps
@@ -105,3 +172,173 @@ are recorded here as resolved rather than deleted, so the reasoning survives.
   `salary_record` and `TRUNCATE` is a separate privilege it never receives — but an owner
   connection could truncate the table. **Re-entry:** if a future story grants the runtime role
   broader privileges, add a `BEFORE TRUNCATE` statement-level trigger.
+
+## Deferred from: code review of 1-4 (2026-07-19)
+
+Findings from the adversarial + edge-case review pass on story 1-4 that were judged real but not
+this story's problem. Recorded in the dev-auto triage format.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `fromBoundaryMoney` validates `amountMinor` exhaustively but copies `currency` through
+    unchecked, so a blank or malformed code crosses the boundary and only surfaces later as a
+    salary that silently fails to render.
+  evidence: The function's own JSDoc frames it as the defence against "a hostile or buggy caller",
+    and it rejects five distinct `BigInt` coercion traps — but `{amountMinor:'1', currency:''}`
+    returns a `Money`. The domain cannot check ISO-4217 *membership* (that needs the currency
+    table), but it can check *shape*. Deliberately not fixed here: the spec's I/O matrix specified
+    only the `amountMinor` rejections, so a shape rule is a new decision, not a missed one.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `ON CONFLICT DO NOTHING` converges on row *existence*, never on row *values*, so a
+    divergent pre-existing reference row survives every future deploy unrepaired.
+  evidence: If a crashed pre-1-4 integration run left `settings id=1` pointing at a fixture
+    currency, the data migration applies cleanly, changes nothing, and that environment's AD-13
+    conversion target is wrong permanently. `DO UPDATE` is NOT the fix for `settings` — it would
+    clobber a real threshold change on every deploy — so this needs a deliberate per-table ruling.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The reference-count assertions are scoped to the expected code list, so an *extra*
+    seeded row — a 26th role, a 9th currency — is invisible to the suite.
+  evidence: `WHERE code = ANY($1)` + `toHaveLength(25)` proves the 25 expected roles exist and
+    nothing more. A future edit adding `staff_engineer` would violate the story's own "no seniority
+    word in a role name" rule and the ratified cardinality, and every test would still pass. The
+    literal "exactly 8/8/6/25/1" counts were verified out-of-band against a fresh container.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The new CHECK constraints and `lower(code)` unique indexes are added VALIDATING, so on a
+    long-lived database holding a violating row the migration fails and wedges every later deploy.
+  evidence: Story 1-7 documented this exact failure mode (P3009/P3018 leaves the history
+    unrecoverable). Reference tables shipped empty from 1-3 so nothing violates them today, but
+    accumulated integration fixtures are undeletable and a future constraint may not be so lucky.
+    `ADD CONSTRAINT ... NOT VALID` followed by a separate `VALIDATE CONSTRAINT` is the safe shape.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `salary_record` rows that already violate `effective_from >= hire_date` are never
+    detected — the triggers guard both write paths but nothing validates history.
+  evidence: Both triggers are `BEFORE INSERT`/`BEFORE UPDATE`; neither looks backwards. No such
+    rows can exist yet (no story writes salary records), so this is cheap to close now and
+    expensive after CAP-2/CAP-3 and the Epic 12 seed have run.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `groupRightToLeft` recurses once per digit group with no depth bound, so a pathologically
+    long `amountMinor` overflows the stack — throwing from a module contracted never to throw.
+  evidence: `fromBoundaryMoney` accepts any canonical integer string, including a 100,000-digit
+    one. The value would be nonsense, but the failure mode is a `RangeError` escaping `src/domain`,
+    which is the same totality breach the exponent guard was patched to close. An iterative
+    rewrite, or a digit-length bound at the boundary, closes it.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `btrim()` is called with no second argument in every `*_not_blank` CHECK, so it strips
+    only ASCII spaces — a code, name, or symbol consisting solely of a tab, newline, or NBSP is
+    accepted as non-blank.
+  evidence: `btrim(E'\t') = E'\t' <> ''` is true, so the CHECK passes. An invisible `currency.symbol`
+    renders a salary with no symbol (what `currency_symbol_not_blank` exists to prevent), and an
+    invisible reference `code` becomes a valid FK target that silently splits a peer group. Affects
+    the 1-3 CHECKs on `role`/`level`/`country`/`currency.code` and `employee.name` identically, so
+    the fix is one migration covering all of them: `CHECK (code ~ '[^[:space:]]')`.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The reference-data migration's `ON CONFLICT DO NOTHING` carries no conflict target, so a
+    conflict on ANY unique constraint — not just the primary key — is silently swallowed.
+  evidence: The targetless form is deliberate (it must also cover the `lower(code)` indexes), but it
+    cannot distinguish "already seeded" from "a different row occupies this unique slot". If a
+    long-lived database holds any `level` row at rank 1-6, the matching seeded level is skipped with
+    no error and the deploy reports success with five levels. Worse on the currency chain: a
+    pre-existing lowercase `'usd'` suppresses the `'USD'` insert, and the `settings` insert then
+    fails its FK, marking the migration FAILED and wedging every later deploy.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `currency.minor_unit_exponent` and `currency.symbol` are UPDATE-able by `payroll_app`
+    with no immutability guard, so changing one after salary records exist silently re-renders every
+    stored amount in that currency.
+  evidence: Reference tables were granted full `SELECT, INSERT, UPDATE, DELETE` in 20260718163326
+    because they are editable. But `amount_minor` is stored against an assumed exponent: moving USD
+    from 2 to 0 turns every `$2,150,000.00` into `$215,000,000` through the one formatter, with no
+    error anywhere. A `BEFORE UPDATE` trigger rejecting a change to either column once any
+    `salary_record` references the currency would close it.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The `settings_outlier_threshold_pct_range` CHECK caps the threshold at 100, an upper
+    bound no architecture decision ratifies, inside an immutable migration.
+  evidence: The deferral this story closed specified only that zero or negative makes outlier
+    detection meaningless. The `<= 100` bound was added beyond that wording on the reasoning that
+    above 100 nothing below the median can flag — but a deliberately asymmetric threshold (150 flags
+    only people paid more than 2.5x their peer median) is a coherent configuration, not a data-entry
+    error. Relaxing it later costs a new migration. Needs product ratification either way.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: A `DATABASE_URL_APP` password containing a URL-reserved character silently disables the
+    12 integration tests that use the restricted runtime role — they fail with `Invalid URL` before
+    reaching the database.
+  evidence: Observed on this machine: the provisioned `payroll_app` password contains an unencoded
+    `/`, so `new URL()` rejects the connection string and every `client.test.ts` and role-scoped
+    `schema.test.ts` case errors at setup rather than asserting anything. Neon generates passwords
+    from an alphabet that includes such characters, so any developer can hit this. The failure names
+    the URL, never the password, which makes it slow to diagnose. `.env.example` and the README
+    should state that the password must be percent-encoded.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: Two `salary_record` acceptance tests COMMIT a row on every run into a table with no
+    DELETE path, so the fixture table grows unboundedly and unrecoverably.
+  evidence: `reference-data.test.ts` wraps every other acceptance case in
+    `expectAcceptedThenRolledBack` for the stated reason that a committed row "grows a reference
+    table permanently, on every run, forever" — but the hire-date boundary cases insert outside any
+    transaction. They must commit as written, because the `hire_date` UPDATE tests below them need a
+    committed record to conflict with; closing this means creating that record once in `beforeAll`
+    and rolling the two boundary assertions back. Not done here: the change reorders fixture
+    lifetimes and could not be verified, since the integration suite cannot reach a database on this
+    machine.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The four reference `name` columns have no non-blank CHECK, and the suite asserts a
+    property the schema does not enforce.
+  evidence: `20260719050000_review_hardening_1_4` added `btrim(x) <> ''` to `employee.name`, all
+    four `code` columns, and `currency.symbol` — but not to `currency.name`, `role.name`,
+    `level.name`, or `country.name`. Meanwhile `reference-data.test.ts` asserts
+    `rows.every((r) => r.name.trim().length > 0)` for currencies and roles, so it verifies an
+    invariant nothing upholds. A role named `'   '` is an invisible label on every chart axis and on
+    the Settings screen and is accepted today — the same harm the `currency.symbol` CHECK exists to
+    prevent.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `level.rank` has no positivity CHECK, which the "six sequential ranks" assertion silently
+    depends on.
+  evidence: The seeded-ladder test selects `WHERE rank <= 6` and documents that this "IS the exact
+    global set" because every fixture rank in the repo is >= 1,000 — an assumption nothing in the
+    schema enforces. A rank of `0` or `-1` from a future fixture, an import, or a manual edit joins
+    that result set and fails the test with an opaque array mismatch pointing at the reference data
+    rather than at the intruding row. `CHECK (rank > 0)` belonged with the five range/non-blank
+    CHECKs this story already added.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The spec's frozen "Always" constraint states `payroll_app` gets `SELECT, INSERT` only and
+    never `UPDATE`/`DELETE`, which the story's own migration correctly contradicts.
+  evidence: `20260718224918` executes `GRANT SELECT, INSERT, UPDATE, DELETE ON "currency" TO
+    "payroll_app"`, matching 1-3's grant for the reference tables — the grant is right and the
+    constraint prose is over-broad, since the withholding is specific to `salary_record` (Law 5 /
+    AD-18). Both review passes recorded "no spec defects". The trap was defused in `prisma/README.md`
+    during this pass, but the constraint line lives inside `<intent-contract>`, which this workflow
+    may not amend; an agent reading it literally would revoke a needed privilege.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: The `FOR SHARE` write-skew fix introduces a lock-upgrade deadlock path and an unmeasured
+    per-row locking cost, neither documented.
+  evidence: `20260719060000_hire_date_lock` takes `FOR SHARE` on the employee row inside the
+    insert-side trigger. Two transactions that each insert a `salary_record` and then update the same
+    employee's `hire_date` upgrade a shared lock to exclusive in opposite orders — a textbook 40P01
+    deadlock, and no retry path exists anywhere in the codebase. Separately, every `salary_record`
+    insert now takes a share lock, so the 10,000-row Epic 12 seed and every CSV import pay it per
+    row, with concurrent share-lockers on one employee row promoting to multixacts. The migration
+    comment explains the correctness need but names neither cost.
+
+- source_spec: `spec-1-4-money-currency-domain-primitives.md`
+  summary: `GroupingStyle` in the domain has no compile-time linkage to the Prisma `grouping_style`
+    enum, and an unrecognized value renders INDIAN grouping silently.
+  evidence: `groupMajor` is `if (style === 'WESTERN') { ... }` followed by an unguarded INDIAN path,
+    so any other value falls through to Indian grouping — no error, no `null`, in a module whose
+    entire contract is that a failure is a `null` return. The value arrives from a database row via a
+    cast at the delivery boundary. Adding a third enum value in a later migration would re-group every
+    salary in that currency with nothing detecting it. Left as-is deliberately: the honest fix is an
+    exhaustiveness branch, which is unreachable under the current closed union and would therefore
+    break the 100% coverage and 100% mutation-score gates this story is held to. Closing it properly
+    means generating `GroupingStyle` from the Prisma enum, or relaxing the gate for a `never` guard.
