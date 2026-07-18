@@ -15,7 +15,8 @@
     "reports",
     ".stryker-tmp",
     "playwright-report",
-    "test-results"
+    "test-results",
+    "src/adapters/db/generated"
   ],
   "coverageAnalysis": "perTest",
   "mutate": ["src/domain/**/*.{ts,tsx}", "!src/domain/**/*.{test,spec}.{ts,tsx}"],

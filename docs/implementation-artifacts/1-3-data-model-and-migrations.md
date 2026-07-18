@@ -1,6 +1,10 @@
+---
+baseline_commit: 83fd9ab087535722e87c34aaed3b9d4d680ce8f6
+---
+
 # Story 1.3: Data Model and Migrations
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -169,12 +169,29 @@ const purityConfig = {
           { name: 'perf_hooks', message: 'No perf_hooks in the pure core (Law 6) — it is a clock.' },
           { name: 'node:perf_hooks', message: 'No perf_hooks in the pure core (Law 6) — it is a clock.' },
           { name: '@prisma/client', message: 'No Prisma in the pure core (Law 2). Reach the DB through a port + adapter.' },
+          { name: '@prisma/adapter-pg', message: 'No Prisma driver adapter in the pure core (Law 2). Reach the DB through a port + adapter.' },
           { name: 'next', message: 'No Next.js in the pure core (Law 2).' },
         ],
         patterns: [
           {
             group: ['fs/*', 'node:fs/*', 'next/*', '@prisma/*', 'prisma/*'],
             message: 'No filesystem / Next / Prisma imports in the pure core (Law 2).',
+          },
+          {
+            // Under Prisma 7 the generator emits TypeScript source to a path inside src/ — so a
+            // domain leak no longer imports the literal specifier `@prisma/client` (which the
+            // `paths` list above bans) but the GENERATED PATH, which would otherwise lint clean.
+            // Cover every way to spell it: the alias, and relative paths that climb out of the
+            // pure layers into the adapters tree.
+            group: [
+              '@/adapters/db/generated',
+              '@/adapters/db/generated/*',
+              '@/adapters/*',
+              '**/adapters/db/generated',
+              '**/adapters/db/generated/*',
+            ],
+            message:
+              'No Prisma generated client in the pure core (Law 2). The DB is reached through a port declared in src/application/ports/ and implemented in src/adapters/db/.',
           },
         ],
       },
@@ -199,6 +216,10 @@ const config = [
       'test-results/**',
       'playwright-report/**',
       'next-env.d.ts',
+      // Prisma generated client — the v7 generator emits TypeScript SOURCE under src/, so ESLint
+      // would otherwise lint thousands of generated files. One of five exclusions (see also
+      // .gitignore, vitest coverage, stryker.config.json, tsconfig.json `exclude`).
+      'src/adapters/db/generated/**',
       // Tooling / planning artifacts — not application source.
       '.claude/**',
       '_bmad/**',

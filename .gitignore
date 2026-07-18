@@ -36,6 +36,13 @@ coverage/
 /playwright-report/
 /.playwright/
 
+# prisma generated client — the v7 `prisma-client` generator emits TypeScript SOURCE (not a
+# compiled package in node_modules), so this is thousands of generated .ts files under src/.
+# It is excluded from FIVE places, this being one: .gitignore, eslint.config.mjs `ignores`,
+# vitest coverage, stryker `ignorePatterns`, and tsconfig.json `exclude`. Regenerate with
+# `npm run db:generate` (also wired to `postinstall`).
+/src/adapters/db/generated/
+
 # environment (keep .env.example if added)
 .env
 .env.*

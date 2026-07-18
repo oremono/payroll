@@ -60,6 +60,7 @@
     "_bmad",
     ".bmad-loop",
     "design-artifacts",
-    "docs"
+    "docs",
+    "src/adapters/db/generated"
   ]
 }
