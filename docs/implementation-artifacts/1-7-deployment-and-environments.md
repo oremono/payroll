@@ -4,7 +4,7 @@ baseline_commit: cc7d4e0af713e41558c22ccbac715eb99cc2c2f6
 
 # Story 1.7: Deployment and Environments
 
-Status: review
+Status: in-progress
 
 <!-- Sequenced immediately after 1-3, before 1-4 (rk, 2026-07-18). Row order in sprint-status.yaml,
      not the key number, is execution order. -->
