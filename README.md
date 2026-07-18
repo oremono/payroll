@@ -35,6 +35,81 @@ npm install
 | `npm run test:coverage` | Vitest with the coverage floor on `src/domain` + `src/application` |
 | `npm run test:mutation` | Stryker mutation testing over `src/domain` (a survivor fails) |
 | `npm run test:a11y` | Playwright + axe accessibility pass over the built app |
+| `npm run test:integration` | Integration suite against a **real** Postgres 18 (see § Database) |
+| `npm run db:generate` | Regenerate the Prisma client (also wired to `postinstall`) |
+| `npm run db:migrate` | Create + apply a migration locally (`prisma migrate dev`) |
+| `npm run db:deploy` | Apply pending migrations (`prisma migrate deploy`) — CI and deploys |
+
+## Database
+
+PostgreSQL **18**, pinned across every environment (Neon in deployed environments, a local
+container for development). Prisma **7.8.0** is the ORM.
+
+### Connection strings
+
+Copy `.env.example` to `.env` and fill it in. Two URLs, and the distinction matters:
+
+| Variable | Role | Used by |
+| --- | --- | --- |
+| `DATABASE_URL` | The **owner** — owns the schema and can create databases | Migrations, `prisma generate`, integration-test fixtures |
+| `DATABASE_URL_APP` | `payroll_app`, the **restricted runtime role** — `SELECT`/`INSERT` on `salary_record` but **not** `UPDATE`/`DELETE` | The application at runtime |
+
+They are deliberately different roles. `prisma migrate dev` needs `CREATEDB` for its shadow
+database, which the least-privilege runtime role must not have — and the append-only revoke
+(Law 5 / AD-18) is meaningless if the app connects as the owner, since PostgreSQL lets a table
+owner bypass privilege checks entirely.
+
+> Prisma 7 removed `url` from the `datasource` block. Connection URLs live **only** in
+> `prisma.config.ts`, which loads `.env` explicitly (Prisma 7 auto-loads nothing). `prisma migrate
+> deploy` has no `--url` flag — CI supplies the URL through the job `env:` block.
+
+### Local setup
+
+```bash
+# 1. A disposable Postgres 18
+docker run -d --name payroll-pg18 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=payroll \
+  -p 55432:5432 postgres:18
+
+# 2. Provision the restricted runtime role (once per cluster; idempotent)
+docker exec -i payroll-pg18 psql -U postgres -d payroll < prisma/sql/bootstrap-roles.sql
+
+# 3. Apply migrations
+npm run db:deploy
+
+# 4. Run the integration suite
+npm run test:integration
+```
+
+Role creation lives in `prisma/sql/bootstrap-roles.sql` rather than in a migration on purpose:
+roles are **cluster-wide** and survive `migrate dev`'s shadow database, so a bare `CREATE ROLE` in
+a migration fails on replay with `P3006 role already exists` (prisma/prisma#6581). Only the
+`GRANT`/`REVOKE` — idempotent once the role exists — are in the migration.
+
+### Schema and migrations
+
+`prisma/schema.prisma` is the data model; `prisma/migrations/` holds the committed history. Some
+invariants cannot be expressed declaratively (Prisma 7.8.0 has no `@@check`, and cannot model
+`GRANT`/`REVOKE` or triggers), so they are hand-authored SQL in
+`20260718163326_append_only_and_checks`:
+
+- **`salary_record` is append-only** in two layers — the `UPDATE`/`DELETE` revoke from
+  `payroll_app`, *and* a `BEFORE UPDATE OR DELETE` trigger that raises for **every** role,
+  including the owner. Appending a new record is the only correction mechanism (Law 5 / AD-18).
+- **`CHECK (amount_minor > 0)`** — a salary is strictly positive (AD-4).
+- **`CHECK (id = 1)` on `settings`** — the single-row guard (AD-19).
+
+The reference tables (`role`, `level`, `country`, `currency`) and `settings` ship **empty**; their
+values arrive in Story 1-4.
+
+> **Deployed environments** run `prisma migrate deploy` **at build**. Wiring that into Vercel/Neon
+> is a later deployment story — the command and the intent are recorded here, the plumbing is not
+> built yet.
+
+The generated Prisma client is written to `src/adapters/db/generated/` (git-ignored, and excluded
+from ESLint, coverage, Stryker, and `tsc`). The Prisma 7 generator emits TypeScript **source**, so
+`prisma generate` must run before `typecheck`/`build` — `postinstall` handles that wherever
+`npm ci` runs.
 
 ## Continuous Integration
 
@@ -50,11 +125,12 @@ protection.
 | Unit + coverage floor | `npm run test:coverage` | Fast deterministic unit suite + per-path coverage floors on `domain` (100) and `application` (90) (AD-23) |
 | Mutation testing | `npm run test:mutation` | A surviving mutant over `src/domain` fails the build (AD-23) |
 | Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9) |
+| Integration (Postgres 18) | `npm run test:integration` | The schema's DB-enforced invariants — append-only `salary_record`, the positive-amount CHECK, single-row `settings` — against a real disposable Postgres 18, never a mock (AD-24) |
 
 **Branch protection:** require these status checks on `master` — **`Lint · Typecheck · Build ·
-Unit + Coverage`**, **`Mutation testing (domain)`**, and **`Accessibility (axe)`** (the job names
-in `ci.yml`). Configuring branch protection is a repository-admin action in GitHub settings, not
-part of the code.
+Unit + Coverage`**, **`Mutation testing (domain)`**, **`Accessibility (axe)`**, and
+**`Integration (Postgres 18)`** (the job names in `ci.yml`). Configuring branch protection is a
+repository-admin action in GitHub settings, not part of the code.
 
 The `test:mutation` and `test:a11y` gates need extra local setup on first run: Stryker downloads
 nothing, but the axe gate needs a browser — run `npx playwright install chromium` once.
@@ -85,6 +161,17 @@ inward: `domain ← application ← adapters/ui`. This is mechanically enforced 
 
 ## Testing
 
-Vitest is the runner. The domain/application suite touches **no database, no clock, and no
-network**, and follows TDD (red → green → refactor). Integration tests against a real Postgres
-instance are a separate suite introduced when persistence appears (Story 1-3+).
+Vitest is the runner, and there are **two suites, kept deliberately apart**:
+
+- **Unit** (`npm run test`, `vitest.config.ts`, `tests/**`) — the domain/application suite. Touches
+  **no database, no clock, and no network**, and follows TDD (red → green → refactor). The coverage
+  floor and mutation gate run over this suite only.
+- **Integration** (`npm run test:integration`, `vitest.integration.config.ts`,
+  `tests/integration/**`) — the one place database access is allowed (AD-24). Runs against a real
+  disposable Postgres 18, **never a mock**. Excluded from the unit config's `include`, so
+  `npm run test` never touches a database.
+
+The integration suite deliberately does **not** clean up the `salary_record` rows it appends: the
+append-only trigger blocks `DELETE` for every role including the owner, which is the invariant
+working as designed. Fixture codes are uniquely suffixed per run, and AD-24 specifies a disposable
+database.
