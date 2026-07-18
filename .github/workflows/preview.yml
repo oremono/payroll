@@ -1,0 +1,223 @@
+name: Preview
+
+# Story 1-7. A Neon database branch per pull request, proven by the real integration sequence, then
+# a Vercel preview deployed against it.
+#
+# DELIBERATELY A SEPARATE FILE from ci.yml. The four required checks there (Lint · Typecheck ·
+# Build · Unit + Coverage, Mutation testing (domain), Integration (Postgres 18), Accessibility
+# (axe)) are branch-protection rails and must keep their meaning and their names; entangling a
+# deploy pipeline with them would couple merge eligibility to Vercel and Neon availability.
+#
+# This workflow is CI-driven, not Git-driven: vercel.json's ignoreCommand blocks Vercel's own
+# automatic deployment for every ref except master, so a preview build can never start before its
+# Neon branch and environment variables exist. master still auto-deploys to production.
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: Neon branch · migrate · integration · deploy · smoke
+    # Fork PRs cannot read secrets (NEON_API_KEY, VERCEL_TOKEN, PAYROLL_APP_PASSWORD), so every
+    # step below would fail on an empty string and read as a broken pipeline rather than an
+    # unavailable one. Skip cleanly instead.
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Mirrors ci.yml's concurrency rail. Without it two rapid pushes to the same PR race on branch
+    # creation and on the deploy. Scoped per PR, at JOB level so the cleanup job below keeps its
+    # own independent group.
+    concurrency:
+      group: preview-${{ github.event.number }}
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `postinstall` runs `prisma generate`, so the generated client exists from here on.
+      - run: npm ci
+
+      # A branch TTL is a backstop for orphans, not the primary cleanup — the `closed` job below is
+      # that. It matters because Neon caps branches per project (commonly 10 on free) and the
+      # `closed` event does not fire for a git branch deleted outside a PR.
+      - name: Compute branch expiry
+        id: expiry
+        run: echo "at=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      # Pinned to the MOVING @v6 tag, deliberately not @v6.4.0 — that tag exists but points at an
+      # older commit than the 6.3.1 release and carries no release notes.
+      #
+      # Input names were read from action.yml at the pinned ref, not copied from Neon's published
+      # sample workflow, which is still on v5. v6 renamed them: username→role, parent→parent_branch,
+      # *_with_pooler→*_pooled. The v5 names fail silently or with an unhelpful error.
+      - name: Create (or reuse) the Neon branch for this PR
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          # The Neon project's default branch is named `production`, NOT `main`. Passed explicitly
+          # because the action's default parent would not resolve. (rk, 2026-07-19: keep Neon's
+          # name; do not rename it to match git's `master`.)
+          parent_branch: production
+          # Keyed on the PR NUMBER, not the head ref. The number is identical on opened /
+          # synchronize / closed, so cleanup always resolves the same name creation used. A
+          # head-ref-derived name would need sanitizing (refs carry slashes) and would orphan its
+          # Neon branch if the git branch were renamed mid-PR — and orphans consume branch quota.
+          branch_name: pr-${{ github.event.number }}
+          database: neondb
+          role: neondb_owner
+          expires_at: ${{ steps.expiry.outputs.at }}
+
+      # The action hands back a full connection URI for the OWNER role. The runtime role's URL is
+      # COMPOSED from it rather than requested from the Neon API: payroll_app's password is already
+      # known (branches inherit their parent's roles AND passwords — the whole reason bootstrap runs
+      # once per project), and whether the API can return credentials for a SQL-created role is
+      # unverified. Composing removes the dependency entirely.
+      - name: Compose the two connection URLs
+        env:
+          OWNER_DIRECT_URL: ${{ steps.neon.outputs.db_url }}
+          OWNER_POOLED_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          APP_PASSWORD: ${{ secrets.PAYROLL_APP_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import os
+          from urllib.parse import urlsplit, urlunsplit, quote, parse_qsl, urlencode
+
+          def build(src, user, password):
+              parts = urlsplit(src)
+              netloc = f"{user}:{quote(password, safe='')}@{parts.hostname}"
+              if parts.port:
+                  netloc += f":{parts.port}"
+              query = dict(parse_qsl(parts.query, keep_blank_values=True))
+              # AC 3: both URLs must carry sslmode=require. The action's `ssl` input defaults to
+              # 'require' so this is normally already present — set it rather than assume it.
+              query["sslmode"] = "require"
+              return urlunsplit((parts.scheme, netloc, parts.path, urlencode(query), parts.fragment))
+
+          direct = urlsplit(os.environ["OWNER_DIRECT_URL"])
+          owner_url = build(os.environ["OWNER_DIRECT_URL"], direct.username, direct.password)
+          app_url = build(os.environ["OWNER_POOLED_URL"], "payroll_app", os.environ["APP_PASSWORD"])
+
+          # Mask BEFORE either value can reach a log line. Actions masks the raw secret already,
+          # but not these composed strings, which embed it.
+          #
+          # ::add-mask:: is parsed from the step's STDOUT, so it must be printed — NOT redirected
+          # into $GITHUB_ENV. The env assignments are therefore appended to the file directly
+          # rather than via stdout redirection; doing both through stdout silently loses the mask.
+          for value in (owner_url, app_url):
+              print(f"::add-mask::{value}")
+
+          # DATABASE_URL is the OWNER on the DIRECT endpoint; DATABASE_URL_APP is payroll_app on the
+          # POOLED endpoint. Neither pairing is stylistic — see README § Deployment & environments.
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"DATABASE_URL={owner_url}\n")
+              env_file.write(f"DATABASE_URL_APP={app_url}\n")
+          PY
+
+      # ─── The gate (AC 10) ────────────────────────────────────────────────────────────────────
+      # Reproduces ci.yml's integration sequence IN FULL AND IN ORDER against the Neon branch.
+      # Running only the test step would prove nothing about migrations: a Neon branch is a
+      # copy-on-write clone that already carries its parent's schema, so on a PR that ADDS a
+      # migration the suite would exercise a stale schema and the first real run of `migrate
+      # deploy` on Neon would be the Vercel build — after the gate.
+      #
+      # bootstrap-roles.sql is deliberately NOT run here. payroll_app is inherited from the parent
+      # branch; re-running bootstrap per branch is precisely the mistake this story exists to avoid.
+      - name: Apply migrations to the Neon branch
+        run: npx prisma migrate deploy
+
+      - name: Check for schema drift
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+      # Reuses tests/integration/* unchanged — no Neon-specific variant exists, by design. This is
+      # the mechanical proof that role inheritance, the schema-scoped grants, and the append-only
+      # REVOKE behave on Neon exactly as they do on the CI service container.
+      - name: Integration tests (real Neon branch)
+        run: npm run test:integration
+
+      # ─── Deploy ──────────────────────────────────────────────────────────────────────────────
+      # The Vercel CLI is not a project dependency; invoked pinned rather than floating.
+      #
+      # VERCEL_ORG_ID / VERCEL_PROJECT_ID must be ENVIRONMENT variables — the CLI reads them from
+      # the environment to skip interactive linking. Passing them as GitHub `vars` alone does
+      # nothing.
+      #
+      # Preview values are passed PER-DEPLOYMENT rather than persisted with `vercel env add`, so no
+      # per-branch state accumulates in the Vercel project and nothing needs cleaning up beyond the
+      # Neon branch itself.
+      #
+      # The build needs only DATABASE_URL: client.ts is lazy, so the build never touches
+      # DATABASE_URL_APP. That laziness is load-bearing here.
+      #
+      # CI_DRIVEN_PREVIEW lets vercel.json's ignoreCommand through for this deployment; without it
+      # a preview created from a non-master ref would be ignored by the same rule that blocks
+      # Git-triggered previews.
+      - name: Deploy preview to Vercel
+        id: deploy
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          url=$(npx --yes vercel@54.18.7 deploy \
+            --token="${{ secrets.VERCEL_TOKEN }}" \
+            --yes \
+            --build-env CI_DRIVEN_PREVIEW=1 \
+            --build-env DATABASE_URL="$DATABASE_URL" \
+            --env DATABASE_URL_APP="$DATABASE_URL_APP")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview deployed to $url"
+
+      # The runner has no browser — install it exactly as ci.yml's a11y job does.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # Runs ONLY e2e/smoke.spec.ts. The axe spec is not run against the deployed URL: `test:a11y`
+      # was narrowed to its own file in this story precisely so that stays true.
+      - name: Smoke check the deployed preview
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.deploy.outputs.url }}
+        run: npm run test:smoke
+
+  cleanup:
+    name: Delete the PR's Neon branch
+    # Fires on close WHETHER OR NOT the PR merged — an abandoned PR orphans its branch just as
+    # effectively as a merged one, and orphans consume the project's branch quota.
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Its own group, and NOT cancel-in-progress: a cancelled cleanup leaves the orphan it exists to
+    # prevent.
+    concurrency:
+      group: preview-cleanup-${{ github.event.number }}
+      cancel-in-progress: false
+
+    steps:
+      # `branch` is the current input; `branch_id` is deprecated. Resolves the same pr-<number>
+      # name the create step used.
+      #
+      # continue-on-error because the action shells out to `neonctl branches delete`, which exits
+      # non-zero when the branch is already gone — which is a NORMAL outcome here (the expiry TTL
+      # may have collected it, or a re-opened-then-closed PR may clean up twice). A cleanup that
+      # fails the run on "already deleted" trains people to ignore red.
+      - name: Delete the Neon branch
+        continue-on-error: true
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: pr-${{ github.event.number }}
