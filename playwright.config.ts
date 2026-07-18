@@ -11,7 +11,13 @@ import { defineConfig, devices } from '@playwright/test';
 // A dedicated port, NOT 3000 — otherwise a `next dev` already running locally gets reused and the
 // axe pass silently judges the dev build instead of the built app.
 const PORT = 3100;
-const baseURL = `http://localhost:${PORT}`;
+
+// Story 1-7: when PLAYWRIGHT_BASE_URL is set, the target is an ALREADY-DEPLOYED URL (the preview
+// pipeline points the smoke spec at the Vercel deployment it just created). Building and serving a
+// local copy in that case would be wasted work AND wrong — the point is to prove the DEPLOYED
+// instance serves. Unset, behaviour is exactly as before: build once, serve on 3100.
+const deployedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const baseURL = deployedBaseURL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -26,10 +32,17 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Build once and serve the production output — the surface the axe pass judges is the built app.
-  webServer: {
-    command: `npm run build && npm run start -- --port ${PORT}`,
-    url: baseURL,
-    timeout: 180_000,
-    reuseExistingServer: !process.env.CI,
-  },
+  // Omitted entirely against a deployed URL: there is nothing to start, and passing a webServer
+  // whose `url` is the remote host would make Playwright wait on (and then race) a server it never
+  // launched.
+  ...(deployedBaseURL
+    ? {}
+    : {
+        webServer: {
+          command: `npm run build && npm run start -- --port ${PORT}`,
+          url: baseURL,
+          timeout: 180_000,
+          reuseExistingServer: !process.env.CI,
+        },
+      }),
 });
