@@ -50,6 +50,7 @@
 generated: 2026-07-17 22:31
 last_updated: 2026-07-18
 project: payroll
+# 1-3 elaborated via create-story 2026-07-18: schema + migrations + append-only REVOKE + integration harness
 project_key: NOKEY
 tracking_system: file-system
 story_location: docs/implementation-artifacts
@@ -59,7 +60,7 @@ development_status:
   epic-1: in-progress
   1-1-project-scaffold-and-source-tree: done
   1-2-ci-pipeline-and-gates: done
-  1-3-data-model-and-migrations: backlog
+  1-3-data-model-and-migrations: ready-for-dev
   1-4-money-currency-domain-primitives: backlog
   1-5-design-token-build: backlog
   1-6-app-shell-and-as-of-control: backlog
