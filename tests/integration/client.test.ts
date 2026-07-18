@@ -126,4 +126,65 @@ describe('the shipped Prisma client', () => {
     // the models, not just raw SQL.
     await expect(db.salaryRecord.findMany({ take: 1 })).resolves.toBeInstanceOf(Array);
   });
+
+  it('bounds its connection pool — concurrency beyond the bound queues into a second wave', async () => {
+    // Story 1-7 AC 4/5. Asserts the pool bound BEHAVIOURALLY, by timing, because every direct
+    // route to the number is either tautological or wrong here:
+    //
+    //   - Reading the constant back (or `pool.options.max`) asserts that a literal equals itself.
+    //     It would still pass if the adapter never handed the value to pg at all.
+    //   - `pg_stat_activity` is worse than useless on the pooled endpoint AC 3 puts this suite on:
+    //     behind PgBouncer in transaction mode it reports the POOLER's server-side backends, which
+    //     are shared across clients and bear no 1:1 relation to this process's sockets. It is also
+    //     partly NULL for a non-superuser, and neondb_owner is not a superuser.
+    //
+    // Timing is the one signal that means the same thing on a direct endpoint, a pooled endpoint,
+    // and the local container — a query that cannot get a socket waits, and waiting is observable.
+    //
+    // EXPECTED_MAX mirrors APP_POOL_MAX in src/adapters/db/client.ts deliberately rather than
+    // importing it: the two assertions below pin the bound from BOTH sides, so a change to the
+    // production constant in either direction fails this test instead of silently retuning it.
+    const EXPECTED_MAX = 5;
+    const SLEEP_SECONDS = 1;
+    // One wave is ~1s. 1.9s sits clear of both — above any plausible round-trip overhead on a
+    // single wave, below the ~2s floor of two.
+    const ONE_WAVE_CEILING_MS = 1_900;
+    const TWO_WAVE_CEILING_MS = 6_000;
+
+    const sleepConcurrently = async (count: number): Promise<number> => {
+      const startedAt = performance.now();
+
+      await Promise.all(
+        Array.from(
+          { length: count },
+          // pg_sleep in FROM, not in the select list: it returns `void`, and Prisma's deserializer
+          // rejects a void COLUMN outright ("Failed to deserialize column of type 'void'").
+          () => db.$queryRaw`SELECT 1 AS slept FROM pg_sleep(${SLEEP_SECONDS}::double precision)`,
+        ),
+      );
+
+      return performance.now() - startedAt;
+    };
+
+    // Warm the pool first. A cold socket to Neon pays TLS + startup before the sleep begins, and
+    // that cost lands entirely inside the baseline measurement — the one measurement with no
+    // headroom to absorb it.
+    await Promise.all(
+      Array.from({ length: EXPECTED_MAX + 3 }, () => db.$queryRaw`SELECT 1`),
+    );
+
+    // Baseline. Without it, a pool that serialized EVERY query would satisfy the bound assertion
+    // below for entirely the wrong reason — the failure mode `max: 1` actually produces, and the
+    // reason AC 4 rejects it.
+    const baselineMs = await sleepConcurrently(EXPECTED_MAX);
+
+    expect(baselineMs).toBeLessThan(ONE_WAVE_CEILING_MS);
+
+    // The bound itself: EXPECTED_MAX + 3 sleepers cannot all hold a socket at once, so three of
+    // them queue and the whole set takes two waves.
+    const overCommittedMs = await sleepConcurrently(EXPECTED_MAX + 3);
+
+    expect(overCommittedMs).toBeGreaterThanOrEqual(ONE_WAVE_CEILING_MS);
+    expect(overCommittedMs).toBeLessThan(TWO_WAVE_CEILING_MS);
+  });
 });
