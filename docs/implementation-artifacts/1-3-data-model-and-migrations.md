@@ -555,11 +555,16 @@ clean. `npm ci` from scratch verified to regenerate the client via `postinstall`
 
 **Two conflicts inherited by 1-4 — named, not silently resolved (as the story required):**
 
-- **Level cardinality is unresolved.** `reconcile-stitch.md` line 97 flags two incompatible level
-  vocabularies in the mocks (Settings/Gender Insights: L1–L8 + M1–M3 = **11**; Employees/Overdue
-  chips: IC2–IC6 + M2/M4/M7), while the addendum sizes the grid at **6**. Structure-only 1-3 is
-  unaffected — `level` is just a table, and `rank` orders whatever wins — but **1-4 cannot draft
-  level values until this is decided.**
+- ~~**Level cardinality is unresolved.**~~ **RESOLVED (rk, 2026-07-18): 6 levels.** The mocks carry
+  two incompatible vocabularies (`reconcile-stitch.md` line 97 — Settings/Gender Insights: L1–L8 +
+  M1–M3 = **11**; Employees/Overdue chips: IC2–IC6 + M2/M4/M7 = **8**), and the addendum sizes the
+  grid at **6**. Six wins on a product consequence, not on provenance: peer identity is
+  `(role, level, country)`, so level count divides the population directly. At ~25 roles × 8
+  countries, 6 levels gives 1,200 cells ≈ 8 employees per peer group — the only option that
+  routinely clears the **n ≥ 5** floor. Eleven levels would give 2,200 cells ≈ 4.5 per group, so
+  most comparisons would refuse and the product would mostly answer "not enough peers". **1-4 now
+  drafts 6 level values** and reconciles the mock labels down to them; `level.rank` orders them.
+  Structure-only 1-3 is unaffected — `level` is just a table.
 - **Is `country` a reference table, and does import reject on it?** SPEC line 77 names only role
   and level as seeded reference tables, while epics.md line 63 and AD-6 both require a `country`
   reference (currency derives from it) — so modeling it here is right, and 1-3 builds the FK. But
@@ -567,10 +572,13 @@ clean. `npm ci` from scratch verified to regenerate the client via `postinstall`
   open, and SPEC CAP-1 mandates role/level rejection only. The **rejection semantics are Epic 2's
   open question**, not this schema's.
 
-**Also surfaced, logged to `deferred-work.md`, deliberately not absorbed:** the Repository contract
-(epics.md line 64) and Deployment/NFR11 (line 68) are both bound to Epic 1 but owned by **no** story
-in 1-1…1-6; `TRUNCATE` bypasses row-level triggers (not a runtime hole — `payroll_app` never
-receives the `TRUNCATE` privilege — but worth knowing).
+**Also surfaced, logged to `deferred-work.md`:** the two Epic 1 requirements owned by no story in
+1-1…1-6 — both **ruled on by rk on 2026-07-18**. The **Repository contract** (epics.md line 64)
+defers to its first consumer (CAP-2/CAP-3); Epic 1's data-model requirement is satisfied by the
+schema alone. **Deployment / NFR11** (line 68) gets a **new Epic 1 story, not yet written**
+(suggested `1-7-deployment`, sequenced after 1-6). Separately: `TRUNCATE` bypasses row-level
+triggers — not a runtime hole, since `payroll_app` never receives the `TRUNCATE` privilege, but
+worth knowing.
 
 **Scope held:** nothing was seeded (Decision 1) — the reference tables and `settings` ship empty and
 the suite builds its own fixtures. No `peer_group` table, no outlier/findings table, no
