@@ -110,11 +110,24 @@ jobs:
         run: |
           python3 <<'PY'
           import os
-          from urllib.parse import urlsplit, urlunsplit, quote, parse_qsl, urlencode
+          from urllib.parse import urlsplit, urlunsplit, quote, unquote, parse_qsl, urlencode
 
+          # userinfo taken FROM a URL is already percent-encoded; a raw secret is not. Encoding
+          # both the same way double-encodes the first (`p%40ss` -> `p%2540ss`), which produces a
+          # wrong password that then fails as an opaque auth error — opaque because the composed
+          # URL is masked, so the log shows only ***. Normalise by decoding first, then encoding
+          # once: unquote() is a no-op on a raw secret that contains no percent sign, and correctly
+          # reverses the action's encoding on userinfo lifted out of a URL. (Code review
+          # 2026-07-19; latent today only because Neon's generated passwords are alphanumeric.)
           def build(src, user, password):
               parts = urlsplit(src)
-              netloc = f"{user}:{quote(password, safe='')}@{parts.hostname}"
+              userinfo = f"{quote(unquote(user), safe='')}:{quote(unquote(password), safe='')}"
+              host = parts.hostname
+              # urlsplit().hostname strips the brackets from an IPv6 literal; reinstate them or the
+              # port becomes indistinguishable from the address.
+              if host and ":" in host:
+                  host = f"[{host}]"
+              netloc = f"{userinfo}@{host}"
               if parts.port:
                   netloc += f":{parts.port}"
               query = dict(parse_qsl(parts.query, keep_blank_values=True))
@@ -124,8 +137,29 @@ jobs:
               return urlunsplit((parts.scheme, netloc, parts.path, urlencode(query), parts.fragment))
 
           direct = urlsplit(os.environ["OWNER_DIRECT_URL"])
+          app_password = os.environ["APP_PASSWORD"]
+
+          # A missing secret or repo variable is substituted by Actions as an EMPTY STRING, not left
+          # unset — so without this the URLs compose cleanly with a blank password and the failure
+          # surfaces three steps later as a masked Postgres auth error blamed on the database.
+          for name, value in (
+              ("OWNER_DIRECT_URL", os.environ["OWNER_DIRECT_URL"]),
+              ("OWNER_POOLED_URL", os.environ["OWNER_POOLED_URL"]),
+              ("PAYROLL_APP_PASSWORD", app_password),
+          ):
+              if not value:
+                  raise SystemExit(f"{name} is empty — check the repository secrets and variables.")
+
           owner_url = build(os.environ["OWNER_DIRECT_URL"], direct.username, direct.password)
-          app_url = build(os.environ["OWNER_POOLED_URL"], "payroll_app", os.environ["APP_PASSWORD"])
+          app_url = build(os.environ["OWNER_POOLED_URL"], "payroll_app", app_password)
+
+          # The direct/pooled + owner/app split is the story's central correctness constraint, and
+          # both ways of getting it wrong are SILENT: a pooled endpoint breaks `migrate deploy`'s
+          # session advisory lock, and an owner connection at runtime reduces the append-only
+          # REVOKE to a no-op. Assert rather than trust the action's outputs.
+          assert "-pooler" not in urlsplit(owner_url).hostname, "owner URL must use the DIRECT endpoint"
+          assert "-pooler" in urlsplit(app_url).hostname, "app URL must use the POOLED endpoint"
+          assert urlsplit(app_url).username == "payroll_app", "app URL must connect as payroll_app"
 
           # Mask BEFORE either value can reach a log line. Actions masks the raw secret already,
           # but not these composed strings, which embed it.
@@ -186,13 +220,27 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          # Via env, not interpolated into the script body: an expression substituted into the
+          # command line lands in /proc/*/cmdline, readable by anything else running on the runner.
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           url=$(npx --yes vercel@54.18.7 deploy \
-            --token="${{ secrets.VERCEL_TOKEN }}" \
+            --token="$VERCEL_TOKEN" \
             --yes \
             --build-env CI_DRIVEN_PREVIEW=1 \
             --build-env DATABASE_URL="$DATABASE_URL" \
-            --env DATABASE_URL_APP="$DATABASE_URL_APP")
+            --env DATABASE_URL_APP="$DATABASE_URL_APP" | tail -n 1)
+
+          # Validate before publishing. The CLI's stdout is not a contract: an npx notice, a
+          # deprecation warning or a progress line would make $url multi-line, and `echo` of a
+          # multi-line value into $GITHUB_OUTPUT corrupts the file (GitHub requires a delimiter
+          # block for those) — the runner would then read a truncated URL, or parse later lines as
+          # further outputs, and the smoke check would silently probe the wrong target.
+          case "$url" in
+            https://*) ;;
+            *) echo "::error::vercel deploy did not print a URL on its last stdout line. Got: $url"; exit 1 ;;
+          esac
+
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview deployed to $url"
 

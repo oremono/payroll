@@ -406,8 +406,15 @@ stop and request them rather than fake or skip them. Everything after this secti
   - [x] Merge to `master`, confirm the production build runs `migrate deploy` (check the build log for the
         Prisma output) and succeeds.
   - [x] Confirm the URL responds `200` and renders the placeholder page.
-  - [x] Confirm Node **24** in the build log (`.nvmrc` + `engines.node >= 24 <25`), rather than assuming.
-  - [x] **Verify `pg` resolves in the deployed function.** `pg@8.22.0` and `@types/pg` are
+  - [ ] Confirm Node **24** in the build log (`.nvmrc` + `engines.node >= 24 <25`), rather than assuming.
+        **Not possible as written (2026-07-19):** Vercel no longer prints the Node version in build
+        logs. Confirmed instead via `engines.node`, which Vercel documents as overriding project
+        settings and which fails the build when unsatisfiable. Left unchecked because the subtask
+        as written was not performed.
+  - [ ] **Verify `pg` resolves in the deployed function.** **Not yet meaningful (2026-07-19):** both
+        routes are static-prerendered, so no function exists to resolve anything. Re-enter at Story
+        1-6, when the first dynamic surface lands. Settled analytically in the meantime — see the
+        Dev Agent Record. `pg@8.22.0` and `@types/pg` are
         **devDependencies**, but `@prisma/adapter-pg` is a runtime dependency that needs `pg` at runtime. This
         is the same class of trap that put `prisma` and `dotenv` in `dependencies`, and it was not re-checked
         then. If the function cannot resolve `pg`, promote it to `dependencies` (leave `@types/pg` in
@@ -437,20 +444,20 @@ to exactly 5 — Blind Hunter correct, Edge Case Hunter incorrect).
 
 **Patches**
 
-- [ ] [Review][Patch] **AC 13 is violated — real Neon identifiers committed, and the record falsely claims otherwise** [docs/implementation-artifacts/1-7-deployment-and-environments.md:685,688,692,712] — the Dev Agent Record commits the **production** endpoint `ep-mute-night-…`, a preview endpoint, and a branch id, while the AC-status table asserts "✅ … placeholders only". Both the hosts and the false claim must go. **Highest-severity finding; it is a self-inflicted contradiction in the evidence record.**
-- [ ] [Review][Patch] Owner password is double percent-encoded when composing `DATABASE_URL` [.github/workflows/preview.yml] — `urlsplit().password` returns the *still-encoded* substring; `quote()` re-encodes it (`p%40ss` → `p%2540ss`). Correct for the raw `APP_PASSWORD` secret, wrong for the owner. Latent only because Neon's current owner password is alphanumeric; the failure would be a masked, opaque auth error. Also affects `direct.username` (interpolated with no encoding).
-- [ ] [Review][Patch] README claims the pipeline proves *deployed* database connectivity [README.md § No health-check endpoint] — the integration suite runs on the GitHub runner, not from the Vercel function. It proves the Neon branch is correct; it proves nothing about the deployed app's DB path. "A stronger claim than any health route could make" is inverted.
-- [ ] [Review][Patch] Timing-test comment overstates what the assertion pins [tests/integration/client.test.ts] — simulated across pool sizes: `max` ∈ {5,6,7} all pass; only ≤4 and ≥8 are caught. The comment claims a change "in either direction fails this test". Either tighten the test or correct the comment.
-- [ ] [Review][Patch] `PLAYWRIGHT_BASE_URL=''` takes the local-webServer branch with `baseURL=''` [playwright.config.ts:19-20,38] — `??` treats `''` as set, the ternary treats it as unset. Reachable whenever the deploy step captures no URL.
-- [ ] [Review][Patch] Deploy URL captured unvalidated and written unguarded to `$GITHUB_OUTPUT` [.github/workflows/preview.yml] — no shape check; a multi-line stdout corrupts the output file (GitHub requires a delimiter block for multi-line values). One `case "$url" in https://*)` closes this and the finding above.
+- [x] [Review][Patch] **FIXED 2026-07-19 — AC 13 was violated — real Neon identifiers committed, and the record falsely claims otherwise** [docs/implementation-artifacts/1-7-deployment-and-environments.md:685,688,692,712] — the Dev Agent Record committed the **production** endpoint hostname, a preview endpoint, and a branch id, while the AC-status table asserts "✅ … placeholders only". Both the hosts and the false claim must go. **Highest-severity finding; it is a self-inflicted contradiction in the evidence record.**
+- [x] [Review][Patch] **FIXED** — Owner password is double percent-encoded when composing `DATABASE_URL` [.github/workflows/preview.yml] — `urlsplit().password` returns the *still-encoded* substring; `quote()` re-encodes it (`p%40ss` → `p%2540ss`). Correct for the raw `APP_PASSWORD` secret, wrong for the owner. Latent only because Neon's current owner password is alphanumeric; the failure would be a masked, opaque auth error. Also affects `direct.username` (interpolated with no encoding).
+- [x] [Review][Patch] **FIXED** — README claims the pipeline proves *deployed* database connectivity [README.md § No health-check endpoint] — the integration suite runs on the GitHub runner, not from the Vercel function. It proves the Neon branch is correct; it proves nothing about the deployed app's DB path. "A stronger claim than any health route could make" is inverted.
+- [x] [Review][Patch] **FIXED** — Timing-test comment overstates what the assertion pins [tests/integration/client.test.ts] — simulated across pool sizes: `max` ∈ {5,6,7} all pass; only ≤4 and ≥8 are caught. The comment claims a change "in either direction fails this test". Either tighten the test or correct the comment.
+- [x] [Review][Patch] **FIXED** — `PLAYWRIGHT_BASE_URL=''` takes the local-webServer branch with `baseURL=''` [playwright.config.ts:19-20,38] — `??` treats `''` as set, the ternary treats it as unset. Reachable whenever the deploy step captures no URL.
+- [x] [Review][Patch] **FIXED** — Deploy URL captured unvalidated and written unguarded to `$GITHUB_OUTPUT` [.github/workflows/preview.yml] — no shape check; a multi-line stdout corrupts the output file (GitHub requires a delimiter block for multi-line values). One `case "$url" in https://*)` closes this and the finding above.
 - [ ] [Review][Patch] `expires_at` is never refreshed when the branch is reused [.github/workflows/preview.yml] — a PR open >7 days without a push loses its branch under a live preview URL, with no signal. Framed in both the workflow comment and README as an orphan-only backstop.
-- [ ] [Review][Patch] `ignoreCommand` skips the build when `VERCEL_GIT_COMMIT_REF` is unset/empty [vercel.json] — exits 0, so it surfaces as "Canceled by Ignored Build Step" (a *success*-looking outcome) rather than a failure. Same silent break if the production branch is ever renamed off `master`.
-- [ ] [Review][Patch] Nothing asserts the direct/pooled + role invariant the docs call a correctness constraint [.github/workflows/preview.yml compose step] — no check that the owner host lacks `-pooler`, that the app host has it, or that the app user is `payroll_app`. Two `assert` lines in the existing Python block; the documented failure mode is explicitly *silent*.
-- [ ] [Review][Patch] Two Task 7 subtasks are ticked `[x]` but were not performed as written [story Task 7] — "Confirm Node 24 **in the build log**" was replaced by an inference from `engines.node`, and "verify `pg` resolves in the deployed function" was not performed (no function exists yet). Both are documented, but should be unchecked/re-entered rather than ticked.
-- [ ] [Review][Patch] `VERCEL_TOKEN` interpolated into the shell command line rather than passed via `env:` [.github/workflows/preview.yml] — lands in `/proc/*/cmdline`.
+- [x] [Review][Patch] **FIXED** — `ignoreCommand` skips the build when `VERCEL_GIT_COMMIT_REF` is unset/empty [vercel.json] — exits 0, so it surfaces as "Canceled by Ignored Build Step" (a *success*-looking outcome) rather than a failure. Same silent break if the production branch is ever renamed off `master`.
+- [x] [Review][Patch] **FIXED** — Nothing asserts the direct/pooled + role invariant the docs call a correctness constraint [.github/workflows/preview.yml compose step] — no check that the owner host lacks `-pooler`, that the app host has it, or that the app user is `payroll_app`. Two `assert` lines in the existing Python block; the documented failure mode is explicitly *silent*.
+- [x] [Review][Patch] **FIXED** — Two Task 7 subtasks are ticked `[x]` but were not performed as written [story Task 7] — "Confirm Node 24 **in the build log**" was replaced by an inference from `engines.node`, and "verify `pg` resolves in the deployed function" was not performed (no function exists yet). Both are documented, but should be unchecked/re-entered rather than ticked.
+- [x] [Review][Patch] **FIXED** — `VERCEL_TOKEN` interpolated into the shell command line rather than passed via `env:` [.github/workflows/preview.yml] — lands in `/proc/*/cmdline`.
 - [ ] [Review][Patch] Both DB credentials broadcast to every later step via `$GITHUB_ENV` [.github/workflows/preview.yml] — visible to `npx playwright install` and `npx vercel`, both fetched at run time. Only three steps need them; step-level `env:` would scope them.
-- [ ] [Review][Patch] No existence check on `PAYROLL_APP_PASSWORD` / Neon outputs [.github/workflows/preview.yml] — GitHub substitutes empty strings for missing secrets, so an empty password composes silently and fails three steps later as a masked auth error.
-- [ ] [Review][Patch] `.env.example` host template omits the `.c-3` segment [.env.example] — real Neon direct hosts are `ep-<id>.c-3.<region>.aws.neon.tech`. Hand-constructing from this template yields a host that does not resolve — the exact mistake Task 1 warns against.
+- [x] [Review][Patch] **FIXED** — No existence check on `PAYROLL_APP_PASSWORD` / Neon outputs [.github/workflows/preview.yml] — GitHub substitutes empty strings for missing secrets, so an empty password composes silently and fails three steps later as a masked auth error.
+- [x] [Review][Patch] **FIXED** — `.env.example` host template omits the `.c-3` segment [.env.example] — real Neon direct hosts are `ep-<id>.c-3.<region>.aws.neon.tech`. Hand-constructing from this template yields a host that does not resolve — the exact mistake Task 1 warns against.
 - [ ] [Review][Patch] Smoke spec's second assertion is vacuous [e2e/smoke.spec.ts] — `body` `toBeAttached()` is true of any HTML document including an error shell, which the adjacent comment claims it distinguishes. The status assertion does that work alone.
 - [ ] [Review][Patch] The "~2× margin" claim extrapolates local numbers to the cross-region CI run [deferred-work.md, story Completion Notes] — the only CI datum is total test duration, which does not isolate the baseline assertion's headroom.
 
@@ -627,14 +634,14 @@ Every claim below is backed by a CI run or a command output, not by narrative.
 | Preview pipeline green end-to-end (branch → migrate → diff → integration → deploy → smoke) | [run 29658480123](https://github.com/oremono/payroll/actions/runs/29658480123), 2m46s |
 | Four required gates green at branch tip | [run 29658480127](https://github.com/oremono/payroll/actions/runs/29658480127) |
 | Four required gates green on `master` after merge | [run 29658726061](https://github.com/oremono/payroll/actions/runs/29658726061) |
-| Neon branch lifecycle create → delete | `Branch pr-1 created successfully`; cleanup [run 29658726129](https://github.com/oremono/payroll/actions/runs/29658726129) deleted `br-withered-flower-azy5bodw`, expiry `2026-07-25` (the 7-day TTL) |
+| Neon branch lifecycle create → delete | `Branch pr-1 created successfully`; cleanup [run 29658726129](https://github.com/oremono/payroll/actions/runs/29658726129) deleted the branch (id redacted), expiry `2026-07-25` (the 7-day TTL) |
 | `ignoreCommand` blocks Git deploys on non-`master` | PR #1 Vercel check: **"Canceled by Ignored Build Step"** |
 | `migrate deploy` genuinely runs in the Vercel build | Preview deploy log: `4 migrations found in prisma/migrations` / `No pending migrations to apply` |
-| Migrations use the **direct** endpoint | Preview log datasource host `ep-withered-scene-az2n01hp.c-3.ap-southeast-1.aws.neon.tech` — no `-pooler` |
+| Migrations use the **direct** endpoint | Preview log datasource host `ep-<preview-endpoint>.<region>.aws.neon.tech` — no `-pooler` (host redacted) |
 | Composed URLs never reach a log | Both render as `***` in every step's `env:` block |
 | Production build initially FAILED | `payroll-5zz121ofc` — `Error: Connection url is empty. See https://pris.ly/d/config-url` |
 | **Production build now GREEN** after rk re-added `DATABASE_URL` non-sensitive | `payroll-nc4szvqmk` — `4 migrations found` / `No pending migrations to apply` / `Build Completed [26s]`, and the `[prisma.config] DATABASE_URL is not set` warning is **absent** |
-| Production migrates over the **direct** endpoint | Production build log datasource host `ep-mute-night-azbvpjd9.c-3…neon.tech` — no `-pooler` |
+| Production migrates over the **direct** endpoint | Production build log datasource host `ep-<production-endpoint>.<region>.aws.neon.tech` — no `-pooler` (host redacted) |
 | Production serves the 1-1 placeholder | `200`; `<h1>Salary Management for ACME HR</h1>` + `<p>Project scaffold is up and running.</p>`, matching `src/app/page.tsx` |
 | Smoke spec green against **production** | `PLAYWRIGHT_BASE_URL=https://payroll-iota-coral.vercel.app npm run test:smoke` → 1 passed |
 
@@ -746,7 +753,7 @@ Both are honest deviations, not skipped checks:
 | 10 Branch proven by the integration sequence | ✅ All three steps green on Neon |
 | 11 No health-check route | ✅ None added |
 | 12 Smoke check without widening a11y | ✅ Verified by `--list`, not by staying green |
-| 13 No secret committed | ✅ Diff grepped for host, password, project id — placeholders only |
+| 13 No secret committed | ✅ No password or project id committed; `.env.example` carries placeholder shapes only. **Corrected 2026-07-19:** the first version of this Dev Agent Record committed three real Neon endpoint/branch identifiers and this row wrongly claimed "placeholders only" — the grep had been run against the code diff, then the claim written over the whole diff. Identifiers redacted; see Review Findings. They remain in git history (`262c900`), which is accepted: a Neon hostname is not a credential on its own — connections still require the role password and TLS — and endpoint ids cannot be rotated without recreating the project. |
 | 14 Every existing gate still passes | ✅ Green on branch tip and on `master` |
 | 15 Docs updated to fact | ✅ README § Deployment & environments; `deferred-work.md` closed |
 

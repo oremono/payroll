@@ -16,7 +16,21 @@ const PORT = 3100;
 // pipeline points the smoke spec at the Vercel deployment it just created). Building and serving a
 // local copy in that case would be wasted work AND wrong — the point is to prove the DEPLOYED
 // instance serves. Unset, behaviour is exactly as before: build once, serve on 3100.
-const deployedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+// Normalised to `undefined` when blank. `??` treats '' as SET while a truthiness test treats it as
+// UNSET, so reading the raw variable in both places made the two disagree: an empty value produced
+// baseURL '' AND still started the local webServer, i.e. a full build followed by an unparseable
+// URL. Empty is reachable — it is what the preview pipeline passes if the deploy step captures no
+// URL — so it is rejected loudly rather than silently coerced. (Code review 2026-07-19.)
+const rawBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+
+if (rawBaseURL !== undefined && rawBaseURL.trim() === '') {
+  throw new Error(
+    'PLAYWRIGHT_BASE_URL is set but empty. Unset it to test a local build, or give it the deployed ' +
+      'URL — an empty value almost always means an upstream step failed to capture the deploy URL.',
+  );
+}
+
+const deployedBaseURL = rawBaseURL?.trim();
 const baseURL = deployedBaseURL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({

@@ -142,8 +142,21 @@ describe('the shipped Prisma client', () => {
     // and the local container — a query that cannot get a socket waits, and waiting is observable.
     //
     // EXPECTED_MAX mirrors APP_POOL_MAX in src/adapters/db/client.ts deliberately rather than
-    // importing it: the two assertions below pin the bound from BOTH sides, so a change to the
-    // production constant in either direction fails this test instead of silently retuning it.
+    // importing it, so that changing the production constant is not silently self-ratifying.
+    //
+    // Precisely what the two assertions below pin (corrected after code review 2026-07-19 — an
+    // earlier version of this comment claimed a change "in either direction" fails, which is
+    // false). Waves are ceil(queries / max), each ~1 s:
+    //
+    //   max ≤ 4  baseline (5 sleepers) needs 2 waves  -> baseline assertion fails    ✓ caught
+    //   max 5-7  baseline 1 wave, over-commit 2 waves -> both assertions hold        → PASSES
+    //   max ≥ 8  over-commit (8 sleepers) fits 1 wave -> bound assertion fails       ✓ caught
+    //
+    // So this pins APP_POOL_MAX to the RANGE [5,7], not to exactly 5. That is deliberate and
+    // sufficient: it catches the two failure modes that matter — a pool small enough to serialize
+    // (the `max: 1` mistake AC 4 rejects) and one loose enough not to bound anything. Pinning an
+    // exact value by timing would need wave sizes that differ by one connection, which is far
+    // inside the noise of a cross-region round trip.
     const EXPECTED_MAX = 5;
     const SLEEP_SECONDS = 1;
     // One wave is ~1s. 1.9s sits clear of both — above any plausible round-trip overhead on a

@@ -286,10 +286,19 @@ by default) rather than to the PR.
 ### No health-check endpoint
 
 There is none, and none may be added: AD-21 fixes the route-handler count at exactly two (the CAP-1
-multipart upload and CSV export), and neither exists yet. Reachability is proven by
-`e2e/smoke.spec.ts` against the deployed URL; deployed *database* connectivity is proven by the
-preview pipeline running the real integration suite against the Neon branch — a stronger claim than
-any health route could make.
+multipart upload and CSV export), and neither exists yet.
+
+What is and is not proven, stated precisely — the earlier wording here overclaimed:
+
+- `e2e/smoke.spec.ts` proves the **deployed URL serves** (reachability), from CI, against the real
+  deployment.
+- The preview pipeline's integration suite proves the **Neon branch is correctly provisioned** —
+  role inheritance, schema-scoped grants, the append-only `REVOKE`. It runs **on the GitHub runner**,
+  not from a Vercel function, so it says nothing about the deployed app's own path to the database.
+- **Nothing currently exercises the deployed app's database connectivity**, and nothing can until a
+  dynamic surface exists — today both routes are static-prerendered, so there is no function to
+  exercise. This is the one thing a health route would genuinely prove, and AD-21 forecloses it.
+  The gap closes naturally at Story 1-6, when the first server-rendered surface reaches the database.
 
 ## Source tree
 
