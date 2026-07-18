@@ -23,6 +23,25 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /**
+ * Sockets one function instance may hold open against Postgres at once (Story 1-7).
+ *
+ * The PRIMARY fix for serverless connection exhaustion is not this number — it is that
+ * DATABASE_URL_APP points at Neon's POOLED endpoint. PgBouncer is the real pool there; it absorbs
+ * up to ~10,000 client connections and multiplexes them onto a small server-side set. This bound
+ * only caps what a single instance opens toward that pooler, so a burst of concurrency inside one
+ * instance cannot fan out without limit.
+ *
+ * `max: 1` is deliberately REJECTED. It serializes every concurrent query behind any in-flight
+ * interactive transaction, converting a connection-limit problem into a latency problem, and it is
+ * not current Neon guidance — Neon's own Vercel examples set no `max` at all. 5 leaves real
+ * intra-instance concurrency while staying far below any plausible limit.
+ *
+ * A module constant, not an env var: env holds only connection strings and the deploy target
+ * (Conventions / AD-19).
+ */
+const APP_POOL_MAX = 5;
+
+/**
  * Build the client. Kept in a function, and called lazily by `getDbClient()`, so that merely
  * importing this module never opens a connection — the `check` and `a11y` CI jobs build and serve
  * the app with NO database, and module-scope instantiation would break both.
@@ -46,7 +65,7 @@ function createClient(): PrismaClient {
     );
   }
 
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString, max: APP_POOL_MAX }) });
 }
 
 /**
