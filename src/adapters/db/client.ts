@@ -28,11 +28,21 @@ const globalForPrisma = globalThis as unknown as {
  * the app with NO database, and module-scope instantiation would break both.
  */
 function createClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
+  // DATABASE_URL_APP, deliberately NOT DATABASE_URL. The application connects as the restricted
+  // runtime role (payroll_app: SELECT/INSERT on salary_record, no UPDATE/DELETE); DATABASE_URL is
+  // the OWNER and belongs to migrations only.
+  //
+  // This distinction is the whole of AD-18 layer A. PostgreSQL lets a table owner bypass privilege
+  // checks entirely, so connecting here with the owner URL would silently reduce
+  // `REVOKE UPDATE, DELETE` to a no-op — the invariant would read as enforced while being
+  // unenforced. It is required rather than falling back to DATABASE_URL for exactly that reason: a
+  // fallback would restore the silent failure the moment the variable is missing.
+  const connectionString = process.env.DATABASE_URL_APP;
 
   if (!connectionString) {
     throw new Error(
-      'DATABASE_URL is not set. Copy .env.example to .env and point it at a PostgreSQL 18 instance.',
+      'DATABASE_URL_APP is not set. The application connects as the restricted runtime role, not ' +
+        'the owner — copy .env.example to .env and see README § Database for the two-role split.',
     );
   }
 
@@ -47,11 +57,13 @@ function createClient(): PrismaClient {
  * Components and Server Actions wiring adapters into use-cases). Never the pure core.
  */
 export function getDbClient(): PrismaClient {
-  const client = globalForPrisma.prisma ?? createClient();
+  // Cached UNCONDITIONALLY, including in production. The common Next.js snippet caches on
+  // globalThis only outside production, because there the module-level binding is the real
+  // singleton and globalThis merely survives dev hot-reload. This module has no such binding, so
+  // making the cache conditional would leave production — the one environment that cannot afford
+  // it — constructing a fresh PrismaClient and pg Pool on every call, exhausting connections
+  // within a few dozen requests.
+  globalForPrisma.prisma ??= createClient();
 
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = client;
-  }
-
-  return client;
+  return globalForPrisma.prisma;
 }

@@ -484,12 +484,58 @@ parameter: "schema"`, so the step would have failed on GitHub. Fixed to pass con
 explicitly (`PGPASSWORD` + `-h/-U/-d`). The whole job was then re-run against a clean container:
 bootstrap → `migrate deploy` → 9/9 green.
 
+**Code-review fix verification (2026-07-18).** Both `client.ts` bugs were reproduced against the
+pre-fix file before being fixed: the role assertion failed with `expected 'postgres' to be
+'payroll_app'`, and under `NODE_ENV=production` the singleton assertion failed as well (it passes
+under `NODE_ENV=test`, which is why a green suite had missed it). Notably the "cannot UPDATE/DELETE
+through the client" assertions **passed even against the buggy owner-connected client** — a direct
+demonstration that the layer-B trigger is what preserved data integrity while layer A was void.
+The `--omit=dev` failure was likewise reproduced (exit 1, `Cannot find module 'dotenv/config'`) and
+then verified fixed.
+
 **Final gate run (all local, Task 9):** `lint` PASS · `typecheck` PASS · `build` PASS ·
 `test:coverage` PASS (5 tests, 100% on the pure core) · `test:mutation` PASS (100.00, 5 killed, 0
-survived) · `test:a11y` PASS (1 test) · `test:integration` PASS (9 tests) · `prisma migrate status`
+survived) · `test:a11y` PASS (1 test) · `test:integration` PASS (13 tests, 2 files) · `prisma migrate status`
 clean. `npm ci` from scratch verified to regenerate the client via `postinstall`.
 
 ### Completion Notes List
+
+**⚠️ Deviation from AC 1 — `prisma` and `dotenv` are runtime `dependencies`, not devDependencies.**
+AC 1 specifies `prisma@7.8.0` as a **devDependency**. Code review found that this combination is
+broken: `postinstall` runs `prisma generate`, the generated client is git-ignored and therefore
+**required** at runtime, so any production-style install must be able to generate it. With both
+packages in `devDependencies`, `npm ci --omit=dev` fails outright — reproduced, exit 1,
+`Cannot find module 'dotenv/config'` (`prisma.config.ts` imports it). Verified fixed in both
+directions: the same install now succeeds and emits the client. `dotenv` moves for the same reason
+— `prisma.config.ts` needs it whenever the CLI runs. **This contradicts an explicit AC and needs
+rk's ratification**; the alternative (keep them dev-only and commit the generated client, or drop
+`postinstall`) trades one problem for a worse one.
+
+**Findings from code review (2026-07-18), all fixed — see the Debug Log for the reproductions:**
+
+- **The production client was never cached** (`client.ts`). The `globalThis` cache was populated
+  only outside production and no module-level binding backed it, so in production every
+  `getDbClient()` call built a fresh `PrismaClient` and `pg` Pool — connection exhaustion within a
+  few dozen requests. Now cached unconditionally.
+- **The runtime client connected as the OWNER** (`client.ts`) — it read `DATABASE_URL` while
+  `README.md` and `.env.example` both specify `DATABASE_URL_APP`. Because an owner bypasses
+  privilege checks entirely, AD-18 layer A was a **silent no-op in production**, and the suite's
+  layer-A assertion was testing a role the application did not use — the exact false green the
+  story warns about. Now reads `DATABASE_URL_APP` and **requires** it: a fallback to `DATABASE_URL`
+  would restore the silent failure the moment the variable went missing. Data integrity was never
+  at risk, because the layer-B trigger blocks the owner too — which is precisely the case for
+  Decision 2 shipping both layers.
+- **`settings` test cleanup was not in `finally`** — a regressed guard would skip it and leave a
+  stray row that breaks a later `ADD CONSTRAINT`. Now `try`/`finally`.
+- **Fixture currency/country codes drew from 256 values** while the suite can never delete its
+  rows, so a persistent local database would hit duplicate-key failures after ~20 runs. Now the
+  full suffix.
+
+**Root cause worth carrying forward:** every one of these lived in `client.ts` and its absence of
+tests. `schema.test.ts` proved the database invariants with its own hand-rolled `pg` pools and so
+never exercised the client the application ships. `tests/integration/client.test.ts` now closes
+that gap, asserting `current_user = 'payroll_app'`, singleton identity (verified failing under
+`NODE_ENV=production`), and that `UPDATE`/`DELETE` are rejected **through the shipped client**.
 
 **Decisions recorded (the story asked for each of these explicitly):**
 
@@ -598,6 +644,7 @@ dismissal/seen state, no auth/user tables, no `image_url`, no UNIQUE on `employe
 - `prisma/sql/bootstrap-roles.sql`
 - `src/adapters/db/client.ts`
 - `tests/integration/schema.test.ts`
+- `tests/integration/client.test.ts`
 - `vitest.integration.config.ts`
 - `.env.example`
 
@@ -628,3 +675,5 @@ dismissal/seen state, no auth/user tables, no `image_url`, no UNIQUE on `employe
 | 2026-07-18 | Initial migration generated; append-only enforced in both ratified layers (`REVOKE` + `BEFORE UPDATE OR DELETE` trigger), `CHECK (amount_minor > 0)`, and the `settings` single-row guard added as hand-authored SQL; AD-24 integration harness added against real Postgres 18, red observed before green (`03e9273`) |
 | 2026-07-18 | CI gains the `Integration (Postgres 18)` job; README documents the database, the two-role split, and the fourth required check. Local job simulation caught that `psql` rejects Prisma's `?schema=public` (`47338e1`) |
 | 2026-07-18 | Fixed a silent privilege bug: schema-scoped `GRANT USAGE ON SCHEMA public` moved from the role bootstrap into the migration, so a schema rebuild no longer blinds the runtime role (`c91b526`) |
+| 2026-07-18 | rk's rulings recorded: 6 levels, repository port defers to CAP-2/CAP-3, deployment gets a new Epic 1 story (`a087d52`) |
+| 2026-07-18 | Code-review fixes: the client is now cached unconditionally and connects as `payroll_app` rather than the owner; `prisma`/`dotenv` moved to `dependencies` so `npm ci --omit=dev` works (**deviates from AC 1**); settings-test cleanup moved into `finally`; fixture codes widened. New `tests/integration/client.test.ts` covers the shipped client — integration suite now 13 tests across 2 files |

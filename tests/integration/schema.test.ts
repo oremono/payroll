@@ -38,12 +38,20 @@ if (!APP_URL) {
 const owner = new Pool({ connectionString: OWNER_URL });
 const app = new Pool({ connectionString: APP_URL });
 
-// Unique per run so repeated local runs against a persistent container never collide.
+// Unique per run. This suite cannot delete what it creates — the append-only trigger blocks
+// DELETE on salary_record for every role, and the reference FKs are ON DELETE RESTRICT — so rows
+// accumulate on a persistent local container and fixture codes must not collide across runs.
+//
+// The FULL suffix is used for every code, including currency and country. An earlier version took
+// only 2 hex characters for those two (256 possible values), which by the birthday bound would
+// start failing `beforeAll` with a duplicate-key error after roughly twenty local runs. The `code`
+// columns are TEXT with no length constraint, so over-long test codes are harmless; real
+// ISO-4217 currency and country values arrive with Story 1-4.
 const suffix = randomUUID().slice(0, 8);
-const CURRENCY = `T${suffix.slice(0, 2)}`.toUpperCase();
+const CURRENCY = `TC${suffix}`.toUpperCase();
 const ROLE = `role-${suffix}`;
 const LEVEL = `level-${suffix}`;
-const COUNTRY = `C${suffix.slice(0, 2)}`.toUpperCase();
+const COUNTRY = `CO${suffix}`.toUpperCase();
 
 const employeeId = randomUUID();
 
@@ -193,15 +201,20 @@ describe('settings is single-row (AD-19)', () => {
       [CURRENCY],
     );
 
-    await expect(
-      owner.query(
-        'INSERT INTO settings (id, outlier_threshold_pct, reporting_currency) VALUES (2, 25, $1)',
-        [CURRENCY],
-      ),
-    ).rejects.toThrow();
-
-    // Clean up unconditionally, including any second row — if the guard ever regresses, the
-    // stray row must not leak into the next run (or into a later migration's constraint check).
-    await owner.query('DELETE FROM settings');
+    try {
+      await expect(
+        owner.query(
+          'INSERT INTO settings (id, outlier_threshold_pct, reporting_currency) VALUES (2, 25, $1)',
+          [CURRENCY],
+        ),
+      ).rejects.toThrow();
+    } finally {
+      // MUST be in `finally`. If the single-row guard ever regresses, the insert above succeeds,
+      // the assertion throws, and a cleanup placed after it would be skipped — leaving two rows
+      // that make the next `ADD CONSTRAINT ... CHECK (id = 1)` fail with "violated by some row",
+      // i.e. a clear test failure turned into a confusing migration failure elsewhere. That
+      // exact sequence happened once during development.
+      await owner.query('DELETE FROM settings');
+    }
   });
 });
