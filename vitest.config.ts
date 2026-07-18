@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 // Mirror the `@/*` -> `src/*` path aliases declared in tsconfig.json so imports resolve
 // identically in tests and in the app. `srcDir` ends with a trailing slash so the regex
@@ -13,6 +13,10 @@ export default defineConfig({
   test: {
     // Domain/application unit suite only — no DB, no clock, no network (Law: Testing / AD-23).
     include: ['tests/**/*.{test,spec}.ts'],
+    // `tests/**` WOULD otherwise sweep in tests/integration/**, folding real-database tests into
+    // `npm run test` and into the coverage gate. The integration suite is deliberately separate
+    // (AD-24) and runs only via `npm run test:integration` (vitest.integration.config.ts).
+    exclude: [...configDefaults.exclude, 'tests/integration/**'],
     environment: 'node',
     coverage: {
       // Coverage floor on the pure core (AD-23). Reports the CODE under test, not the tests.
@@ -26,8 +30,11 @@ export default defineConfig({
         'src/application/**/*.{ts,tsx,js,jsx,mts,cts}',
       ],
       // A colocated test file would count as never-executed source (the runner only picks up
-      // tests/**) and spuriously fail the floor — exclude the pattern outright.
-      exclude: ['**/*.{test,spec}.*'],
+      // tests/**) and spuriously fail the floor — exclude the pattern outright. The Prisma
+      // generated client (thousands of generated .ts files) is excluded here too: it sits under
+      // src/adapters/, so the `include` above already omits it, but this is one of the five
+      // gates it must be named in (.gitignore, ESLint ignores, coverage, Stryker, tsconfig).
+      exclude: ['**/*.{test,spec}.*', 'src/adapters/db/generated/**'],
       reporter: ['text', 'html'],
       reportsDirectory: './coverage',
       thresholds: {

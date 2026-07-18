@@ -1,0 +1,284 @@
+// Payroll data model — Story 1-3.
+//
+// Source of truth: ARCHITECTURE-SPINE.md § Structural Seed (ER diagram) + AD-4/6/8/10/13/19, and
+// the Consistency Conventions (DB tables snake_case singular; calendar DATE for effective_from /
+// pinned_on / hire_date, never timestamps).
+//
+// Standing rules encoded here, so a future reader does not have to rediscover them:
+//   * Every table carries an `id` uuid PK and a `created_at`. `updated_at` and `is_active` are
+//     deliberately SCOPED, not universal (Decision 3) — see the comments on salary_record and
+//     employee. Do not "restore consistency" by adding the omitted columns.
+//   * Child FKs target the natural `code`, never the surrogate `id`: AD-4's Money carries the
+//     ISO-4217 code and peer identity (role, level, country) is read on every comparison —
+//     neither may require a join.
+//   * A peer group is NOT a table (AD-2, derived at read time); there is no outlier/findings
+//     table and no dismissal/seen state (AD-12); there is no auth/user table (SPEC non-goal).
+//
+// Constraints Prisma cannot model declaratively in 7.8.0 — the amount_minor > 0 CHECK (AD-4), the
+// settings single-row guard (AD-19), and the append-only REVOKE + trigger (Law 5 / AD-18) — live
+// as hand-authored SQL in prisma/migrations/. They are no less part of this schema.
+
+// Prisma 7: the datasource block accepts provider / relationMode / schemas / extensions ONLY.
+// `url` was removed in 7.0.0 and lives in prisma.config.ts — `url = env("DATABASE_URL")` here is a
+// v6 idiom that will not validate.
+datasource db {
+  provider = "postgresql"
+}
+
+// Prisma 7: provider is `prisma-client` (`prisma-client-js` is deprecated) and `output` is
+// REQUIRED. The generator emits TypeScript SOURCE, not a compiled package in node_modules — hence
+// the import path is "<output>/client" and the directory is excluded from five gates (.gitignore,
+// ESLint ignores, coverage, Stryker ignorePatterns, and tsconfig `exclude`).
+//
+// Output sits inside src/adapters/db/ so Law 2 holds structurally: Prisma physically lives in the
+// adapters layer and nowhere else.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/adapters/db/generated"
+}
+
+/// Gender is exactly MALE | FEMALE (Law 3 — exact vocabulary, verbatim). Never part of peer
+/// identity; used only by the gender-gap (AD-17) and gender-distribution capabilities.
+enum Gender {
+  MALE
+  FEMALE
+
+  @@map("gender")
+}
+
+/// A person in the payroll population. Membership in any as-of population is derived (AD-16:
+/// hire_date <= D AND at least one salary record with effective_from <= D) — hence NO `is_active`
+/// column: a boolean cannot answer "was this person active on 2025-03-01?", and a second
+/// orthogonal filter is exactly the answer/refusal divergence AD-16 exists to close.
+model Employee {
+  /// UUIDv7 generated in the shell by the id port (AD-10) — deliberately NO @default. Neither a
+  /// DB default (gen_random_uuid()) nor Prisma-side @default(uuid(7)) is compliant: the id port
+  /// owns generation, and the id is opaque (it appears in URLs; a sequential id leaks headcount).
+  id String @id @db.Uuid
+
+  /// Display identity only — deliberately NOT unique: 10,000 people collide on name, and the UUID
+  /// is the identity. There is no image/avatar column: reconcile-stitch.md line 57 struck employee
+  /// headshots as "invented data the product cannot have".
+  name String @db.Text
+
+  /// Peer identity is the (role, level, country) triple, read on every comparison — so these are
+  /// natural-code FKs, readable without a join. Free text is not accepted anywhere, including
+  /// import: each must resolve to a reference row.
+  roleCode  String @map("role_code") @db.Text
+  levelCode String @map("level_code") @db.Text
+
+  /// Immutable after create (AD-6) — enforced by offering NO update path in any form, use-case, or
+  /// repository method, not by a DB trigger. The column itself is a normal FK.
+  countryCode String @map("country_code") @db.Text
+
+  gender Gender
+
+  /// Calendar date, no timezone (Conventions) — half of the AD-16 population predicate.
+  hireDate DateTime @map("hire_date") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  role    Role    @relation(fields: [roleCode], references: [code])
+  level   Level   @relation(fields: [levelCode], references: [code])
+  country Country @relation(fields: [countryCode], references: [code])
+
+  /// Zero-or-more (spine ER diagram): CAP-2 can create an employee with no salary record, who is
+  /// invisible to every statistic until one exists (AD-16).
+  salaryRecords SalaryRecord[]
+
+  /// AD-16 loads the full as-of population per request and AD-12 forbids caching, over 10,000
+  /// employees — every peer comparison groups by this exact triple. See Completion Notes.
+  @@index([roleCode, levelCode, countryCode])
+  @@map("employee")
+}
+
+/// Append-only salary history (Law 5 / AD-18). The table admits INSERT and SELECT only: UPDATE and
+/// DELETE are revoked from the runtime role AND blocked by a BEFORE UPDATE OR DELETE trigger that
+/// raises (both layers live in a migration; see Decision 2).
+///
+/// Consequently there is NO `updated_at` (the column could never change value, and would be the
+/// first thing a future reader mistakes for an update path) and NO `is_active` (is_active = false
+/// IS a soft delete — an AD-18 violation, and unsettable anyway). Decision 3.
+model SalaryRecord {
+  id String @id @db.Uuid
+
+  /// The AD-8 tie-break: current salary = the record with the greatest (effective_from, seq) where
+  /// effective_from <= as-of date. UNIQUE NOT NULL rather than the PK — AD-8 requires monotonicity
+  /// and a deterministic ordering key, not primacy; the uuid PK keeps table shape uniform.
+  ///
+  /// Prisma emits BIGSERIAL (a sequence + nextval default), not an IDENTITY column, so seq has
+  /// normal SERIAL semantics: monotonic but GAP-PRONE under rolled-back transactions. That
+  /// satisfies AD-8, which needs ordering, not gaplessness — never assume contiguity.
+  seq BigInt @unique @default(autoincrement()) @db.BigInt
+
+  employeeId String @map("employee_id") @db.Uuid
+
+  /// Integer minor units, never a float (AD-4). A database CHECK (amount_minor > 0) is added in a
+  /// migration — Prisma 7.8.0 has no declarative CHECK. The minor-unit exponent comes from the
+  /// currency table, never a hard-coded 100 (JPY has exponent 0).
+  amountMinor BigInt @map("amount_minor") @db.BigInt
+
+  /// Written from the employee's country at write time and validated to equal it (AD-6). Never
+  /// re-resolved from employee.country at read time — this column is the record's own truth.
+  currencyCode String @map("currency_code") @db.Text
+
+  /// Calendar date, no timezone. A record dated > today is rejected on every write path — that
+  /// validation is the write layer's (later story), not a DB constraint.
+  effectiveFrom DateTime @map("effective_from") @db.Date
+
+  /// AUDIT ONLY — may NEVER be used as an ordering or tie-break key (AD-8). That is seq's job.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // onUpdate: Restrict, NOT Prisma's default Cascade. A cascaded update rewrites the referencing
+  // salary_record rows, which fires the append-only trigger and aborts the whole transaction with
+  // "salary_record is append-only" — an error naming a table the caller never touched. Restrict
+  // fails immediately and legibly at the row actually being renamed instead. (Code review 2026-07-18.)
+  employee Employee @relation(fields: [employeeId], references: [id], onUpdate: Restrict)
+  currency Currency @relation(fields: [currencyCode], references: [code], onUpdate: Restrict)
+
+  /// The current-salary resolver reads an employee's records ordered by (effective_from, seq) on
+  /// every comparison, for every employee in the as-of population. See Completion Notes.
+  @@index([employeeId, effectiveFrom])
+  @@map("salary_record")
+}
+
+/// Reference taxonomy. VALUES are Story 1-4's (Decision 1) — this table ships EMPTY.
+///
+/// `is_active` on the reference tables gates PICKABILITY, never VISIBILITY: an inactive row is
+/// rejected for NEW writes (import per AD-7, and the create/edit form's select options) but still
+/// resolves for existing employees. Filtering an inactive role out of statistics would reintroduce
+/// the exact AD-16 population divergence this schema avoids.
+model Role {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique @db.Text
+  name      String   @db.Text
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employees Employee[]
+
+  @@map("role")
+}
+
+/// Reference taxonomy. VALUES are Story 1-4's (Decision 1) — ships EMPTY.
+model Level {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code String @unique @db.Text
+  name String @db.Text
+
+  /// Orders the gender-distribution-by-level chart and prevents level inversion. Justified by the
+  /// chart's row order, not by a DESIGN.md rule — no UX document mentions a rank explicitly.
+  ///
+  /// UNIQUE because `ORDER BY rank` with duplicate ranks leaves the tie to the query plan, so the
+  /// chart would reorder itself between page loads — a Law 6 / NFR1 determinism violation that no
+  /// test would catch, since duplicate ranks are valid data. (Code review 2026-07-18.)
+  rank Int @unique @db.Integer
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employees Employee[]
+
+  @@map("level")
+}
+
+/// Reference taxonomy. VALUES are Story 1-4's (Decision 1) — ships EMPTY.
+model Country {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code String @unique @db.Text
+  name String @db.Text
+
+  /// One country maps to exactly one currency (AD-6): salary_record.currency_code is written from
+  /// the employee's country at write time.
+  currencyCode String @map("currency_code") @db.Text
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  currency  Currency   @relation(fields: [currencyCode], references: [code])
+  employees Employee[]
+
+  @@map("country")
+}
+
+/// ISO-4217 currency reference. VALUES + minor-unit exponents are Story 1-4's (Decision 1) — this
+/// table ships EMPTY; only the columns are this story's.
+model Currency {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// The ISO-4217 code — the FK target, because AD-4's Money is { amountMinor, currency } where
+  /// `currency` IS this code.
+  code String @unique @db.Text
+  name String @db.Text
+
+  /// Drives the one money formatter — never a hard-coded 100 (JPY = 0, USD = 2, INR = 2).
+  minorUnitExponent Int @map("minor_unit_exponent") @db.Integer
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  countries       Country[]
+  salaryRecords   SalaryRecord[]
+  fxRatesFrom     FxRate[]       @relation("FxRateFromCurrency")
+  fxRatesTo       FxRate[]       @relation("FxRateToCurrency")
+  settingsUsingAs Settings[]
+
+  @@map("currency")
+}
+
+/// A pinned FX rate (AD-13, verbatim shape: from_currency, to_currency, rate NUMERIC, pinned_on
+/// DATE). A "rate set" is all rows sharing one pinned_on, and a set is written whole or not at all.
+model FxRate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fromCurrency String   @map("from_currency") @db.Text
+  toCurrency   String   @map("to_currency") @db.Text
+
+  /// NUMERIC, never a float (AD-13). Decimal(18, 8) rather than the default decimal(65,30) —
+  /// 8 fractional digits is well beyond any published FX quote. Values come back as
+  /// Prisma.Decimal objects, not JS numbers.
+  rate Decimal @db.Decimal(18, 8)
+
+  /// The rate-set identity — a calendar date, no timezone.
+  pinnedOn DateTime @map("pinned_on") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  from Currency @relation("FxRateFromCurrency", fields: [fromCurrency], references: [code])
+  to   Currency @relation("FxRateToCurrency", fields: [toCurrency], references: [code])
+
+  /// Not optional: now that `id` is the PK, this UNIQUE is the only thing preventing two
+  /// contradictory rates for the same pair within one rate set (AD-13).
+  @@unique([fromCurrency, toCurrency, pinnedOn])
+  @@map("fx_rate")
+}
+
+/// Single-row org configuration (AD-19). At most one row is guaranteed by a CHECK (id = 1) added
+/// in a migration — hence the fixed integer PK rather than the uuid used everywhere else.
+///
+/// Ships EMPTY: the default row (threshold 20 and a reporting_currency) is Story 1-4's, because
+/// reporting_currency is an FK and needs currencies to exist first (Decision 1).
+model Settings {
+  /// Always 1 — CHECK (id = 1) is the single-row guard.
+  id Int @id @default(1) @db.Integer
+
+  /// The org-wide outlier threshold default, read once at the delivery boundary and passed inward
+  /// as a parameter. No domain code reads settings; this is persisted data, never env (AD-19).
+  outlierThresholdPct Int @map("outlier_threshold_pct") @db.Integer
+
+  /// The org-wide conversion target — exactly one, never inferred (AD-13). Config, not a
+  /// user-facing setting: no UI control exposes it.
+  reportingCurrency String @map("reporting_currency") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  currency Currency @relation(fields: [reportingCurrency], references: [code])
+
+  @@map("settings")
+}

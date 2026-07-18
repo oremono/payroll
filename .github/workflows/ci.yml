@@ -54,6 +54,75 @@ jobs:
       - name: Mutation testing
         run: npm run test:mutation
 
+  # Adapter integration gate (AD-24): the schema's invariants are proven against a REAL disposable
+  # PostgreSQL 18 — never a mock. This is the one job with database access; the coverage and
+  # mutation gates stay on the pure suite.
+  integration:
+    name: Integration (Postgres 18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Postgres is pinned to 18 across all environments (spine Stack). The container's `postgres`
+    # role is superuser — it owns the schema and runs migrations. The restricted runtime role
+    # (payroll_app) is provisioned as a separate step; it must never be the migration role, since
+    # `migrate dev` requires CREATEDB for its shadow database.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: payroll
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Prisma 7 removed `url` from the datasource block and `migrate deploy` has no `--url` flag, so
+    # the connection strings can ONLY reach Prisma through prisma.config.ts reading these.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/payroll?schema=public
+      DATABASE_URL_APP: postgresql://payroll_app:payroll_app@localhost:5432/payroll?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # `postinstall` runs `prisma generate`, so the generated client exists from here on.
+      - run: npm ci
+      # Roles are cluster-wide and outlive `migrate dev`'s shadow database, so role creation is an
+      # explicit infrastructure step rather than a migration (prisma/prisma#6581).
+      #
+      # Connection parameters are passed explicitly rather than reusing $DATABASE_URL: psql
+      # rejects Prisma's `?schema=public` query parameter outright ("invalid URI query parameter"),
+      # so the two tools cannot share one URL string.
+      #
+      # The runtime role's password is supplied, never defaulted — bootstrap-roles.sql refuses to
+      # create a role without one. This is a throwaway service container, so the value is inline;
+      # a deployed environment supplies a real secret the same way.
+      - name: Provision the restricted runtime role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d payroll \
+            -v ON_ERROR_STOP=1 \
+            -v payroll_app_password=payroll_app \
+            -f prisma/sql/bootstrap-roles.sql
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      # Drift gate: compares the migrated database against schema.prisma and exits 2 on any
+      # difference. Without it, editing schema.prisma and forgetting the migration passes every
+      # other gate — postinstall regenerates a client that has the column, migrate deploy applies
+      # nothing, and the mismatch only surfaces at runtime as `column ... does not exist`.
+      - name: Check for schema drift
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Integration tests (real Postgres 18)
+        run: npm run test:integration
+
   # Accessibility floor (NFR9): an automated axe pass over the built app. Any violation fails.
   a11y:
     name: Accessibility (axe)
