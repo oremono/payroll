@@ -32,12 +32,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # Mirrors ci.yml's concurrency rail. Without it two rapid pushes to the same PR race on branch
-    # creation and on the deploy. Scoped per PR, at JOB level so the cleanup job below keeps its
-    # own independent group.
+    # SERIALIZE per PR — deliberately queue rather than cancel, and deliberately SHARE this group
+    # with the cleanup job below. Both properties are load-bearing (code review 2026-07-19):
+    #
+    #   cancel-in-progress: false, because cancelling is not free here. `cancel-in-progress: true`
+    #   SIGTERMs whatever is running, and if that is `prisma migrate deploy` the branch is left with
+    #   a failed row in `_prisma_migrations`. Every later run on that branch then aborts with P3009,
+    #   and because the branch is REUSED across `synchronize` the wedge is sticky for the life of
+    #   the PR. It is also not generically repairable: a cancelled migration leaves either
+    #   DDL-not-applied (needs `migrate resolve --rolled-back`) or DDL-applied-but-unrecorded (needs
+    #   `--applied`), and nothing in the migration history distinguishes them. Verified empirically:
+    #   `--rolled-back` + retry fails with `relation "..." already exists` in the second case.
+    #
+    #   Shared group with `cleanup`, so closing a PR mid-run QUEUES the delete behind the preview
+    #   job instead of racing it. Previously the two groups were independent, and cleanup — which
+    #   has no `npm ci` — could delete `pr-N` before the preview job's create step ran, leaving a
+    #   branch that no `closed` event would ever collect again.
+    #
+    # Queueing does not let stale work pile up: GitHub keeps at most one PENDING job per group and
+    # cancels superseded pending ones. So a third push discards the queued second run — cancelling
+    # work that has not started, which is exactly the cancellation that is safe.
     concurrency:
       group: preview-${{ github.event.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -200,10 +217,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Its own group, and NOT cancel-in-progress: a cancelled cleanup leaves the orphan it exists to
-    # prevent.
+    # THE SAME group as the preview job, not a separate one (code review 2026-07-19). Closing a PR
+    # while its preview job is still running must not delete the branch out from under it — worse,
+    # cleanup is much faster (no `npm ci`), so it could previously win the race, delete nothing, and
+    # let the preview job create `pr-N` AFTERWARDS. No second `closed` event ever fires, so that
+    # branch was orphaned until the 7-day TTL, against a ~10-branch quota.
+    #
+    # Sharing the group makes the delete QUEUE behind the preview run and execute once the branch
+    # it is meant to collect actually exists. Still not cancel-in-progress: a cancelled cleanup
+    # leaves precisely the orphan it exists to prevent.
     concurrency:
-      group: preview-cleanup-${{ github.event.number }}
+      group: preview-${{ github.event.number }}
       cancel-in-progress: false
 
     steps:

@@ -422,6 +422,43 @@ stop and request them rather than fake or skip them. Everything after this secti
         integration-fixtures-accumulate item, which preview branches now partly mitigate (each PR gets a fresh
         clone) but do not solve for the primary.
 
+### Review Findings (code review 2026-07-19)
+
+Three adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor) ran with fresh context.
+Every finding below was re-verified against the code before being recorded; two were dismissed as noise
+and one inter-layer contradiction was adjudicated (the timing test pins `max` to the **range [5,7]**, not
+to exactly 5 — Blind Hunter correct, Edge Case Hunter incorrect).
+
+**Decisions needed**
+
+- [ ] [Review][Decision] **Preview deployments durably store production-equivalent credentials** — `vercel deploy --env/--build-env` bakes `DATABASE_URL` (owner) and `DATABASE_URL_APP` into the deployment record, which Vercel retains after the PR closes and after the Neon branch is deleted. Because branches inherit the parent's roles *and passwords*, the `payroll_app` password on `pr-N` is byte-identical to the one valid against `production` — only the host differs. Options: rotate `payroll_app` per branch via `ALTER ROLE` after branch creation; or accept and record the rationale (single-user assessment project, private repo, synthetic data, spine § Deferred disclaims operational stakes).
+- [x] [Review][Decision] **RESOLVED 2026-07-19 — D2 + D3 fixed together by one change.** Both jobs now share a single concurrency group with `cancel-in-progress: false` (`.github/workflows/preview.yml`). Queueing rather than cancelling removes the mid-migration SIGTERM that causes the `P3009` wedge (D3), and sharing the group makes a mid-run PR close queue the delete *behind* the job that creates the branch rather than racing it (D2). **This deviates from Task 5, which specifies `cancel-in-progress: true` "mirroring ci.yml:15-17"** — recorded rather than silently applied. The rationale is that cancellation is cheap in `ci.yml` and is not here. **Verified empirically before choosing:** the obvious alternative (detect the wedge and run `migrate resolve --rolled-back`, then retry) is *unsound* — simulated on the local Postgres 18, `migrate deploy` then fails with `relation "level_rank_key" already exists`, because a cancelled migration leaves either DDL-not-applied or DDL-applied-but-unrecorded and the history cannot distinguish them. Trade-off accepted: a superseded run now completes instead of being killed; GitHub still discards *queued* runs, so stale work does not accumulate.
+- [ ] [Review][Decision] **AC 5's "pushed red **on the branch**" is met in spirit, not letter** — all six commits were pushed at once, so CI never ran on `3961010` on the story branch; the failing run lives on `evidence/1-7-pool-bound-red`, which the Dev Agent Record proposes deleting. The commit pair itself is genuine and correctly scoped (red touches only the test, green only `client.ts`). Options: keep the evidence branch permanently; accept the run-record link as sufficient; or amend AC 5's wording for future stories.
+
+**Patches**
+
+- [ ] [Review][Patch] **AC 13 is violated — real Neon identifiers committed, and the record falsely claims otherwise** [docs/implementation-artifacts/1-7-deployment-and-environments.md:685,688,692,712] — the Dev Agent Record commits the **production** endpoint `ep-mute-night-…`, a preview endpoint, and a branch id, while the AC-status table asserts "✅ … placeholders only". Both the hosts and the false claim must go. **Highest-severity finding; it is a self-inflicted contradiction in the evidence record.**
+- [ ] [Review][Patch] Owner password is double percent-encoded when composing `DATABASE_URL` [.github/workflows/preview.yml] — `urlsplit().password` returns the *still-encoded* substring; `quote()` re-encodes it (`p%40ss` → `p%2540ss`). Correct for the raw `APP_PASSWORD` secret, wrong for the owner. Latent only because Neon's current owner password is alphanumeric; the failure would be a masked, opaque auth error. Also affects `direct.username` (interpolated with no encoding).
+- [ ] [Review][Patch] README claims the pipeline proves *deployed* database connectivity [README.md § No health-check endpoint] — the integration suite runs on the GitHub runner, not from the Vercel function. It proves the Neon branch is correct; it proves nothing about the deployed app's DB path. "A stronger claim than any health route could make" is inverted.
+- [ ] [Review][Patch] Timing-test comment overstates what the assertion pins [tests/integration/client.test.ts] — simulated across pool sizes: `max` ∈ {5,6,7} all pass; only ≤4 and ≥8 are caught. The comment claims a change "in either direction fails this test". Either tighten the test or correct the comment.
+- [ ] [Review][Patch] `PLAYWRIGHT_BASE_URL=''` takes the local-webServer branch with `baseURL=''` [playwright.config.ts:19-20,38] — `??` treats `''` as set, the ternary treats it as unset. Reachable whenever the deploy step captures no URL.
+- [ ] [Review][Patch] Deploy URL captured unvalidated and written unguarded to `$GITHUB_OUTPUT` [.github/workflows/preview.yml] — no shape check; a multi-line stdout corrupts the output file (GitHub requires a delimiter block for multi-line values). One `case "$url" in https://*)` closes this and the finding above.
+- [ ] [Review][Patch] `expires_at` is never refreshed when the branch is reused [.github/workflows/preview.yml] — a PR open >7 days without a push loses its branch under a live preview URL, with no signal. Framed in both the workflow comment and README as an orphan-only backstop.
+- [ ] [Review][Patch] `ignoreCommand` skips the build when `VERCEL_GIT_COMMIT_REF` is unset/empty [vercel.json] — exits 0, so it surfaces as "Canceled by Ignored Build Step" (a *success*-looking outcome) rather than a failure. Same silent break if the production branch is ever renamed off `master`.
+- [ ] [Review][Patch] Nothing asserts the direct/pooled + role invariant the docs call a correctness constraint [.github/workflows/preview.yml compose step] — no check that the owner host lacks `-pooler`, that the app host has it, or that the app user is `payroll_app`. Two `assert` lines in the existing Python block; the documented failure mode is explicitly *silent*.
+- [ ] [Review][Patch] Two Task 7 subtasks are ticked `[x]` but were not performed as written [story Task 7] — "Confirm Node 24 **in the build log**" was replaced by an inference from `engines.node`, and "verify `pg` resolves in the deployed function" was not performed (no function exists yet). Both are documented, but should be unchecked/re-entered rather than ticked.
+- [ ] [Review][Patch] `VERCEL_TOKEN` interpolated into the shell command line rather than passed via `env:` [.github/workflows/preview.yml] — lands in `/proc/*/cmdline`.
+- [ ] [Review][Patch] Both DB credentials broadcast to every later step via `$GITHUB_ENV` [.github/workflows/preview.yml] — visible to `npx playwright install` and `npx vercel`, both fetched at run time. Only three steps need them; step-level `env:` would scope them.
+- [ ] [Review][Patch] No existence check on `PAYROLL_APP_PASSWORD` / Neon outputs [.github/workflows/preview.yml] — GitHub substitutes empty strings for missing secrets, so an empty password composes silently and fails three steps later as a masked auth error.
+- [ ] [Review][Patch] `.env.example` host template omits the `.c-3` segment [.env.example] — real Neon direct hosts are `ep-<id>.c-3.<region>.aws.neon.tech`. Hand-constructing from this template yields a host that does not resolve — the exact mistake Task 1 warns against.
+- [ ] [Review][Patch] Smoke spec's second assertion is vacuous [e2e/smoke.spec.ts] — `body` `toBeAttached()` is true of any HTML document including an error shell, which the adjacent comment claims it distinguishes. The status assertion does that work alone.
+- [ ] [Review][Patch] The "~2× margin" claim extrapolates local numbers to the cross-region CI run [deferred-work.md, story Completion Notes] — the only CI datum is total test duration, which does not isolate the baseline assertion's headroom.
+
+**Dismissed as noise (2)**
+
+- IPv6 host would lose its brackets during URL reconstruction — Neon returns DNS hostnames; not reachable.
+- Timing assertion has no flake tolerance — already recorded in `deferred-work.md` with a re-entry path.
+
 ---
 
 ## Dev Notes

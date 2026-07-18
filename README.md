@@ -245,6 +245,17 @@ migrations: the branch is a clone that already carries the parent's schema, so o
 migration the suite would exercise a stale schema and the first real `migrate deploy` on Neon would
 be the Vercel build, after the gate.
 
+**Preview runs are serialized per PR, not cancelled.** Both jobs share one concurrency group with
+`cancel-in-progress: false`, which differs from `ci.yml`'s rail deliberately. Cancelling is cheap in
+`ci.yml` but not here: a SIGTERM during `prisma migrate deploy` leaves a failed row in
+`_prisma_migrations`, and since the Neon branch is *reused* across pushes, every later run on that PR
+then aborts with `P3009`. That wedge is not generically repairable — a cancelled migration leaves
+either DDL-not-applied (`migrate resolve --rolled-back`) or DDL-applied-but-unrecorded (`--applied`),
+and the history cannot tell you which. Sharing the group also makes a mid-run PR close *queue* the
+branch delete behind the run that creates the branch, instead of racing it. The cost is that a
+superseded run finishes instead of being killed; GitHub still discards *queued* runs, so stale work
+does not accumulate.
+
 Preview deploys are **CI-driven, not Git-driven.** `vercel.json`'s `ignoreCommand` blocks Vercel's
 automatic build for every ref except `master`, so a preview can never start before its Neon branch
 and environment variables exist. (Per-branch `git.deploymentEnabled` entries do *not* work for this:
