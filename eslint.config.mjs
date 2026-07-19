@@ -214,11 +214,25 @@ const COLOR_LITERAL_BAN_SELECTORS = [
  * it is not a style choice, it is a reference to nothing, and `tokens:check` and the hex ban would
  * both stay green while it shipped.
  *
- * `\b` before `dark` keeps `is-dark` and `text-darkroom` out while still catching a STACKED variant
- * (`md:dark:bg-…`), where the preceding `:` is a word boundary. The trailing colon is what makes it
- * a Tailwind variant rather than the English word.
+ * The pattern is the bare text `dark:`, anywhere in a string literal. The TRAILING COLON is the
+ * whole of the discrimination: it is what separates a Tailwind variant from the English word, and
+ * it is why `is-dark`, `text-darkroom`, and a bare `dark` all lint clean.
+ *
+ * There is deliberately NO `\b` anchor, and its removal is the correction of a claim rather than a
+ * loosening (code review 2026-07-19). The anchor was justified in this comment as excluding
+ * `is-dark` / `text-darkroom` — but neither contains a colon, so neither could ever match with or
+ * without it, and every test here passed identically either way: it was a surviving mutant in a
+ * file whose header claims to pin every intersection. What `\b` actually excluded was `dark:`
+ * preceded by a WORD character (`themedark:`), and it did NOT exclude the realistic hyphenated
+ * case, because `-` is itself a word boundary — `group-hover-dark:bg-x` matched with the anchor in
+ * place. So the anchor bought nothing this ban wants and cost it a false sense of precision.
+ *
+ * Dropping it does widen the ban to a word-char-prefixed `dark:`, which is an ACCEPTED
+ * over-approximation of the same kind as the hex ban's `#feed`, with the same one-line escape
+ * hatch. Both directions are pinned by tests in tests/tokens/eslint-config.test.ts, so neither the
+ * widening nor a re-added anchor can land unnoticed.
  */
-const DARK_VARIANT_PATTERN = String.raw`\bdark:`;
+const DARK_VARIANT_PATTERN = String.raw`dark:`;
 
 const DARK_VARIANT_BAN_MESSAGE =
   'No `dark:` variant anywhere in src/ (F-5 / AD-15). Dark mode is one token name with two ' +

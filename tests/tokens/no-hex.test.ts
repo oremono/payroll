@@ -47,6 +47,25 @@ const STYLESHEET_EXTENSIONS = ['.css', '.scss', '.sass', '.less', '.pcss', '.sty
 const COLOR_LITERAL =
   /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})(?![0-9a-f])|\b(?:rgba?|hsla?|hwb|oklch|oklab|lab|lch|color)\(/i;
 
+/**
+ * A Tailwind `dark` variant, in a stylesheet (code review 2026-07-19).
+ *
+ * The F-5 ban was mechanized in eslint.config.mjs — and ESLint does not lint CSS, so it was scoped
+ * to JS/TS files only and a variant written into a `.css` file under src/ shipped ungated. That is
+ * the same stylesheet-shaped hole the color half of AD-15 has this suite for, left open on the
+ * other half of the same contract; a hole is not smaller for being on the less likely side.
+ *
+ * The trailing colon is the whole discrimination, and it is what keeps real CSS out: `color-scheme:
+ * light dark` and `@media (prefers-color-scheme: dark)` both put `dark` BEFORE a delimiter, never
+ * before a colon. Mirrors the ESLint-side `DARK_VARIANT_PATTERN` — the two halves must ban the same
+ * thing, or the variant simply moves across the boundary one of them cannot see.
+ *
+ * The colon may be BACKSLASH-ESCAPED, which the JS/TS side never has to consider: `dark:bg-x` is
+ * how a person writes it in an `@apply`, and `.dark\:bg-x` is how it appears once it is a
+ * selector. Matching only the first would let the ban be defeated by pasting compiled output.
+ */
+const DARK_VARIANT = /dark\\?:/i;
+
 /** Every stylesheet under `root`, absolute paths, skipping `excludedDir` and anything below it. */
 function stylesheetsUnder(root: string, excludedDir: string = PRISMA_GENERATED_DIR): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
@@ -135,6 +154,35 @@ describe('the color-literal pattern the CSS-side ban matches', () => {
   });
 });
 
+describe('the variant pattern the CSS-side F-5 ban matches', () => {
+  it.each([
+    ['a bare variant', 'dark:bg-surface-card'],
+    ['a stacked variant', 'md:dark:bg-surface-card'],
+    ['a hyphen-prefixed variant', 'group-hover-dark:bg-surface-card'],
+    ['an escaped class selector, as Tailwind emits it', '.dark\\:bg-x { color: red; }'],
+  ])('rejects %s', (_name, value) => {
+    expect(DARK_VARIANT.test(value)).toBe(true);
+  });
+
+  // The cases that must NOT trip it, because they are how dark mode is legitimately spelled in this
+  // repo's one generated stylesheet. `dark` sits before a delimiter in both, never before a colon.
+  it.each([
+    ['the color-scheme declaration', 'color-scheme: light dark;'],
+    ['the media query the generated tokens use', '@media (prefers-color-scheme: dark) {'],
+  ])('accepts %s', (_name, value) => {
+    expect(DARK_VARIANT.test(value)).toBe(false);
+  });
+
+  // Not a false positive — the thing F-5 is actually about. A `--…-dark` custom property IS the
+  // second token name the contract says does not exist ("one token name, two values"), and the
+  // generated file deliberately emits none: `e2e/tokens.spec.ts` asserts
+  // `--color-surface-base-dark` resolves to the empty string in the browser. Catching the
+  // declaration that would create one is the ban working, not overreaching.
+  it('rejects a `-dark` suffixed custom property — the second token F-5 says does not exist', () => {
+    expect(DARK_VARIANT.test('--color-surface-base-dark: #0f172a;')).toBe(true);
+  });
+});
+
 describe('the CSS half of the AD-15 color-literal ban', () => {
   it('finds the generated token file where the build is contracted to put it', () => {
     expect(stylesheetsUnder(SRC)).toContain(GENERATED_TOKENS);
@@ -159,5 +207,36 @@ describe('the CSS half of the AD-15 color-literal ban', () => {
 
   it('wires the generated file into the stylesheet Next actually loads', () => {
     expect(readFileSync(GLOBALS, 'utf8')).toContain('tokens.generated.css');
+  });
+});
+
+// The CSS half of the F-5 `dark` variant ban (code review 2026-07-19). eslint.config.mjs closes the
+// JS/TS half; ESLint does not lint CSS, so without this the ban had a hole exactly the width of a
+// stylesheet — the same hole, on the same contract, that the color half above exists to close.
+describe('the CSS half of the F-5 variant ban', () => {
+  it('finds no Tailwind `dark` variant in any hand-authored stylesheet under src/', () => {
+    const offenders = stylesheetsUnder(SRC)
+      .filter((file) => file !== GENERATED_TOKENS)
+      .filter((file) => DARK_VARIANT.test(readFileSync(file, 'utf8')))
+      .map((file) => path.relative(SRC, file));
+
+    expect(
+      offenders,
+      'F-5: one token name, two values. tokens.generated.css re-points every --color-* under ' +
+        'prefers-color-scheme, so `bg-surface-card` already repaints itself and there is no ' +
+        '`-dark` token to reach for. Write the single token utility.',
+    ).toEqual([]);
+  });
+
+  // The generated file is exempt for the same reason it is exempt from the color ban: it is emitted
+  // from DESIGN.md, drift-gated by `npm run tokens:check`, and never hand-edited — and its own
+  // header comment discusses the variant it forbids. Exempting it is stated and tested rather than
+  // assumed, so the exemption cannot quietly widen: this asserts it is the ONLY file relying on it.
+  it('exempts only the generated token file, and only because it is generated', () => {
+    const carrying = stylesheetsUnder(SRC)
+      .filter((file) => DARK_VARIANT.test(readFileSync(file, 'utf8')))
+      .map((file) => path.relative(SRC, file));
+
+    expect(carrying).toEqual([path.relative(SRC, GENERATED_TOKENS)]);
   });
 });

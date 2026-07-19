@@ -17,7 +17,7 @@
  * awkward comment is a cheap price for a gate with no holes in it.
  *
  * Dark mode rides `prefers-color-scheme` inside the generated file: one token name, two values, so
- * nothing in the app ever writes a `dark:` variant.
+ * nothing in the app ever writes a Tailwind `dark` variant.
  *
  * Tailwind's own import comes first so its layers are established before the theme extends them.
  */
@@ -44,8 +44,13 @@
  *
  * There is no toggle, no .dark class, no data-theme attribute, and no persistence cookie: system
  * preference is the only ratified hook, which is also why no rule in this file or anywhere in src/
- * writes a dark: variant. eslint.config.mjs gates that for .ts/.tsx and no-hex.test.ts gates the
- * color half of it here.
+ * writes a Tailwind `dark` variant. eslint.config.mjs gates that for .ts/.tsx and
+ * tests/tokens/no-hex.test.ts gates BOTH halves for stylesheets, which ESLint structurally cannot
+ * see.
+ *
+ * And yes — the variant ban applies to this comment too, exactly as the color ban does, which is
+ * why the word above is written without its trailing colon. A blanket text scan is the only kind a
+ * stylesheet admits, and a slightly awkward comment is a cheap price for a gate with no holes.
  *
  * @layer base so every Tailwind utility outranks it: a component that sets its own surface wins,
  * as it must, and this is only ever the floor.

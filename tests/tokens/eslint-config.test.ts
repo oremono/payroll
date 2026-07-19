@@ -196,6 +196,38 @@ describe('the F-5 `dark:` variant ban', () => {
   it('accepts the bare word "dark" with no variant colon', async () => {
     expect(await isRejected(`export const c = 'dark';`, 'src/ui/Badge.tsx')).toBe(false);
   });
+
+  // The pattern itself, pinned in BOTH directions (code review 2026-07-19).
+  //
+  // The pattern used to carry a `\b` anchor justified as excluding `is-dark` / `text-darkroom`.
+  // That justification was false — neither contains a colon, so neither could ever match either way
+  // — and the two tests above passed identically with the anchor and without it, which made the
+  // anchor a SURVIVING MUTANT in the file whose header claims to pin every intersection. The two
+  // cases below are the ones that actually separate the two spellings, so the anchor can be neither
+  // silently dropped nor silently restored.
+  it('rejects a HYPHEN-prefixed variant — the case `\b` never excluded, because `-` is a boundary', async () => {
+    expect(
+      await isRejected(`export const c = 'group-hover-dark:bg-surface-tint';`, 'src/ui/Badge.tsx'),
+    ).toBe(true);
+  });
+
+  it('rejects `dark:` preceded by a WORD character — the accepted over-approximation', async () => {
+    // This is the ONLY thing the `\b` anchor ever excluded. It is now rejected, deliberately: the
+    // same trade the hex ban makes for `#feed`, with the same one-line escape hatch. Re-adding the
+    // anchor turns this red, which is the point.
+    expect(await isRejected(`export const c = 'themedark:bg-surface-card';`, 'src/ui/Badge.tsx')).toBe(
+      true,
+    );
+  });
+
+  it('lets the escape hatch through for a genuine false positive', async () => {
+    const code = [
+      '// eslint-disable-next-line no-restricted-syntax -- prose, not a Tailwind variant.',
+      `export const c = 'themedark: the legacy theme key';`,
+    ].join('\n');
+
+    expect(await isRejected(code, 'src/ui/Badge.tsx')).toBe(false);
+  });
 });
 
 describe('the AD-14 randomness ban', () => {
