@@ -1,6 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+// The summary strip appears on the page TWICE, deliberately: once in the report's <p>, and once in
+// `#app-announcer`, because `composeImportAnnouncement()` returns `composeSummaryStrip()` verbatim
+// for an imported result — the announcement IS the strip. Playwright matches sr-only text, so an
+// unscoped getByText() on the strip resolves two nodes and dies on strict mode. Assert against the
+// visible report, which is what these tests are about.
+const reportRegion = (page: Page) => page.locator('section[aria-labelledby="import-report-heading"]');
+
 // The browser-level gate for the bulk-import surface (story 2-2).
 //
 // Everything asserted here is markup a page-load scan structurally cannot reach: the summary strip,
@@ -207,7 +214,7 @@ test.describe('a partial import', () => {
     await stubImport(page, PARTIAL);
     await upload(page);
 
-    await expect(page.getByText('9,947 rows imported · 53 rows rejected · nothing guessed')).toBeVisible();
+    await expect(reportRegion(page).getByText('9,947 rows imported · 53 rows rejected · nothing guessed')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Rejection Report (53 rows)' })).toBeVisible();
 
     // Header row plus fifty data rows — the page size, not the whole report.
@@ -271,10 +278,16 @@ test.describe('a partial import', () => {
     const region = page.locator('#app-announcer');
     await expect(region).toHaveText('9,947 rows imported · 53 rows rejected · nothing guessed');
 
-    // One voice: the report is a REGION WITH A HEADING, and there is no second live region and no
-    // alert anywhere on the surface (NFR9; AD-20).
-    await expect(page.locator('[aria-live]')).toHaveCount(1);
-    await expect(page.locator('[role="alert"]')).toHaveCount(0);
+    // One voice: the report is a REGION WITH A HEADING, and the APP adds no second live region and
+    // no alert of its own (NFR9; AD-20).
+    //
+    // Scoped to the app's own nodes rather than counted document-wide. Next injects
+    // `#__next-route-announcer__` into every page — `aria-live="assertive"` AND `role="alert"`,
+    // with no opt-out — so the document-wide counts asserted something the application cannot
+    // satisfy, no matter how correct its own markup is. The convention being enforced is unchanged;
+    // only its scope is. `e2e/shell.spec.ts` already counts `#app-announcer` for this reason.
+    await expect(page.locator('#app-announcer')).toHaveCount(1);
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
   });
 
   test('replaces the prior report wholesale on a second upload, back at page 1', async ({
@@ -293,8 +306,8 @@ test.describe('a partial import', () => {
     await page.getByLabel('Spreadsheet file').setInputFiles(CSV_FIXTURE);
     await page.getByRole('button', { name: 'Import file' }).click();
 
-    await expect(page.getByText('0 rows imported · 4 rows rejected · nothing guessed')).toBeVisible();
-    await expect(page.getByText('9,947 rows imported · 53 rows rejected · nothing guessed')).toHaveCount(0);
+    await expect(reportRegion(page).getByText('0 rows imported · 4 rows rejected · nothing guessed')).toBeVisible();
+    await expect(reportRegion(page).getByText('9,947 rows imported · 53 rows rejected · nothing guessed')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Rejection Report (4 rows)' })).toBeVisible();
   });
 });
@@ -304,7 +317,7 @@ test.describe('a clean import', () => {
     await stubImport(page, CLEAN);
     await upload(page);
 
-    await expect(page.getByText('9,947 rows imported · 0 rows rejected · nothing guessed')).toBeVisible();
+    await expect(reportRegion(page).getByText('9,947 rows imported · 0 rows rejected · nothing guessed')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
     // No celebration, no success styling, no notification affordance.
     await expect(page.getByRole('heading', { name: 'Import report' })).toBeVisible();
@@ -318,7 +331,7 @@ test.describe('an all-rejected file', () => {
     await stubImport(page, ALL_REJECTED);
     await upload(page);
 
-    await expect(page.getByText('0 rows imported · 4 rows rejected · nothing guessed')).toBeVisible();
+    await expect(reportRegion(page).getByText('0 rows imported · 4 rows rejected · nothing guessed')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Rejection Report (4 rows)' })).toBeVisible();
     await expect(page.getByRole('row')).toHaveCount(5);
     await expect(page.getByRole('heading', { name: 'The file was not imported' })).toHaveCount(0);
@@ -338,7 +351,9 @@ test.describe('a whole-file refusal', () => {
     // backend has already worded (Law 7).
     await expect(refusal).toContainText(REFUSAL.statement);
 
-    await expect(page.locator('[role="alert"]')).toHaveCount(0);
+    // Excludes Next's injected route announcer (see the note above); this asserts that OUR refusal
+    // is a headed region and never an alert, which is the actual convention.
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
     // No counts, no table — the file was never read as rows, so there is nothing to count.
     await expect(page.getByRole('table')).toHaveCount(0);
     await expect(page.getByText('nothing guessed')).toHaveCount(0);
