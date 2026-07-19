@@ -15,15 +15,21 @@
   `/employees` and `/employees/{id}`, `deps()` injects it, and the handler invokes it only after a
   commit — and 4-1's refactor of those two calls into one shared helper preserved both.
 
-  **The suite is also order-dependent**, which is the sharper problem: `npx playwright test
-  e2e/employees.spec.ts` passes 42/42 against a freshly seeded database, but running the create
-  test ALONE (`--grep`) against the same fresh seed fails — the row never appears, even at a 15s
-  ceiling. Something earlier in the file makes the refresh work. A suite that passes only as a
-  whole cannot tell you which test is broken when one fails.
+  ⚠️ **CORRECTION.** An earlier version of this entry claimed the suite was ORDER-DEPENDENT —
+  that the create test failed when run alone. That was wrong, and the cause was my own environment:
+  the local Docker Postgres had stopped again, so the app could not reach the database at all and
+  every page rendered the `unavailable` refusal. With Postgres genuinely up, the create test passes
+  **both** in isolation and in the full suite. There is no ordering defect. Recorded because the
+  false conclusion was acted on — the 15s ceilings below were justified partly by it.
 
   Raised the two read-after-write ceilings to 15s as an empirical measure, with the reasoning
   recorded at each site. That cannot mask a broken revalidation — the isolated run still fails at
   15s — but it is not a proven fix either, and it does not address the ordering dependency at all.
+
+  **What is still unexplained:** the failure reproduces in CI on three consecutive runs and has
+  never reproduced locally once the database was actually up. CI uploads no Playwright trace, so
+  the only evidence is a one-line locator error — that gap is now closed by an `upload-artifact`
+  step on the `browser-db` job, and the next red run will carry a trace showing the real DOM.
 
   **Re-entry:** this belongs to story 4-2, which renders the salary timeline into the same detail
   route and will add more read-after-write surfaces to the same race. Find the real signal to wait

@@ -215,3 +215,14 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Employees directory, detail and form (real rows)
         run: npm run test:browser:db
+      # Without this a CI-only failure is undiagnosable. playwright.config.ts sets
+      # `trace: 'retain-on-failure'`, so a trace EXISTS on the runner — it just died with the
+      # container. A failure that reproduces only here (as the 4-1 read-after-write failure does)
+      # cannot be reasoned about from a one-line locator error.
+      - name: Upload Playwright trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-browser-db
+          path: test-results/
+          retention-days: 7
