@@ -149,6 +149,51 @@ test.describe('aria-current follows the current path', () => {
   });
 });
 
+// The as-of date is PERSISTENT ambient provenance, not a per-page filter (DESIGN § Components →
+// As-of date control: "always visible on every screen"). A sidebar link that dropped the param
+// silently returned the whole application to today on every navigation, with no signal — which
+// defeats both halves of the story's central promise: the date persists, and a bookmarked URL
+// reproduces the view.
+test.describe('the as-of date survives navigation', () => {
+  test('a sidebar link carries the current asOf param onto the destination', async ({ page }) => {
+    const past = PAST();
+    await page.goto(`/?asOf=${past.iso}`);
+    await expect(asOfButton(page).locator('time')).toHaveText(past.label);
+
+    await page.getByRole('link', { name: 'Employees' }).click();
+
+    // Both the address bar and the header still carry it. The URL matters because it is the state;
+    // the header matters because it is what the person actually reads.
+    await expect(page).toHaveURL(new RegExp(`/employees\\?asOf=${past.iso}$`));
+    await expect(asOfButton(page).locator('time')).toHaveText(past.label);
+  });
+
+  test('every sidebar link carries it, not merely the first one', async ({ page }) => {
+    const past = PAST();
+    await page.goto(`/?asOf=${past.iso}`);
+
+    for (const route of ROUTES) {
+      await expect(page.getByRole('link', { name: route.label })).toHaveAttribute(
+        'href',
+        `${route.path}?asOf=${past.iso}`,
+      );
+    }
+  });
+
+  test('leaves hrefs bare when no asOf param is set — today needs no spelling out', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    for (const route of ROUTES) {
+      await expect(page.getByRole('link', { name: route.label })).toHaveAttribute(
+        'href',
+        route.path,
+      );
+    }
+  });
+});
+
 test.describe('the as-of control', () => {
   test('is a single named button carrying both the date and the action', async ({ page }) => {
     await page.goto('/');

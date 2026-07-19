@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isActiveNavItem,
   NAV_ITEMS,
+  navHrefWithAsOf,
   pageTitleFor,
   PRIMARY_NAV_ITEMS,
   SETTINGS_NAV_ITEM,
@@ -107,5 +108,39 @@ describe('pageTitleFor', () => {
 
   it('falls back to the product name on a path no nav item claims', () => {
     expect(pageTitleFor('/employees/42')).toBe('Salary Management for ACME HR');
+  });
+});
+
+// Code review 2026-07-19 (P1). The sidebar rendered `href={item.href}` with no search params, so
+// setting the as-of date to a past date and then clicking ANY nav item silently returned the whole
+// application to today — the header reporting the today it had just been handed, so the loss was
+// not even visible. The as-of date is persistent ambient provenance; it travels.
+describe('navHrefWithAsOf', () => {
+  it('carries the as-of param onto the destination', () => {
+    expect(navHrefWithAsOf('/employees', '2026-05-12')).toBe('/employees?asOf=2026-05-12');
+  });
+
+  it('carries it onto Home, whose href is a bare slash', () => {
+    expect(navHrefWithAsOf('/', '2026-05-12')).toBe('/?asOf=2026-05-12');
+  });
+
+  it('leaves the href BARE when no as-of param is set — today needs no spelling out', () => {
+    expect(navHrefWithAsOf('/employees', undefined)).toBe('/employees');
+  });
+
+  // The param is hostile by definition: anything a person or a stale link can type reaches this
+  // function. It is carried VERBATIM (encoded) rather than parsed — `resolveAsOf` at the
+  // destination's boundary is the one place that decides what a param means, so a garbage value
+  // resolves to today identically before and after the navigation.
+  it('carries a malformed param verbatim, leaving the meaning to resolveAsOf', () => {
+    expect(navHrefWithAsOf('/employees', 'tomorrow')).toBe('/employees?asOf=tomorrow');
+  });
+
+  it('percent-encodes a param that would otherwise forge a second key', () => {
+    expect(navHrefWithAsOf('/employees', 'a&b=c')).toBe('/employees?asOf=a%26b%3Dc');
+  });
+
+  it('percent-encodes the empty param rather than dropping it', () => {
+    expect(navHrefWithAsOf('/employees', '')).toBe('/employees?asOf=');
   });
 });

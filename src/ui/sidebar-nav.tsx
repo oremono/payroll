@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
-import { isActiveNavItem, PRIMARY_NAV_ITEMS, SETTINGS_NAV_ITEM, type NavItem } from '@/ui/nav-items';
+import {
+  isActiveNavItem,
+  navHrefWithAsOf,
+  PRIMARY_NAV_ITEMS,
+  SETTINGS_NAV_ITEM,
+  type NavItem,
+} from '@/ui/nav-items';
 
 /**
  * The fixed 256px primary sidebar (DESIGN § Layout & Spacing: "fixed 256px side nav").
@@ -20,6 +26,12 @@ import { isActiveNavItem, PRIMARY_NAV_ITEMS, SETTINGS_NAV_ITEM, type NavItem } f
  * Active state is carried by THREE signals — background, weight, and `aria-current` — never by
  * color alone (DESIGN: "Color is never the sole carrier of meaning").
  *
+ * Every href CARRIES THE AS-OF DATE (`navHrefWithAsOf`). The as-of date is persistent ambient
+ * provenance, not a per-page filter, and it lives in the URL — so a bare href silently returns the
+ * whole application to today on every navigation, with no signal at all, because the header then
+ * reports the today it was just handed. That is why this component reads the search params as well
+ * as the path. (Code review 2026-07-19.)
+ *
  * Every class compiles to a generated token: `w-64` is 64 x `--spacing` (256px), `h-16` is 64px,
  * `p-container-margin` is `--spacing-container-margin`. Nothing here is a hand-written length, and
  * there is no `dark:` variant — the same names re-point themselves under `prefers-color-scheme`.
@@ -29,13 +41,21 @@ const LINK_BASE = 'block rounded px-3 py-2 text-body-md';
 const LINK_IDLE = `${LINK_BASE} text-ink-muted hover:bg-surface-tint hover:text-ink`;
 const LINK_ACTIVE = `${LINK_BASE} bg-surface-tint font-semibold text-primary`;
 
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavLink({
+  item,
+  pathname,
+  asOfParam,
+}: {
+  item: NavItem;
+  pathname: string;
+  asOfParam: string | undefined;
+}) {
   const isActive = isActiveNavItem(item.href, pathname);
 
   return (
     <li>
       <Link
-        href={item.href}
+        href={navHrefWithAsOf(item.href, asOfParam)}
         aria-current={isActive ? 'page' : undefined}
         className={isActive ? LINK_ACTIVE : LINK_IDLE}
       >
@@ -47,6 +67,14 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // `getAll`, not `get` — the same reading `<AsOfControl>` and `resolveAsOf` make. A REPEATED param
+  // is ambiguous, and an ambiguous param is not a date: propagating one of two contradictory
+  // instructions would be worse than propagating neither, and the destination resolves it to today
+  // either way. Zero values is the same non-answer.
+  const asOfValues = searchParams.getAll('asOf');
+  const asOfParam = asOfValues.length === 1 ? asOfValues[0] : undefined;
 
   return (
     <nav
@@ -59,7 +87,7 @@ export function SidebarNav() {
 
       <ul className="flex-1 space-y-1 p-3">
         {PRIMARY_NAV_ITEMS.map((item) => (
-          <NavLink key={item.href} item={item} pathname={pathname} />
+          <NavLink key={item.href} item={item} pathname={pathname} asOfParam={asOfParam} />
         ))}
       </ul>
 
@@ -67,7 +95,7 @@ export function SidebarNav() {
           rather than the last row of the one above — `flex-1` on that list pushes this to the
           floor of the sidebar at any viewport height. */}
       <ul className="border-t border-border-hairline p-3">
-        <NavLink item={SETTINGS_NAV_ITEM} pathname={pathname} />
+        <NavLink item={SETTINGS_NAV_ITEM} pathname={pathname} asOfParam={asOfParam} />
       </ul>
     </nav>
   );
