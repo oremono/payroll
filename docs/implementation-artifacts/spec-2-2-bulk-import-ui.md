@@ -85,13 +85,24 @@ warnings: ['oversized']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/ui/import-report.test.ts` -- write the failing unit suite first: strip composition (plural/singular/zero, pinned-locale separators), pagination slicing (exact page, last partial page, single page, empty), name cell for `null`, announcement sentence for both `kind`s -- red before green (Law 1); covers every I/O Matrix row that is pure logic
-- [ ] `src/ui/import-report.ts` -- implement `composeSummaryStrip`, `rejectionPage`, `nameCell`, `composeImportAnnouncement`; framework-free, no React, no `Date`, page size 50 -- keeps the testable logic in the node suite where the repo has no jsdom
+- [x] `tests/ui/import-report.test.ts` -- write the failing unit suite first: strip composition (plural/singular/zero, pinned-locale separators), pagination slicing (exact page, last partial page, single page, empty), name cell for `null`, announcement sentence for both `kind`s -- red before green (Law 1); covers every I/O Matrix row that is pure logic
+- [x] `src/ui/import-report.ts` -- implement `composeSummaryStrip`, `rejectionPage`, `nameCell`, `composeImportAnnouncement`; framework-free, no React, no `Date`, page size 50 -- keeps the testable logic in the node suite where the repo has no jsdom
 - [ ] `src/ui/import-panel.tsx` -- `'use client'` panel: labelled file input with `accept=".csv,text/csv"` and `aria-describedby` helper naming the nine required columns, disabled-until-chosen submit, `FormData` POST to `/api/import`, `kind` switch rendering strip / table / refusal region, `useAnnounce()` on settle, local catch for transport failure -- the story's whole surface, matching the `as-of-control` idiom
+> **Recovery note (2026-07-19).** The first dev session was killed mid-implementation — the host
+> process exited, so there was no timeout escalation and the green half sat uncommitted. It is now
+> committed as `b41fb69`. The five boxes above are checked because each was **verified against the
+> repository**, not assumed: the three files exist at HEAD, `e2e/tokens.spec.ts` carries the
+> `refusal-fill` assertion, and `package.json` has `test:import` wired into `test:browser`.
+> The two unchecked boxes are the real remaining work: `e2e/import.spec.ts` passes **17 of 23**, and
+> all 6 failures are one slice — post-upload report rendering (summary strip, paginated rejection
+> table in file order, the app-level live-region announcement, wholesale replacement of a prior
+> report on a second upload, and the whole-file refusal as a headed region rather than
+> `role="alert"`). `lint`, `typecheck` and the 653-test unit suite are green.
+
 - [ ] `src/app/import/page.tsx` -- replace the placeholder statement with `<ImportPanel />`; keep it a server component with no `<h1>` -- the route becomes the capability
-- [ ] `e2e/import.spec.ts` -- Playwright: stub `/api/import` with `page.route` + canned `ImportResult` payloads (partial, clean, all-rejected, refusal), drive the real file picker with `setInputFiles`, assert rendered text/table/heading semantics, keyboard operability, and run `AxeBuilder` on each post-upload state in **both** colour schemes -- these states are markup a page-load scan never reaches
-- [ ] `e2e/tokens.spec.ts` -- add the `refusal-fill` contrast assertion (ink on `refusal-fill`, and its hairline border) now that a refusal is rendered for the first time -- discharges the deferred gate gap; **Block If** it fails
-- [ ] `package.json` -- add `test:import` running `playwright test e2e/import.spec.ts` and include it in `test:browser` -- matches the one-script-per-suite convention
+- [x] `e2e/import.spec.ts` -- Playwright: stub `/api/import` with `page.route` + canned `ImportResult` payloads (partial, clean, all-rejected, refusal), drive the real file picker with `setInputFiles`, assert rendered text/table/heading semantics, keyboard operability, and run `AxeBuilder` on each post-upload state in **both** colour schemes -- these states are markup a page-load scan never reaches
+- [x] `e2e/tokens.spec.ts` -- add the `refusal-fill` contrast assertion (ink on `refusal-fill`, and its hairline border) now that a refusal is rendered for the first time -- discharges the deferred gate gap; **Block If** it fails
+- [x] `package.json` -- add `test:import` running `playwright test e2e/import.spec.ts` and include it in `test:browser` -- matches the one-script-per-suite convention
 
 **Acceptance Criteria:**
 - Given the import page with no file chosen, when it loads, then the submit control is disabled and no request has been issued.
