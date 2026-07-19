@@ -57,7 +57,10 @@ const CURRENCY_B = `XB${suffix}`.toUpperCase().slice(0, 10);
 // A band of its own — schema.test.ts starts at 2_000_000, client.test.ts at 1_000, and
 // reference-data.test.ts draws from 3_000_000 upward. `rank` is UNIQUE with no way to clean up,
 // and the full 32-bit draw keeps birthday collisions implausible across accumulated runs.
-const fixtureRank = 2_200_000_000 + (parseInt(suffix, 16) % 40_000_000);
+// `rank` is a 32-bit `int`, so the band has to stay under 2_147_483_647 — the first draw here was
+// 2_200_000_000-based and PostgreSQL refused it outright. reference-data.test.ts draws up to
+// ~2_003_000_000, so 2_100_000_000..2_140_000_000 is this file's own band with room either side.
+const fixtureRank = 2_100_000_000 + (parseInt(suffix, 16) % 40_000_000);
 
 const HEADER =
   'name,role_code,level_code,country_code,gender,hire_date,amount_minor,currency,effective_from';

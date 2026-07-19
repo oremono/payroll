@@ -127,14 +127,19 @@ async function appendSalary(amountMinor: number, effectiveFrom: string): Promise
 
 describe('salary_record round-trip', () => {
   it('appends two records for an employee and reads them back ordered by (effective_from, seq)', async () => {
-    await appendSalary(5_000_00, '2020-01-15');
-    await appendSalary(6_500_00, '2022-04-01');
+    const earlier = await appendSalary(5_000_00, '2020-01-15');
+    const later = await appendSalary(6_500_00, '2022-04-01');
 
+    // Scoped to THESE TWO ids, not to every record the shared fixture employee holds (story 2-1).
+    // Sibling tests in this file append to the same employee and salary_record admits no DELETE,
+    // so `WHERE employee_id = $1` asserted this suite's own run order: it passed under file order
+    // and failed under `--shuffle` with seven rows where it expected two. Order-independence is a
+    // stated acceptance criterion, and the ordering claim is about these two records anyway.
     const { rows } = await app.query<{ amount_minor: string; effective_from: Date; seq: string }>(
       `SELECT amount_minor, effective_from, seq FROM salary_record
-       WHERE employee_id = $1
+       WHERE id = ANY($1)
        ORDER BY effective_from ASC, seq ASC`,
-      [employeeId],
+      [[earlier, later]],
     );
 
     expect(rows).toHaveLength(2);

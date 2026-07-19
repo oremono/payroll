@@ -178,6 +178,20 @@ beforeAll(async () => {
      VALUES ($1, 'Grace Hopper', $2, $3, $4, 'FEMALE', $5)`,
     [fixtureEmployeeId, FIXTURE_ROLE, FIXTURE_LEVEL, FIXTURE_COUNTRY, HIRE_DATE],
   );
+
+  // A COMMITTED salary record for the fixture employee, planted here rather than left to a
+  // sibling test (story 2-1). The hire_date UPDATE assertions below need an existing record to
+  // conflict with, and they used to get one only because the two "accepts a record dated …" tests
+  // happened to run first — which held under file order and broke under `--shuffle`, where
+  // "rejects moving hire_date later" could run before anything had been inserted and the UPDATE
+  // then succeeded. Order-independence is a stated acceptance criterion, so the dependency is made
+  // explicit instead of implicit. The "accepts" tests still insert their own rows and still assert
+  // their own claim.
+  await owner.query(
+    `INSERT INTO salary_record (id, employee_id, amount_minor, currency_code, effective_from)
+     VALUES ($1, $2, 500000, $3, $4)`,
+    [randomUUID(), fixtureEmployeeId, FIXTURE_CURRENCY, HIRE_DATE],
+  );
 });
 
 afterAll(async () => {
