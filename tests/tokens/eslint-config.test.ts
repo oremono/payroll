@@ -129,6 +129,75 @@ describe('the AD-15 color-literal ban', () => {
   });
 });
 
+// The token contract's other half (story 1-6). "No component ever writes `dark:`" was stated in
+// five places — src/ui/README.md, src/app/globals.css, scripts/design-tokens/README.md, to-css.ts's
+// header, and the 1-5 spec — and enforced in NONE, which is the exact unenforced-prohibition shape
+// the color ban above exists to fix. There is one token name and two values, so a `dark:` variant
+// can only ever reach for a `-dark` token that does not exist.
+//
+// Its layering is the interesting part, and the reason it is pinned here rather than trusted: the
+// selectors are shared by the three `src/**`-scoped blocks, so the ban must hold in an ordinary
+// component, in the pure core, AND in the PRNG port — the file whose narrower block silently
+// revoked the randomness exemption in 1-5. It must NOT hold under scripts/ or tests/, which handle
+// the string as data (this very file does).
+describe('the F-5 `dark:` variant ban', () => {
+  it('rejects a `dark:` utility in a component', async () => {
+    expect(await isRejected(`export const c = 'dark:bg-surface-card';`, 'src/ui/Badge.tsx')).toBe(
+      true,
+    );
+  });
+
+  it('rejects a `dark:` utility EMBEDDED in a longer class string', async () => {
+    expect(
+      await isRejected(
+        `export const c = 'rounded bg-surface-card dark:bg-surface-card p-3';`,
+        'src/ui/Badge.tsx',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects a `dark:` utility inside a template literal', async () => {
+    expect(await isRejected('export const c = `dark:text-ink`;', 'src/ui/Badge.tsx')).toBe(true);
+  });
+
+  it('rejects a `dark:` variant stacked after another variant', async () => {
+    expect(await isRejected(`export const c = 'md:dark:bg-surface-tint';`, 'src/ui/Badge.tsx')).toBe(
+      true,
+    );
+  });
+
+  it('rejects it in the pure core, where purityConfig re-declares the selectors', async () => {
+    expect(await isRejected(`export const c = 'dark:text-ink';`, 'src/domain/x.ts')).toBe(true);
+    expect(await isRejected(`export const c = 'dark:text-ink';`, 'src/application/x.ts')).toBe(true);
+  });
+
+  // The layering trap, pinned. prngExemptionConfig is the LAST block matching prng.ts; if it ever
+  // stops carrying the shared selector list, this file becomes the one corner of src/ where a
+  // `dark:` variant lints clean — exactly how the AD-14 exemption was lost in 1-5.
+  it('rejects it in the PRNG port too — the exemption is randomness-only', async () => {
+    expect(await isRejected(`export const c = 'dark:text-ink';`, 'src/adapters/prng.ts')).toBe(true);
+  });
+
+  it('accepts it under scripts/ and tests/, where the string is the subject matter', async () => {
+    expect(await isRejected(`export const c = 'dark:bg-surface-card';`, 'scripts/x.ts')).toBe(false);
+    expect(await isRejected(`export const c = 'dark:bg-surface-card';`, 'tests/tokens/x.ts')).toBe(
+      false,
+    );
+  });
+
+  it('accepts the sanctioned spelling — one token name, no variant', async () => {
+    expect(await isRejected(`export const c = 'bg-surface-card';`, 'src/ui/Badge.tsx')).toBe(false);
+  });
+
+  it('accepts a word that merely ENDS in "dark"', async () => {
+    expect(await isRejected(`export const c = 'is-dark';`, 'src/ui/Badge.tsx')).toBe(false);
+  });
+
+  it('accepts the bare word "dark" with no variant colon', async () => {
+    expect(await isRejected(`export const c = 'dark';`, 'src/ui/Badge.tsx')).toBe(false);
+  });
+});
+
 describe('the AD-14 randomness ban', () => {
   it('rejects Math.random in ordinary application code', async () => {
     expect(await isRejected('export const r = () => Math.random();', 'src/ui/Badge.tsx')).toBe(true);
