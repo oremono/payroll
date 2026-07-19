@@ -79,7 +79,12 @@ export function SidebarNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r border-border-hairline bg-surface-card"
+      // `overflow-y-auto` is load-bearing, not defensive (code review 2026-07-19). This element is
+      // `fixed`, so its content does not extend the page: at a 320px-tall viewport the sidebar's
+      // scrollHeight is 385px, the Settings link sits at y=337, and with the default
+      // `overflow-y: visible` it is simply unreachable — off the bottom of a box that cannot
+      // scroll and cannot be scrolled past.
+      className="fixed inset-y-0 left-0 z-20 flex w-64 flex-col overflow-y-auto border-r border-border-hairline bg-surface-card"
     >
       <div className="flex h-16 shrink-0 items-center border-b border-border-hairline px-3">
         <span className="text-headline-md text-primary">ACME HR</span>

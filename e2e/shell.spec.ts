@@ -154,6 +154,32 @@ test.describe('landmarks and bypass', () => {
 
     await expect(page.locator('nav [aria-current="page"]')).toHaveCount(0);
   });
+
+  // The sidebar is `fixed`, so its content does not extend the page and the window scrollbar cannot
+  // reach it. Without `overflow-y-auto` the bottom-pinned Settings link sat at y=337 in a 320px-tall
+  // box that could neither scroll nor be scrolled past — unreachable by pointer, on the one item the
+  // ratified IA pins to the floor. 320px is the WCAG 1.4.10 reflow floor, not an exotic viewport.
+  test('the sidebar scrolls, so the bottom-pinned Settings link stays reachable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 320 });
+    await page.goto('/');
+
+    const overflow = await page
+      .locator('nav')
+      .evaluate((nav) => ({ scrolls: nav.scrollHeight > nav.clientHeight, overflowY: getComputedStyle(nav).overflowY }));
+
+    // The precondition. If the sidebar ever stops overflowing at this height the assertion below
+    // would pass for the wrong reason, so it is stated rather than assumed.
+    expect(overflow.scrolls).toBe(true);
+    expect(overflow.overflowY).toBe('auto');
+
+    // The claim itself: reachable and operable, not merely present in the DOM.
+    const settings = page.getByRole('link', { name: 'Settings' });
+    await settings.scrollIntoViewIfNeeded();
+    await settings.click();
+    await expect(page).toHaveURL(/\/settings$/);
+  });
 });
 
 test.describe('aria-current follows the current path', () => {
