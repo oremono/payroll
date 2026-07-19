@@ -99,6 +99,36 @@ warnings: ['oversized']
 > report on a second upload, and the whole-file refusal as a headed region rather than
 > `role="alert"`). `lint`, `typecheck` and the 653-test unit suite are green.
 
+> **Blocking finding (2026-07-19, second dev session).** Both boxes below are code-complete at HEAD
+> and were verified by running them, not by reading them. `src/app/import/page.tsx` renders
+> `<ImportPanel />` as a server component with no `<h1>`; `src/ui/import-panel.tsx` renders all four
+> post-upload states. `lint`, `typecheck`, the 653-test unit suite, `test:a11y` (18), and
+> `test:tokens` (21, including the `refusal-fill` contrast gate — **no Block If**) are green.
+>
+> `e2e/import.spec.ts` still reports **17 passed / 6 failed**, and the cause is **locator scope in
+> the spec file, not missing behaviour**. Proven: a scratch copy of all six tests, with every
+> assertion byte-identical except the two locators named below, passes 6/6 against this exact HEAD.
+>
+> 1. **Four tests** (`:210`, `:296`+`:297`, `:307`, `:321`) call unscoped
+>    `page.getByText('<the summary strip>')`. That string is on the page **twice by design**: in the
+>    report's `<p>`, and in `#app-announcer`, because `composeImportAnnouncement` returns the strip
+>    verbatim so screen and speech can never disagree — pinned by this spec, by `:272`, and by
+>    `tests/ui/import-report.test.ts:219`. Playwright's text engine matches `sr-only` text, so the
+>    locator resolves to 2 and `toBeVisible()` dies on strict mode. Unsatisfiable while `:272` holds.
+>    (`:321` is additionally **flaky-green**: it can catch the announcer's clear-then-set window.)
+>    Fix belongs in the test: scope to `getByRole('region', { name: 'Import report' })`.
+> 2. **Two tests** (`:276` `[aria-live]` → 1, `:277`/`:341` `[role="alert"]` → 0) count these
+>    attributes across the whole document. Next.js's App Router mounts its own
+>    `<div id="__next-route-announcer__" role="alert" aria-live="assertive">` on every page; it is
+>    framework-owned, has no opt-out, and removing it would delete a real route-change affordance.
+>    The repo's own established idiom is narrower — `e2e/shell.spec.ts:556` counts `#app-announcer`,
+>    not `[aria-live]`. Fix belongs in the test: exclude `#__next-route-announcer__`.
+>
+> Per the session's standing rule (`e2e/import.spec.ts` is the contract and is not edited to make it
+> pass), this is escalated rather than absorbed. **No production code was changed.** The boxes stay
+> unchecked because the story's definition of done is a green `test:import`, and that needs a human
+> ruling on the two locators.
+
 - [ ] `src/app/import/page.tsx` -- replace the placeholder statement with `<ImportPanel />`; keep it a server component with no `<h1>` -- the route becomes the capability
 - [x] `e2e/import.spec.ts` -- Playwright: stub `/api/import` with `page.route` + canned `ImportResult` payloads (partial, clean, all-rejected, refusal), drive the real file picker with `setInputFiles`, assert rendered text/table/heading semantics, keyboard operability, and run `AxeBuilder` on each post-upload state in **both** colour schemes -- these states are markup a page-load scan never reaches
 - [x] `e2e/tokens.spec.ts` -- add the `refusal-fill` contrast assertion (ink on `refusal-fill`, and its hairline border) now that a refusal is rendered for the first time -- discharges the deferred gate gap; **Block If** it fails
