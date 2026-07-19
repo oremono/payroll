@@ -162,6 +162,59 @@ export type UpdateEmployeeOutcome =
   | { readonly kind: 'not-found' }
   | { readonly kind: 'hire-date-after-salary' };
 
+/**
+ * One salary record, appended to an employee who already exists (CAP-3, story 4-1).
+ *
+ * Deliberately CARRIES NO COUNTRY. The country is the EMPLOYEE's, immutable since create (AD-6), and
+ * the adapter reads it inside its own transaction and re-resolves the currency from it there. A
+ * country travelling on this input would be a second answer to a question the employee row already
+ * answers, and the two could disagree.
+ */
+export type NewSalaryRecord = {
+  /** From the id port (AD-10) — generated in the shell, never by the database. */
+  readonly salaryRecordId: string;
+  readonly employeeId: string;
+  /**
+   * AD-4: never bare. The `currency` carried here is what the domain validated against the
+   * country's — the implementation RE-RESOLVES it from the country inside the transaction anyway,
+   * because a reference table can change between the read and the write.
+   */
+  readonly salary: Money;
+  readonly effectiveFrom: PlainDate;
+};
+
+/**
+ * What an append did.
+ *
+ * `effective-before-hire` is the AD-16 trigger's verdict (SQLSTATE `AP004`) reaching the caller as
+ * DATA rather than as an exception, exactly as `hire-date-after-salary` does on the edit path.
+ *
+ * It carries the `hireDate` the DATABASE enforced against, and that is not decoration. The domain
+ * judges this same rule against the hire date it READ, and it only lets an input through when that
+ * date permits it — so this arm firing is PROOF that the stored hire date is a different one. A
+ * caller composing a sentence from the date it read would quote a hire date the effective date is
+ * demonstrably not earlier than, in every single case the arm appears. The truth has to travel back
+ * from the transaction that lost the race, so it does.
+ *
+ * With one honest limit: the adapter recovers that date by RE-READING the row after the rollback,
+ * because the trigger reports a SQLSTATE and not a value. A hire date edited a second time in that
+ * window is quoted as it stands at the re-read, not as the trigger judged it — so this arm reports
+ * the CURRENT stored hire date, which is the date the user must act on, rather than a snapshot of
+ * the one that lost. It narrows the wrong sentence to a double-edit race; it does not eliminate it.
+ *
+ * There is no `rejected` arm and no future-date arm: a future-dated record is an INVARIANT
+ * violation by the time it reaches the funnel (the domain judged it and reported on it), so the
+ * adapter throws, as every other funnel breach here does.
+ */
+export type AppendSalaryRecordOutcome =
+  | { readonly kind: 'appended' }
+  | { readonly kind: 'not-found' }
+  | {
+      readonly kind: 'effective-before-hire';
+      /** The hire date the trigger judged against — read back from the database, never the caller's. */
+      readonly hireDate: PlainDate;
+    };
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -252,4 +305,34 @@ export type EmployeeRepository = {
 
   /** The pickable reference values for the create/edit form. Active rows only. */
   readonly loadFormOptions: () => Promise<EmployeeFormOptions>;
+
+  // ── CAP-3 (story 4-1) ──────────────────────────────────────────────────────────────────────
+  // A SIBLING of the batch funnel above, on this same port and this same adapter — not a second
+  // write path. It shares the funnel's per-record guard verbatim (in-transaction currency
+  // re-resolution against the ACTIVE country, and the no-future-dating check), because a divergence
+  // between the two is exactly the defect AD-6's single funnel exists to prevent.
+  //
+  // APPEND ONLY, and there is no matching update or delete anywhere on this port (Law 5 / AD-18).
+  // That is not merely convention here: `payroll_app` has UPDATE and DELETE revoked on
+  // `salary_record` AND a BEFORE UPDATE OR DELETE trigger raising `AP001` behind the revoke, so a
+  // port method offering either would be a promise the database refuses to keep. Appending a new
+  // record dated today is the only correction mechanism there is.
+
+  /**
+   * Append ONE salary record to an existing employee.
+   *
+   * Returns an OUTCOME rather than throwing for the two things a caller must act on. `not-found` is
+   * the normal answer to a stale id — including an id that is not a UUID at all, since it arrives
+   * from a URL segment a user can hand-edit. `effective-before-hire` is the AD-16 trigger's `AP004`
+   * verdict mapped to data, carrying the hire date the database enforced against — see
+   * `AppendSalaryRecordOutcome` for why that date cannot be the caller's. Every OTHER database
+   * error still throws: those are invariant violations, not input, and the Server Action boundary
+   * answers them with a payload.
+   *
+   * `today` is passed in rather than read: no application code may touch a clock (Law 6).
+   */
+  readonly appendSalaryRecord: (
+    record: NewSalaryRecord,
+    today: PlainDate,
+  ) => Promise<AppendSalaryRecordOutcome>;
 };

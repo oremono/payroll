@@ -86,6 +86,9 @@ function fakeDeps(
     listEmployees: () =>
       Promise.resolve({ employees: [], totalCount: 0, limit: 25, offset: 0 }),
     loadFormOptions: () => Promise.resolve({ roles: [], levels: [], countries: [] }),
+    // CAP-3's sibling append (story 4-1). Present so this fake still satisfies the port; no CAP-2
+    // handler reaches it, and `tests/app/handle-salary-change.test.ts` is where it is exercised.
+    appendSalaryRecord: () => Promise.resolve({ kind: 'appended' as const }),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };

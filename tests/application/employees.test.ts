@@ -102,6 +102,10 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
       );
     },
     loadFormOptions: async () => guard('loadFormOptions', FORM_OPTIONS),
+    // CAP-3's sibling append (story 4-1). Present so this fake still satisfies the port; no CAP-2
+    // use-case reaches it, and `tests/application/record-salary-change.test.ts` is where it is
+    // actually exercised.
+    appendSalaryRecord: async () => guard('appendSalaryRecord', { kind: 'appended' as const }),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).

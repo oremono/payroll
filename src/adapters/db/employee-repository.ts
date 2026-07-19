@@ -1,4 +1,5 @@
 import type {
+  AppendSalaryRecordOutcome,
   EmployeeDetail,
   EmployeeFormOptions,
   EmployeeListPage,
@@ -7,9 +8,11 @@ import type {
   EmployeeUpdate,
   NewEmployee,
   NewEmployeeWithSalary,
+  NewSalaryRecord,
   UpdateEmployeeOutcome,
 } from '@/application/ports/employee-repository';
 import type { ReferenceData } from '@/domain/import-row';
+import type { Money } from '@/domain/money';
 import { comparePlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
 
 import { getDbClient } from './client';
@@ -248,6 +251,66 @@ const EMPLOYEE_IDENTITY_SELECT = {
   hireDate: true,
 } as const;
 
+/**
+ * THE per-record write guard, applied by every path that appends a `salary_record`.
+ *
+ * ONE helper rather than two statements of the same rule, and that is the whole point (AD-6): the
+ * batch funnel and CAP-3's single-record append must not be able to drift apart about what a
+ * writable salary record is. A divergence between the two is exactly the defect the single funnel
+ * exists to prevent, and two copies of a check is how a divergence begins.
+ *
+ * Both callers hand it a currency they resolved from the country INSIDE their own transaction, with
+ * the same `is_active` filter `loadReferenceData` uses — that is what closes the window between
+ * judging a row and writing it. `undefined` means the country did not resolve as ACTIVE at all.
+ *
+ * THROWS rather than returning a refusal, exactly as the batch funnel always has: the input was
+ * already judged and reported on, so anything reaching here is an invariant violation rather than
+ * user input. Adapters may throw; the pure layers may not. The Route Handler and the Server Action
+ * boundary each catch and answer with a payload, because an unguarded call site is a designed-in
+ * 500.
+ *
+ * `label` is what the message NAMES — an employee's name on the import path, an id on the append
+ * path — because a batch failure has to say which of ten thousand rows it was about.
+ */
+function assertSalaryRecordWritable(params: {
+  readonly label: string;
+  readonly countryCode: string;
+  readonly resolvedCurrency: string | undefined;
+  readonly salary: Money;
+  readonly effectiveFrom: PlainDate;
+  readonly today: PlainDate;
+}): string {
+  const { label, countryCode, resolvedCurrency, salary, effectiveFrom, today } = params;
+
+  if (resolvedCurrency === undefined) {
+    throw new Error(
+      `Country "${countryCode}" is not an active country. It resolved when the input ` +
+        'was judged and does not now, so the reference data changed in between.',
+    );
+  }
+  // AD-6: the record's currency is the COUNTRY's, and the value the domain carried is validated to
+  // equal it rather than trusted.
+  if (resolvedCurrency !== salary.currency) {
+    throw new Error(
+      `Currency mismatch writing "${label}": country "${countryCode}" resolves to ` +
+        `"${resolvedCurrency}", not "${salary.currency}".`,
+    );
+  }
+  // Law 5 / AD-18: no future-dating, on EVERY write path — re-checked here because this guard is
+  // what every write path inherits, including callers that never ran the domain validator.
+  if (comparePlainDate(effectiveFrom, today) > 0) {
+    throw new Error(
+      `effective_from ${plainDateToIso(effectiveFrom)} for "${label}" is later ` +
+        `than today, ${plainDateToIso(today)}. salary_record is append-only and admits ` +
+        'no future-dated record.',
+    );
+  }
+
+  // The currency the row is WRITTEN with — the country's, returned rather than re-looked-up, so no
+  // caller can write one value after validating another.
+  return resolvedCurrency;
+}
+
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -307,33 +370,25 @@ export function createEmployeeRepository(
           countries.map((country) => [country.code, country.currencyCode]),
         );
 
-        for (const row of batch) {
-          const currency = currencyByCountry.get(row.countryCode);
-          if (currency === undefined) {
-            throw new Error(
-              `Country "${row.countryCode}" is not an active country. It resolved when the file ` +
-                'was judged and does not now, so the reference data changed mid-import.',
-            );
-          }
-          // AD-6: the record's currency is the COUNTRY's, and the value the domain carried is
-          // validated to equal it rather than trusted.
-          if (currency !== row.salary.currency) {
-            throw new Error(
-              `Currency mismatch writing "${row.name}": country "${row.countryCode}" resolves to ` +
-                `"${currency}", not "${row.salary.currency}".`,
-            );
-          }
-          // Law 5 / AD-18: no future-dating, on EVERY write path — re-checked here because this
-          // funnel is what every later write path inherits, including callers that never ran the
-          // domain validator.
-          if (comparePlainDate(row.effectiveFrom, today) > 0) {
-            throw new Error(
-              `effective_from ${plainDateToIso(row.effectiveFrom)} for "${row.name}" is later ` +
-                `than today, ${plainDateToIso(today)}. salary_record is append-only and admits ` +
-                'no future-dated record.',
-            );
-          }
-        }
+        // The SHARED per-record guard — the same function CAP-3's single-record append calls, so
+        // the two paths cannot drift apart about what a writable salary record is. Same checks,
+        // same order, same messages this loop always raised.
+        //
+        // Its RETURN is what gets written below, carried on the row rather than looked up again.
+        // Re-reading the map at insert time would be a second answer to a question the guard
+        // already answered — and a caller that validates one currency and writes another is
+        // exactly the divergence this guard was extracted to make impossible.
+        const writable = batch.map((row) => ({
+          row,
+          currencyCode: assertSalaryRecordWritable({
+            label: row.name,
+            countryCode: row.countryCode,
+            resolvedCurrency: currencyByCountry.get(row.countryCode),
+            salary: row.salary,
+            effectiveFrom: row.effectiveFrom,
+            today,
+          }),
+        }));
 
         // Employees first — salary_record carries an FK to them. `createMany`, chunked: one
         // round-trip per thousand rows rather than one per row.
@@ -351,14 +406,14 @@ export function createEmployeeRepository(
           });
         }
 
-        for (const rows of chunk(batch, INSERT_CHUNK_SIZE)) {
+        for (const rows of chunk(writable, INSERT_CHUNK_SIZE)) {
           await tx.salaryRecord.createMany({
-            data: rows.map((row) => ({
+            data: rows.map(({ row, currencyCode }) => ({
               id: row.salaryRecordId,
               employeeId: row.employeeId,
               amountMinor: row.salary.amountMinor,
-              // Written from the country, per the resolution above — never from the file.
-              currencyCode: currencyByCountry.get(row.countryCode) ?? row.salary.currency,
+              // Written from the country, as the guard resolved it — never from the file.
+              currencyCode,
               effectiveFrom: toDbDate(row.effectiveFrom),
             })),
           });
@@ -628,6 +683,103 @@ export function createEmployeeRepository(
       ]);
 
       return { roles, levels, countries };
+    },
+
+    // ── CAP-3 (story 4-1) ────────────────────────────────────────────────────────────────────
+    // A SIBLING of `createEmployeesWithSalaries` on this same repository — not a second funnel.
+    // It shares the client, `toDbDate`, the error discipline, and — the part that matters — the
+    // SAME `assertSalaryRecordWritable` guard, so the currency-from-country rule and the
+    // no-future-dating rule cannot mean one thing for an import and another for a form.
+
+    appendSalaryRecord: async (
+      record: NewSalaryRecord,
+      today: PlainDate,
+    ): Promise<AppendSalaryRecordOutcome> => {
+      // A hand-editable URL segment is ordinary input: answer not-found rather than letting Prisma
+      // raise a cast error against the `@db.Uuid` column before any row is even examined.
+      if (!isUuid(record.employeeId)) {
+        return { kind: 'not-found' };
+      }
+
+      try {
+        const outcome = await client.$transaction(
+          async (tx): Promise<AppendSalaryRecordOutcome> => {
+            // The employee is read INSIDE the transaction for two reasons at once: the country is
+            // what AD-6 resolves the currency from, and the row's existence is what distinguishes
+            // a stale id from a write failure. Reading it outside would reopen the window the
+            // batch funnel closes by re-resolving.
+            const employee = await tx.employee.findUnique({
+              where: { id: record.employeeId },
+              select: { countryCode: true },
+            });
+            if (employee === null) {
+              return { kind: 'not-found' };
+            }
+
+            // Re-resolve currency from country INSIDE the transaction (AD-6), with the same
+            // `is_active` filter `loadReferenceData` applies. The country is the EMPLOYEE's —
+            // immutable since create — never one the caller supplied.
+            const country = await tx.country.findFirst({
+              where: { code: employee.countryCode, isActive: true },
+              select: { currencyCode: true },
+            });
+
+            const currencyCode = assertSalaryRecordWritable({
+              label: record.employeeId,
+              countryCode: employee.countryCode,
+              resolvedCurrency: country?.currencyCode,
+              salary: record.salary,
+              effectiveFrom: record.effectiveFrom,
+              today,
+            });
+
+            await tx.salaryRecord.create({
+              data: {
+                id: record.salaryRecordId,
+                employeeId: record.employeeId,
+                amountMinor: record.salary.amountMinor,
+                // Written from the country, per the resolution above — never from the caller.
+                currencyCode,
+                effectiveFrom: toDbDate(record.effectiveFrom),
+              },
+            });
+
+            return { kind: 'appended' };
+          },
+        );
+        return outcome;
+      } catch (error) {
+        if (hasErrorCode(error, HIRE_DATE_SQLSTATE)) {
+          // The ONE database error this path converts to data. The domain judged the same rule
+          // against the hire date it READ; this is the backstop for one that moved in between, and
+          // it is user-facing either way. `seq` is a BIGSERIAL, so the rolled-back INSERT burns a
+          // number — AD-8 needs ordering, never contiguity, and the schema says so.
+          //
+          // Read the enforced hire date on a FRESH query, deliberately, and not inside the
+          // transaction above. That transaction is GONE: the error propagated out of the callback,
+          // so Prisma has already rolled it back and its client would answer 25P02 to anything
+          // asked of it. A read placed before the INSERT to dodge that would be worse still — it
+          // would cost every successful append an extra round-trip to serve a case that is
+          // vanishingly rare, and it would report the date this connection saw rather than the one
+          // the trigger actually judged.
+          //
+          // The reader is therefore told what the database holds NOW, which is the honest answer to
+          // "what is this person's hire date" and the only one that makes the sentence true.
+          const employee = await client.employee.findUnique({
+            where: { id: record.employeeId },
+            select: { hireDate: true },
+          });
+          if (employee === null) {
+            // Deleted between the failed append and this read. There is no hire date to quote and
+            // no person to record a change against, so the stale-id answer is the truthful one.
+            return { kind: 'not-found' };
+          }
+          return { kind: 'effective-before-hire', hireDate: fromDbDate(employee.hireDate) };
+        }
+        // Everything else is an invariant violation, not input — it throws, and the boundary
+        // answers with a payload rather than a 500.
+        throw error;
+      }
     },
   };
 }

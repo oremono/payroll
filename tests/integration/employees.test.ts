@@ -423,8 +423,10 @@ describe('country_code is immutable at the DATABASE, not merely in the types (AD
 
     const methods = Object.keys(repository);
     expect(methods.filter((method) => /delete|remove|destroy/i.test(method))).toEqual([]);
-    expect(methods.filter((method) => /salar/i.test(method))).toEqual([
-      // The one salary-touching method is the append-only batch funnel. No update, no delete.
+    expect(methods.filter((method) => /salar/i.test(method)).sort()).toEqual([
+      // Both salary-touching methods APPEND: the batch funnel CAP-1 writes through, and CAP-3's
+      // single-record sibling (story 4-1). No update, no delete, and no second write path.
+      'appendSalaryRecord',
       'createEmployeesWithSalaries',
     ]);
   });

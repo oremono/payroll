@@ -43,9 +43,18 @@ const NOT_USED_BY_IMPORT = {
   findEmployeeById: () => Promise.reject(new Error('import never reads by id')),
   listEmployees: () => Promise.reject(new Error('import never lists')),
   loadFormOptions: () => Promise.reject(new Error('import never loads form options')),
+  // CAP-3's single-record append (story 4-1). Import writes its opening salary records through the
+  // BATCH funnel and never through this one — a rejecting stub is how that stays true rather than
+  // being merely asserted in prose.
+  appendSalaryRecord: () => Promise.reject(new Error('import never appends one salary record')),
 } satisfies Pick<
   EmployeeRepository,
-  'createEmployee' | 'updateEmployee' | 'findEmployeeById' | 'listEmployees' | 'loadFormOptions'
+  | 'createEmployee'
+  | 'updateEmployee'
+  | 'findEmployeeById'
+  | 'listEmployees'
+  | 'loadFormOptions'
+  | 'appendSalaryRecord'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */

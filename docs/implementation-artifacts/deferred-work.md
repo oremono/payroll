@@ -842,3 +842,125 @@ Also surfaced while landing the story, outside the Design Notes:
     applied to the rejection a user will almost never see. The spec's Code Map mandates reusing the
     composer "verbatim", so a form projection of the sentences is a spec-level decision for 3-2's
     copy pass, not a unilateral contract change.
+
+## Deferred from: 4-1-record-salary-change-backend (2026-07-19)
+
+The first two entries are named by the story's own Design Notes as items to **record rather than
+resolve**; both are pre-existing, and what this story changes is the exposure of the second. The
+entries after them were added by the story's review passes.
+
+- source_spec: `docs/implementation-artifacts/spec-4-1-record-salary-change-backend.md`
+  summary: Historical `effective_from < hire_date` rows are still never detected — the invariant is
+    enforced only at write time, never over rows that already exist.
+  evidence: `20260719050000_review_hardening_1_4` guards both write directions (a `salary_record`
+    INSERT and an `employee.hire_date` UPDATE), and `salary-fields.ts` now judges the same rule in
+    the domain for both write paths. Nothing scans for rows that predate those guards or that a
+    direct owner-connection insert planted, and the AD-16 population predicate reads
+    `effective_from` unconditionally, so such a row silently joins an as-of population before its
+    subject was hired. Closing it is a data-repair migration plus a standing assertion, neither of
+    which belongs to a story whose surface is one append.
+
+- source_spec: `docs/implementation-artifacts/spec-4-1-record-salary-change-backend.md`
+  summary: This story adds a SECOND concurrent inserter to the `FOR SHARE` lock the hire-date
+    trigger takes, on the unretried 40P01 deadlock path already recorded under
+    `spec-1-4-money-currency-domain-primitives.md`.
+  evidence: `appendSalaryRecord` inserts into `salary_record` inside its own transaction, so it
+    fires `salary_record_effective_from_not_before_hire`, which takes `FOR SHARE` on the employee
+    row (`20260719060000_hire_date_lock`). Until now the only inserters were the batch import and
+    the seed — both effectively serial. CAP-3 is a per-employee form, so two HR users recording
+    changes for one person, or one recording a change while another edits that person's hire date,
+    now upgrade a shared lock to exclusive in opposite orders. No retry path exists anywhere in the
+    codebase, and a 40P01 reaching the boundary surfaces as the generic "The salary change could not
+    be saved, so nothing was recorded." The remedy is unchanged from the original entry — a bounded
+    serialization-failure retry decided once for the codebase — and it is not this story's to
+    invent, but the probability of hitting it is materially higher after this story than before it.
+
+- source_spec: `spec-4-1-record-salary-change-backend.md`
+  summary: An employee whose `hire_date` is in the future can never be given a salary at all — every
+    possible effective date is rejected by one of two rules that cannot both be satisfied.
+  evidence: `checkSalaryEffectiveFrom` rejects `effectiveFrom > today` (Law 5 / AD-18) and rejects
+    `effectiveFrom < hireDate` (AD-16 / the `AP004` trigger). When `hireDate > today` the two
+    windows are disjoint, so the form refuses every date, alternating between two contradictory
+    sentences. Future hire dates are explicitly legal: `employee-fields.ts:139` says "whether a date
+    may be in the future is a property of the CALLER's rule (a salary record may not be
+    future-dated; a hire date may)", and `employee.ts:19` says "a future-hired employee is simply
+    out of population until their date arrives." The BEHAVIOUR is arguably correct — the epic
+    forbids scheduled and pending changes, so a not-yet-hired person legitimately has no pay yet —
+    but nothing tells the user that, and CAP-2 can create such an employee with no salary. The
+    decision needed is copy plus possibly an affordance ("pay can be recorded from <hire date>"),
+    which is a spec-level call, not this story's.
+
+- source_spec: `spec-4-1-record-salary-change-backend.md`
+  summary: A double-submitted salary change plants a second, permanently undeletable row, and
+    nothing in the system can distinguish it from a legitimate same-day correction.
+  evidence: `salary_record` carries unique indexes only on `id` and `seq`; `salaryRecordId` is
+    generated server-side per invocation (`record-salary-change.ts`), so a retry cannot reuse one.
+    A double-click on story 4-2's Save, or a browser retry of a slow Server Action, appends two
+    identical rows, and `salary_record` admits no DELETE — the duplicate is permanent and shows
+    twice in the timeline forever. `handle-salary-change.ts`'s own `revalidateCommitted` comment
+    reasons about exactly this hazard for the write-failure path and then leaves the ordinary
+    double-click open. A unique constraint is NOT the fix: same-date, same-amount appends are the
+    designed correction mechanism (AD-18), so the schema cannot tell the two apart. The remedy is an
+    idempotency key on the payload, which trips this spec's "Block If" (adding a field), or UI-level
+    submit suppression in 4-2 — a decision above this story.
+
+- source_spec: `spec-4-1-record-salary-change-backend.md`
+  summary: CAP-3's user-facing rejection sentences quote raw database column tokens and CSV
+    vocabulary — the same defect already recorded for CAP-2, now reproduced on a new surface.
+  evidence: `tests/domain/salary-change.test.ts` pins the form's sentences as `The effective_from
+    cell is blank.`, `amount_minor "0" is not greater than zero.` and `effective_from 2026-07-20 is
+    later than today, 2026-07-19.` Story 4-2 will render these beside fields labelled "Effective
+    date" and "Amount", showing a user schema identifiers and the word "cell" for a form they did
+    not import. This story BUILT the right vocabulary — `SALARY_FIELD_LABELS` in `salary-change.ts`
+    maps to "effective date"/"amount" — but wired it only into `nonTextSalaryFieldRejection`, the
+    rejection only a hostile caller reaches. The sentences cannot simply be changed here: they come
+    from the one shared composer and this spec's "Block If" forbids altering an import rejection
+    sentence. Closing it means a CAP-3 sentence set distinct from CAP-1's, which is a spec decision.
+
+- source_spec: `spec-4-1-record-salary-change-backend.md`
+  summary: The `unknown-country` sentence blames a missing reference row when the real condition is
+    a DEACTIVATED one — inherited from CAP-1, now reachable from a form.
+  evidence: `composeRejectionSentence` renders `Country code "IN" is not in the country reference
+    table.`, but `loadReferenceData` filters on `is_active`, so the reason fires when the row IS
+    present and merely inactive (`record-salary-change.ts` says so in its own comment). An admin
+    retiring a country sends HR looking for a row that is right there. Pre-existing: the import path
+    has always had the same imprecision, and correcting the shared sentence is forbidden by this
+    spec's "Block If". Closing it means a distinct reason kind for the deactivated case.
+
+- source_spec: `docs/implementation-artifacts/spec-4-1-record-salary-change-backend.md`
+  summary: The CAP-3 payload applies two different whitespace policies across its three fields — the
+    effective date is trimmed before judging, the amount and the currency are not.
+  evidence: `validateSalaryChange` reaches the date through `checkEffectiveFromCell` ->
+    `checkDateCell` (`employee-fields.ts`), which trims, so `' 2026-07-19 '` is ACCEPTED.
+    `checkSalaryAmount` and `checkSalaryCurrency` deliberately do not trim, so `' 2500000'` is
+    `malformed-amount` and `' INR'` produces `Currency " INR" is not "INR", the currency of country
+    "IN".` — a sentence that reads as nonsense. A padded value is a realistic form input (paste from
+    a spreadsheet, a mobile keyboard's trailing space), and the two policies are invisible to the
+    user. Not closable here: `checkDateCell` is shared with CAP-1, so making the date strict would
+    change the import contract this spec's "Block If" protects, and trimming the amount would
+    contradict this spec's own I/O matrix (`'  12'` must reject). The decision is where CAP-3
+    normalizes its payload, which belongs to story 4-2's form.
+
+- source_spec: `docs/implementation-artifacts/spec-4-1-record-salary-change-backend.md`
+  summary: `currency` is a required, byte-exact field on a form path where the server already knows
+    the only correct answer.
+  evidence: AD-6 states currency FOLLOWS from the country and is never chosen, yet
+    `SalaryChangeInput` requires the caller to submit it and `checkSalaryCurrency` compares with
+    `!==` after no normalization. For CSV import the field is a genuine assertion worth confirming;
+    on a form there is nothing to confirm — 4-2 will render it disabled or hidden, and a disabled
+    input is not submitted in `FormData` at all, yielding `The currency field was not submitted as
+    text.` on a field the user cannot correct. Deferred rather than patched because the field is
+    named in this spec's `<intent-contract>` I/O matrix ("Currency not the country's" -> rejected),
+    so removing or defaulting it is a spec-level change this story is not entitled to make.
+
+- source_spec: `docs/implementation-artifacts/spec-4-1-record-salary-change-backend.md`
+  summary: Reference data changing between the use-case's read and the adapter's transaction
+    collapses to a generic write failure instead of the specific rejection the union could carry.
+  evidence: `assertSalaryRecordWritable` THROWS on both the inactive-country and currency-mismatch
+    arms; `appendSalaryRecord` does not map either to `AppendSalaryRecordOutcome`, so
+    `record-salary-change.ts` catches and returns `salaryWriteFailureRejection()` — "The salary
+    change could not be saved, so nothing was recorded." The user cannot tell whether a retry would
+    succeed (country deactivated: never; currency edited: yes, with the new currency).
+    `tests/integration/salary-records.test.ts` proves both races reach the guard. Deferred because
+    adding arms to `AppendSalaryRecordOutcome` widens a port story 4-2 already consumes, and this
+    story's own residual risk notes that union moved once during review already.

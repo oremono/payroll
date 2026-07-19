@@ -35,28 +35,25 @@ import {
   type Gender,
   type ReferenceData,
 } from './employee-fields';
-import { fromBoundaryMoney, type Money } from './money';
-import { comparePlainDate, plainDateToIso, type PlainDate } from './plain-date';
-
-/**
- * The largest value the `salary_record.amount_minor` column can hold — PostgreSQL `bigint` is a
- * signed 64-bit integer.
- *
- * THE DOMAIN OWNS THIS BOUND, and that placement is the whole point (story 2-1, review pass 1).
- * Left unbounded, a cell like `99999999999999999999` parsed as a perfectly good positive integer,
- * reached the INSERT, overflowed there, and aborted the entire batch transaction — so ONE bad row
- * destroyed a 10,000-row payroll import and the request answered with a 500 carrying no report at
- * all. The database must never be the first thing to notice a value the product could have judged.
- */
-export const MAX_AMOUNT_MINOR = 9223372036854775807n;
+import type { Money } from './money';
+import type { PlainDate } from './plain-date';
+import {
+  checkSalaryAmount,
+  checkSalaryCurrency,
+  checkSalaryEffectiveFrom,
+  type SalaryFieldRejectionReason,
+} from './salary-fields';
 
 /**
  * The per-field vocabulary and validators now live in `employee-fields.ts`, shared with CAP-2's
  * `validateEmployeeInput` so there is exactly one implementation of each field rule (story 3-1).
- * They are RE-EXPORTED here because this module is the name every existing consumer imports them
- * by, and moving an import path is not what the extraction is for.
+ * The SALARY-record rules — the amount, the two effective-date bounds, and the currency match —
+ * live in `salary-fields.ts` for the same reason, shared with CAP-3's `validateSalaryChange`
+ * (story 4-1). Both are RE-EXPORTED here because this module is the name every existing consumer
+ * imports them by, and moving an import path is not what an extraction is for.
  */
 export type { DateColumn, Gender, ReferenceData } from './employee-fields';
+export { MAX_AMOUNT_MINOR } from './salary-fields';
 
 /** One CSV data row, every cell still a raw string exactly as the file spelled it. */
 export type ImportRowInput = {
@@ -95,25 +92,11 @@ export type RejectionReason =
   // The per-field half, shared verbatim with CAP-2's employee validator: blank-name,
   // unknown-role/level/country/gender, missing-date, malformed-date.
   | FieldRejectionReason
-  | {
-      readonly kind: 'future-effective-from';
-      readonly effectiveFrom: string;
-      readonly today: string;
-    }
-  | {
-      readonly kind: 'effective-before-hire';
-      readonly effectiveFrom: string;
-      readonly hireDate: string;
-    }
-  | { readonly kind: 'malformed-amount'; readonly value: string }
-  | { readonly kind: 'amount-not-positive'; readonly value: string }
-  | { readonly kind: 'amount-out-of-range'; readonly value: string }
-  | {
-      readonly kind: 'currency-mismatch';
-      readonly value: string;
-      readonly expected: string;
-      readonly countryCode: string;
-    }
+  // The salary-record half, shared verbatim with CAP-3's salary-change validator:
+  // future-effective-from, effective-before-hire, the three amount faults, currency-mismatch.
+  | SalaryFieldRejectionReason
+  // What is left is what belongs to a CSV ROW rather than to a person or a salary record: a record
+  // that never became the right number of cells, or never became cells at all.
   | { readonly kind: 'wrong-cell-count'; readonly expected: number; readonly actual: number }
   | { readonly kind: 'unterminated-quote' };
 
@@ -194,60 +177,28 @@ export function validateImportRow(
     return { ok: false, reason: effectiveFrom.reason };
   }
 
-  // Law 5 / AD-18: no future-dating, on EVERY write path. Inclusive of today — appending a record
-  // dated today is the only correction mechanism the append-only design offers.
-  if (comparePlainDate(effectiveFrom.value, today) > 0) {
-    return {
-      ok: false,
-      reason: {
-        kind: 'future-effective-from',
-        effectiveFrom: plainDateToIso(effectiveFrom.value),
-        today: plainDateToIso(today),
-      },
-    };
+  // Law 5 / AD-18 and the hire-date bound, from the ONE implementation both write paths share
+  // (`salary-fields.ts`). The reasons and their ORDER — future first, then before-hire — are
+  // exactly what this function returned when it judged the two dates itself; the extraction moved
+  // the code and changed neither.
+  const salaryDate = checkSalaryEffectiveFrom(effectiveFrom.value, hireDate.value, today);
+  if (!salaryDate.ok) {
+    return { ok: false, reason: salaryDate.reason };
   }
 
-  // Rejected in-app before the DB's BEFORE INSERT trigger (SQLSTATE AP004) can fire, so the row
-  // carries a reason a reader can act on rather than aborting a batch. Inclusive: a day-one salary
-  // dated exactly on the hire date is legitimate, and the trigger agrees.
-  if (comparePlainDate(effectiveFrom.value, hireDate.value) < 0) {
-    return {
-      ok: false,
-      reason: {
-        kind: 'effective-before-hire',
-        effectiveFrom: plainDateToIso(effectiveFrom.value),
-        hireDate: plainDateToIso(hireDate.value),
-      },
-    };
-  }
-
+  // The TRIM stays here and does not move into the shared check. Trimming is a property of reading
+  // a spreadsheet-exported CSV CELL, not of judging an amount — the Server Action path judges the
+  // exact text it is handed. Both the parsed value and the reported offending value are the trimmed
+  // cell, exactly as before.
   const amountCell = raw.amountMinor.trim();
-  // `fromBoundaryMoney` is REUSED rather than re-derived (Law 4): it already refuses everything
-  // `BigInt` is dangerously permissive about — the empty string, ' 1 ', '0x10', a leading '+',
-  // leading zeros, a fraction, exponent notation — by demanding the canonical decimal form.
-  const parsedAmount = fromBoundaryMoney({ amountMinor: amountCell, currency: expectedCurrency });
-  if (parsedAmount === null) {
-    return { ok: false, reason: { kind: 'malformed-amount', value: amountCell } };
-  }
-  if (parsedAmount.amountMinor <= 0n) {
-    return { ok: false, reason: { kind: 'amount-not-positive', value: amountCell } };
-  }
-  // The bound the database must never be the first to notice — see MAX_AMOUNT_MINOR.
-  if (parsedAmount.amountMinor > MAX_AMOUNT_MINOR) {
-    return { ok: false, reason: { kind: 'amount-out-of-range', value: amountCell } };
+  const amount = checkSalaryAmount(amountCell, expectedCurrency);
+  if (!amount.ok) {
+    return { ok: false, reason: amount.reason };
   }
 
-  const currency = raw.currency.trim();
-  if (currency !== expectedCurrency) {
-    return {
-      ok: false,
-      reason: {
-        kind: 'currency-mismatch',
-        value: currency,
-        expected: expectedCurrency,
-        countryCode,
-      },
-    };
+  const currency = checkSalaryCurrency(raw.currency.trim(), expectedCurrency, countryCode);
+  if (!currency.ok) {
+    return { ok: false, reason: currency.reason };
   }
 
   return {
@@ -259,8 +210,8 @@ export function validateImportRow(
       countryCode,
       gender: gender.value,
       hireDate: hireDate.value,
-      salary: parsedAmount,
-      effectiveFrom: effectiveFrom.value,
+      salary: amount.value,
+      effectiveFrom: salaryDate.value,
     },
   };
 }
