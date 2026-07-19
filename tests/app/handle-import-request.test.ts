@@ -39,6 +39,29 @@ function csvFile(contents: string, name = 'payroll.csv'): File {
   return new File([contents], name, { type: 'text/csv' });
 }
 
+/**
+ * A File whose `size` and/or `text()` are overridden — for the cases a real File cannot produce
+ * (a 16 MB body without allocating one, a stream that dies mid-read).
+ *
+ * It must be a REAL `File`, not a plain object cast to one: `FormData.set` coerces any non-Blob
+ * value to a STRING, so a `{ name, size, text }` literal would arrive at the handler as
+ * `"[object Object]"` and be correctly reported as "no file part".
+ */
+function fileWith(overrides: {
+  readonly name?: string;
+  readonly size?: number;
+  readonly text?: () => Promise<string>;
+}): File {
+  const file = csvFile('name\nAda', overrides.name ?? 'payroll.csv');
+  if (overrides.size !== undefined) {
+    Object.defineProperty(file, 'size', { value: overrides.size });
+  }
+  if (overrides.text !== undefined) {
+    Object.defineProperty(file, 'text', { value: overrides.text });
+  }
+  return file;
+}
+
 function depsThat(runImport: ImportRequestDeps['runImport']): ImportRequestDeps {
   return { runImport };
 }
@@ -151,16 +174,18 @@ describe('handleImportRequest — the size cap', () => {
     // The cap has to fire on `size`, not after `text()`: materializing a gigabyte to discover it
     // is a gigabyte is the denial-of-service the cap exists to prevent.
     let materialized = false;
-    const oversized = {
-      name: 'huge.csv',
-      size: MAX_UPLOAD_MEGABYTES * 1024 * 1024 + 1,
-      text: () => {
-        materialized = true;
-        return Promise.resolve('');
-      },
-    };
     const form = new FormData();
-    form.set('file', oversized as unknown as File);
+    form.set(
+      'file',
+      fileWith({
+        name: 'huge.csv',
+        size: MAX_UPLOAD_MEGABYTES * 1024 * 1024 + 1,
+        text: () => {
+          materialized = true;
+          return Promise.resolve('');
+        },
+      }),
+    );
 
     const result = await handleImportRequest(requestWith(form), PASSTHROUGH);
 
@@ -173,13 +198,11 @@ describe('handleImportRequest — the size cap', () => {
   });
 
   it('accepts an upload of exactly the limit — the cap is a boundary, not a narrowing', async () => {
-    const atLimit = {
-      name: 'big.csv',
-      size: MAX_UPLOAD_MEGABYTES * 1024 * 1024,
-      text: () => Promise.resolve('name\nAda'),
-    };
     const form = new FormData();
-    form.set('file', atLimit as unknown as File);
+    form.set(
+      'file',
+      fileWith({ name: 'big.csv', size: MAX_UPLOAD_MEGABYTES * 1024 * 1024 }),
+    );
 
     expect(await handleImportRequest(requestWith(form), PASSTHROUGH)).toBe(OK_RESULT);
   });
@@ -217,13 +240,8 @@ describe('handleImportRequest — nothing throws, ever', () => {
   });
 
   it('refuses when reading the file body throws', async () => {
-    const unreadable = {
-      name: 'payroll.csv',
-      size: 10,
-      text: () => Promise.reject(new Error('stream aborted')),
-    };
     const form = new FormData();
-    form.set('file', unreadable as unknown as File);
+    form.set('file', fileWith({ text: () => Promise.reject(new Error('stream aborted')) }));
 
     expect(await handleImportRequest(requestWith(form), PASSTHROUGH)).toEqual(
       expect.objectContaining({ reason: { kind: 'unreadable-upload' } }),
@@ -255,7 +273,7 @@ describe('handleImportRequest — nothing throws, ever', () => {
     expect(
       await handleImportRequest(
         requestWith(form),
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- proving totality against a non-Error throw.
+        // A non-Error rejection, deliberately: `catch {}` must not depend on what was thrown.
         depsThat(() => Promise.reject('a string, not an Error')),
       ),
     ).toEqual(expect.objectContaining({ reason: { kind: 'write-failed' } }));
