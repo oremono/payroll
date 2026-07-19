@@ -23,6 +23,11 @@ const ROUTES = [
   '/overdue',
   '/import',
   '/settings',
+  // An unknown path is a surface a person genuinely reaches — a stale bookmark, a mistyped URL, a
+  // link that outlived its route — and until `src/app/not-found.tsx` existed it was the one page
+  // Next rendered itself, unstyled, inside the shell, with a second `h1` and no axe coverage at
+  // all. It is judged here exactly like the seven ratified destinations.
+  '/no-such-page',
 ] as const;
 
 const SCHEMES = ['light', 'dark'] as const;

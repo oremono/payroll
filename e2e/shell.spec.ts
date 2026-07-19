@@ -133,6 +133,27 @@ test.describe('landmarks and bypass', () => {
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('h1')).toHaveText('Home');
   });
+
+  // An unknown path is a route like any other as far as the shell is concerned. Before
+  // `src/app/not-found.tsx` existed, Next served its OWN built-in 404 markup INSIDE the root
+  // layout — so the document carried the header's `h1` plus Next's "404" `h1`, two top-level
+  // headings and a block of unstyled UA-default markup, on a path no gate ever visited.
+  test('an unknown path renders inside the shell, with exactly one h1', async ({ page }) => {
+    await page.goto('/no-such-page');
+
+    await expect(page.locator('nav')).toHaveCount(1);
+    await expect(page.locator('main')).toHaveCount(1);
+    await expect(page.locator('nav')).toHaveAttribute('aria-label', 'Primary');
+    await expect(page.locator('h1')).toHaveCount(1);
+    // No nav item claims the path, so the header falls back to the product name.
+    await expect(page.locator('h1')).toHaveText('Salary Management for ACME HR');
+  });
+
+  test('an unknown path marks NO sidebar item current', async ({ page }) => {
+    await page.goto('/no-such-page');
+
+    await expect(page.locator('nav [aria-current="page"]')).toHaveCount(0);
+  });
 });
 
 test.describe('aria-current follows the current path', () => {
