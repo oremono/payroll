@@ -192,6 +192,40 @@ test.describe('Tailwind utilities resolve to the generated tokens', () => {
     );
   });
 
+  // The webfont task had NO gate. The assertion above reads the DECLARED `font-family` list, which
+  // already named 'JetBrains Mono' before either face was ever loaded — delete both `@fontsource/*`
+  // imports from layout.tsx and it stays green while the app renders `ui-monospace`. That is
+  // precisely the failure DESIGN's "a proportional numeral anywhere in a data surface is a defect"
+  // warns about, and nothing in the repo could see it.
+  //
+  // `document.fonts.check()` is the obvious instrument and it DOES NOT WORK here: it answers "can I
+  // render this spec?", and with no matching `@font-face` rule at all the UA answers yes by falling
+  // back. Measured, not assumed — with both imports deleted, `document.fonts` is EMPTY while
+  // `check('400 12px "JetBrains Mono"')` still returns true. So this reads the font set itself and
+  // demands a face that is actually `loaded`, which is a claim the fallback cannot satisfy.
+  test('actually LOADS the two faces DESIGN binds the product to, not merely names them', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    // A face is fetched when something on the page uses it, so let that settle before asking.
+    await page.evaluate(() => document.fonts.ready);
+
+    const loaded = await page.evaluate(() =>
+      Array.from(document.fonts)
+        .filter((face) => face.status === 'loaded')
+        .map((face) => `${face.family} ${face.weight}`),
+    );
+
+    // Every pair below is one the shell puts on screen right now, which is what makes the question
+    // answerable at all — a weight nothing renders is never fetched and would fail here for a
+    // reason that has nothing to do with the bug. JetBrains Mono 400 is
+    // `--text-number-sm--font-weight` (the header's as-of date), Hanken Grotesk 400 is body-md (the
+    // placeholder paragraph), and Hanken Grotesk 600 is headline-lg (the page title).
+    expect(loaded).toContain('JetBrains Mono 400');
+    expect(loaded).toContain('Hanken Grotesk 400');
+    expect(loaded).toContain('Hanken Grotesk 600');
+  });
+
   // Story 1-6. Until the shell landed, nothing painted the page canvas: `tokens.generated.css`
   // re-pointed every --color-* under prefers-color-scheme, but the surface BEHIND the app was never
   // one of them, so OS dark mode rendered a dark island inside a UA-white page. Every assertion
