@@ -1,5 +1,50 @@
 # Deferred Work
 
+## Deferred from: code review of 1-7-deployment-and-environments (2026-07-19)
+
+Migrated from the story's Review Findings when 1-7 was closed. All six were assessed as
+**non-essential**: NFR11a is met and verified in production, every gate is green, and none of these
+block a consumer. They are hardening and bookkeeping, kept live here for `bmad-loop sweep`.
+
+- **Preview deployments durably retain production-equivalent credentials.** `vercel deploy
+  --env/--build-env` bakes `DATABASE_URL` (owner) and `DATABASE_URL_APP` into the deployment record,
+  which Vercel retains after the PR closes and the Neon branch is deleted. Because branches inherit
+  the parent's roles *and passwords*, `payroll_app`'s password on `pr-N` is byte-identical to the one
+  valid against `production` — only the host differs, so the value is replayable against production
+  by swapping it. Exploiting it requires Vercel project access, which today is one person on a
+  private team, and the app half is `SELECT`/`INSERT` only. **Re-entry:** if repo or Vercel access
+  ever widens beyond one operator, rotate `payroll_app` per branch (`ALTER ROLE` after branch
+  creation) so an inherited credential stops being a production credential. *Worth noting alongside
+  this: the isolation failure that actually occurred was far more mundane — `.env` pointing at the
+  production branch so the test suite wrote to it (see the 1-4/1-5 section). The boring path is the
+  one that bit.*
+- **`expires_at` is never refreshed when a Neon branch is reused.** It is set at creation; on
+  `synchronize` the action returns the existing branch and nothing extends the TTL. A PR open longer
+  than 7 days without a push loses its branch under a live preview URL, which then errors on every
+  database path with no signal — the smoke check already passed and does not re-run. **Re-entry:**
+  set the expiry unconditionally after the create step (`neonctl branches update`), or drop the TTL
+  and rely solely on the `closed` cleanup now that it queues correctly.
+- **Both database credentials are broadcast to every later step via `$GITHUB_ENV`.** Only three
+  steps need them, but `npx playwright install --with-deps chromium` and `npx vercel@…` — packages
+  fetched from the network at run time — also see them. **Re-entry:** move to step-level `env:`.
+- **`e2e/smoke.spec.ts`'s second assertion is close to vacuous.** `expect(page.locator('body'))
+  .toBeAttached()` holds for any HTML document including an error shell, which the adjacent comment
+  claims it distinguishes; the status assertion does that work alone. **Re-entry:** assert on a
+  deployment-identifying signal (an `x-vercel-id` header, or `response.request().url()` matching the
+  target) so the spec earns the discriminating power its comment claims — that would also partly
+  cover the "was this build ignored rather than deployed?" gap.
+- **The "~2× margin" claim for the pool-timing assertion extrapolates local numbers.** The measured
+  ~1.0 s / ~2.0 s figures are local; the only CI datum is total test duration, which does not isolate
+  the baseline assertion's headroom on a cross-region run (runner in `eastus2`, Neon in
+  `ap-southeast-1`). **Re-entry:** log the two phase timings if it ever flakes, then widen
+  `SLEEP_SECONDS` rather than loosening the boundary.
+- **AC 5's "pushed red **on the branch**" was met in spirit, not letter.** All six commits were
+  pushed at once, so CI never ran on the red commit on the story branch; the failing run lives on
+  `evidence/1-7-pool-bound-red` ([run 29658638514](https://github.com/oremono/payroll/actions/runs/29658638514)).
+  The commit pair itself is genuine and correctly scoped. **Re-entry:** either keep that branch as
+  the durable artifact, or amend AC 5's wording for later stories to accept a linked run record —
+  the Actions run survives branch deletion, so the branch itself is disposable.
+
 ## Deferred from: post-loop verification of 1-4 / 1-5 (2026-07-19)
 
 Found while verifying the `bmad-loop` run that landed 1-4 and 1-5. Both are about the same thing:

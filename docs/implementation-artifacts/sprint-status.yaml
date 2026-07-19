@@ -71,7 +71,7 @@ development_status:
   # while the migration work is fresh (rk's ruling). The key keeps its 1-7 number because ~24
   # existing cross-references bind 1-4 to the money/currency story; ROW ORDER in this file, not the
   # key number, is what create-story and dev-story read as execution order.
-  1-7-deployment-and-environments: in-progress
+  1-7-deployment-and-environments: done
   1-4-money-currency-domain-primitives: done
   1-5-design-token-build: done
   1-6-app-shell-and-as-of-control: backlog
