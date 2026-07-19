@@ -1,5 +1,53 @@
 # Deferred Work
 
+## Deferred from: post-loop verification of 1-4 / 1-5 (2026-07-19)
+
+Found while verifying the `bmad-loop` run that landed 1-4 and 1-5. Both are about the same thing:
+reference data that fails **silently**.
+
+- **The reference-data seed uses a TARGETLESS `ON CONFLICT DO NOTHING`, so any unique collision
+  silently drops an FK-target row.** `20260718225000_reference_data` states the choice explicitly
+  ("EVERY STATEMENT IS `ON CONFLICT DO NOTHING`, deliberately without a conflict TARGET"). The
+  intent — idempotent re-runs of `migrate deploy` — is right; the implementation is wider than the
+  intent. Without a target it swallows a violation of *any* unique constraint, not just `code`.
+  **Observed, not theorised:** on a long-lived local database a leftover test fixture held
+  `level.rank = 3`, so the `L3` insert collided on `level_rank_key` and vanished. The database then
+  had five levels and no `L3`, with no error anywhere. That matters because the migration's own
+  header calls these rows load-bearing — "until these exist, no employee, no import, and no seed can
+  be written at all" — so a silently missing level means no employee can ever be created at it.
+  **Aggravating factor: it is not self-healing.** Once the migration is recorded applied,
+  `migrate deploy` reports "No pending migrations to apply" and never retries the dropped row; L3
+  had to be re-inserted by hand. **Re-entry:** a corrective migration that either narrows each
+  statement to `ON CONFLICT (code) DO NOTHING` (so a rank collision *raises*, which is what you
+  want — it means something is genuinely wrong) or asserts the expected cardinalities (8/8/25/6)
+  and raises if short. Production was verified intact (`L1..M2` = ranks 1–6) before this was
+  deferred.
+
+- **`tests/integration/reference-data.test.ts` asserts on global table state via an unenforced
+  convention.** The `seeds six levels…` case scopes itself by `WHERE rank <= 6` and justifies it in
+  a comment: *"every test fixture rank in the repo is >= 1_000, so this IS the exact global set."*
+  Nothing enforces that; it is a convention held in a comment, in a suite whose own deferred-work
+  entry says fixtures accumulate unbounded. It passes on CI's fresh Postgres and fails on any
+  long-lived database — the exact order-dependent confound 1-3's review created
+  `tests/integration/client.test.ts` to eliminate. **Re-entry:** scope the assertion to the seeded
+  codes (`WHERE code = ANY(...)`) so it stops depending on what else is in the table, or enforce the
+  rank band with a CHECK.
+
+- ~~**Integration fixtures accumulate on the `production` Neon branch.**~~ **RESOLVED 2026-07-19.**
+  The predicted failure had happened: `.env`'s `DATABASE_URL` pointed at the Neon **production**
+  branch, so every `npm run test:integration` — including every session of the loop run — planted
+  fixtures there. Found 25 fixture sets across `role`/`level`/`country`/`currency`, 25 `employee`
+  rows, and **38 `salary_record` rows that no application path could remove**, since append-only is
+  working exactly as designed. Cleaned by `TRUNCATE salary_record, employee CASCADE` as owner plus
+  targeted deletes of non-seeded reference codes; `TRUNCATE` was required precisely because it is
+  the one statement that bypasses the row-level `AP001` trigger (the escape hatch already noted
+  below). Production verified back to 8/8/25/6 reference rows and zero data rows. `.env` now points
+  at the Docker Postgres on 55432 as `.env.example` always documented, with the previous values kept
+  in the git-ignored `.env.neon.bak`. **Re-entry:** the underlying hazard is unchanged — nothing
+  *prevents* `.env` from being pointed at a deployed branch. A guard in the integration setup that
+  refuses to run against a host containing `neon.tech` would make it mechanical rather than a
+  convention.
+
 ## Deferred from: code review of 1-2-ci-pipeline-and-gates (2026-07-18)
 
 - `ui → application` "types only" is stated in the ESLint zone message (`eslint.config.mjs`, ui zone) but not mechanically enforced — value imports from `application` into `ui` pass lint. Deferred because the `ui` layer is empty until Story 1-6; when the first component lands, add a type-only carve-out (e.g., a stricter zone plus `@typescript-eslint/consistent-type-imports`, or an importKind-aware boundary rule) so the convention becomes a gate.
