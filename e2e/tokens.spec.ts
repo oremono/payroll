@@ -212,6 +212,33 @@ test.describe('Tailwind utilities resolve to the generated tokens', () => {
     expect(await computed(page, 'body', 'background-color')).toBe('rgb(15, 23, 42)');
   });
 
+  // DESIGN.md § Components → Inputs: "1px {colors.input-border} border, {rounded.DEFAULT}; focus
+  // ring shifts border to {colors.primary}; no shadows." The border-color half of that was simply
+  // absent — the input kept `input-border` when focused, so the one visual signal DESIGN specifies
+  // for "this is where your keystrokes are going" never fired on the product's first form control.
+  test('an input shifts its BORDER to the primary token on focus, per DESIGN § Inputs', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: /change as-of date$/ }).click();
+
+    const input = page.getByRole('textbox', { name: 'As-of date' });
+    await expect(input).toBeFocused();
+
+    // #1e293b — --color-primary, as the browser canonicalises it.
+    expect(await computed(page, '#as-of-date', 'border-top-color')).toBe('rgb(30, 41, 59)');
+  });
+
+  test('and returns to the input-border token when focus leaves it', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: /change as-of date$/ }).click();
+    await page.getByRole('button', { name: 'Apply' }).focus();
+
+    // #8494a9 — --color-input-border. The resting state is the CONTROL: without it, a border that
+    // had been primary all along would satisfy the assertion above while shifting nothing.
+    expect(await computed(page, '#as-of-date', 'border-top-color')).toBe('rgb(132, 148, 169)');
+  });
+
   test('declares `color-scheme: light dark`, so the UA paints its own surfaces to match', async ({
     page,
   }) => {

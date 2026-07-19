@@ -275,7 +275,14 @@ export function AsOfControl({ today }: { today: PlainDate }) {
               max={todayIso}
               aria-describedby="as-of-help"
               onChange={(event) => setDraft(event.target.value)}
-              className="mt-1 block rounded border border-input-border bg-surface-card px-3 py-2 font-mono text-number-sm text-ink"
+              // DESIGN.md § Components → Inputs: "1px {colors.input-border} border,
+              // {rounded.DEFAULT}; focus ring shifts border to {colors.primary}; no shadows." The
+              // shift is the whole focus treatment DESIGN specifies for a form control, and it was
+              // missing — the border stayed `input-border` when focused, so the product's first
+              // form control had nothing but the UA ring to say where keystrokes were going. Both
+              // colors are token utilities; no `dark:` variant is needed, because both names
+              // re-point themselves under `prefers-color-scheme`. (Code review 2026-07-19.)
+              className="mt-1 block rounded border border-input-border bg-surface-card px-3 py-2 font-mono text-number-sm text-ink focus:border-primary"
             />
             <p id="as-of-help" className="mt-1 text-body-sm text-ink-muted">
               Enter to apply · Esc to cancel
