@@ -1,5 +1,34 @@
 # Deferred Work
 
+## Deferred from: loop operation — squashed stories lose the red/green artifact (2026-07-19)
+
+- **A cleanly-completed `bmad-loop` run squashes the whole story into ONE commit, which erases the
+  red-before-green artifact the standing practice requires.** Verified across the loop-completed
+  stories: `1-4` (`45e745c`), `1-5` (`acb8527`) and `3-1` (`63a5041`) are each a single
+  "implemented and reviewed via bmad-loop" commit carrying tests and implementation together, so no
+  commit holds the assertions without the code that satisfies them.
+
+  This is exactly what the practice adopted after 1-3's code review exists to prevent — it was
+  ratified *because* a Dev Agent Record narrative was judged "the author's own uncorroborated
+  account", and it states it "applies from Story 1-7 onward". The gate suites do not catch it:
+  every one of those three stories is 100% coverage, 100% mutation, and green on all four required
+  checks. Only reading the history reveals it.
+
+  The inversion is worth stating plainly: the stories that KEEP the artifact are the ones that went
+  **wrong** — `1-6` (30 commits), `2-1` (15), `2-2` (6) — because their raw per-step commits
+  survived a timeout escalation and were recovered by hand. The runs that went right are the ones
+  that lost it. So the evidence quality of a story is currently inverse to how smoothly it was
+  produced.
+
+  Not a code defect, and no rework of shipped stories is implied. It matters because the Incubyte
+  assessment reads commit history, and because TDD ordering is a Law (Law 1) whose only durable
+  evidence is the commit sequence.
+
+  **Re-entry:** check whether the loop's squash is configurable (a `[scm]` policy key, or preserving
+  the dev session's own commits as it already does on the escalation path — that path demonstrably
+  keeps them). Failing that, decide deliberately whether the squash is an acceptable trade and
+  record the ruling, so the practice and the pipeline stop disagreeing.
+
 ## Deferred from: loop operation (2026-07-19)
 
 - **Two stories shipped without an independent review pass.** `1-6-app-shell-and-as-of-control` and
