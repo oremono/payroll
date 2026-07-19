@@ -126,13 +126,35 @@ test.describe('Tailwind utilities resolve to the generated tokens', () => {
     expect(await computed(page, 'main p', 'border-radius')).toBe('4px');
   });
 
+  test('a NAMED spacing utility resolves its own token', async ({ page }) => {
+    await page.goto('/');
+
+    // Retargeted in story 1-6: the shell moved `main` from `p-3` to `p-container-margin`, which is
+    // DESIGN's ratified 24px container margin ("fluid data workspace with 24px margins"). It is a
+    // strictly stronger assertion than the one it replaces — `p-3` only proved the numeric scale
+    // computes off the bare `--spacing`, while this proves a NAMED `--spacing-*` token reaches a
+    // utility as well. The bare-`--spacing` claim is kept below, on an element that still uses it.
+    expect(await computed(page, 'main', 'padding-top')).toBe('24px');
+    expect(await computed(page, 'main', 'padding-left')).toBe('24px');
+  });
+
   test('a numeric spacing utility computes off the bare `--spacing`', async ({ page }) => {
     await page.goto('/');
 
     // p-3 == 3 x --spacing (4px). If `spacing.unit` had not become the bare `--spacing`, the whole
     // numeric scale would resolve to nothing.
-    expect(await computed(page, 'main', 'padding-top')).toBe('12px');
-    expect(await computed(page, 'main', 'padding-left')).toBe('12px');
+    expect(await computed(page, 'main p', 'padding-top')).toBe('12px');
+    expect(await computed(page, 'main p', 'padding-left')).toBe('12px');
+  });
+
+  test('the sidebar width computes off the bare `--spacing` too — 64 x 4px', async ({ page }) => {
+    await page.goto('/');
+
+    // DESIGN § Layout & Spacing: "fixed 256px side nav". `w-64` is not a magic number, it is 64
+    // steps of the generated scale — which is why the sidebar and the `pl-64` that clears it can
+    // never drift apart.
+    expect(await computed(page, 'nav', 'width')).toBe('256px');
+    expect(await computed(page, 'header', 'height')).toBe('64px');
   });
 
   test('`text-body-md` carries the type scale AND its paired line height', async ({ page }) => {
@@ -157,11 +179,46 @@ test.describe('Tailwind utilities resolve to the generated tokens', () => {
 
     // Eight typography styles collapse to two families; both halves of that lift are asserted, so
     // a renamed or dropped face fails here and not only in the unit suite.
-    expect((await computed(page, 'main data', 'font-family')).toLowerCase()).toContain(
+    //
+    // Retargeted in story 1-6 to the header's as-of `<time>`. The shell replaced 1-5's placeholder
+    // `<data>` element, and the as-of date is the product's first REAL data numeral — DESIGN binds
+    // every numeral, "dates in data positions" included, to the mono face, so this is now the
+    // assertion standing behind "a proportional numeral in a data surface is a defect".
+    expect((await computed(page, 'header time', 'font-family')).toLowerCase()).toContain(
       'jetbrains mono',
     );
     expect((await computed(page, 'main p', 'font-family')).toLowerCase()).toContain(
       'hanken grotesk',
     );
+  });
+
+  // Story 1-6. Until the shell landed, nothing painted the page canvas: `tokens.generated.css`
+  // re-pointed every --color-* under prefers-color-scheme, but the surface BEHIND the app was never
+  // one of them, so OS dark mode rendered a dark island inside a UA-white page. Every assertion
+  // above reads a styled element and would have stayed green throughout — which is exactly why the
+  // 1-5 follow-up review recorded it and why the canvas needs an assertion of its own.
+  test('the page CANVAS carries the surface token, not the UA default', async ({ page }) => {
+    await page.goto('/');
+
+    expect(await computed(page, 'body', 'background-color')).toBe('rgb(248, 250, 252)');
+  });
+
+  test('the page canvas REPAINTS under an emulated dark color scheme', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/');
+
+    // #0f172a — surface-base-dark. If this were still white, the app would be a dark panel floating
+    // on a white page at every viewport taller than its content.
+    expect(await computed(page, 'body', 'background-color')).toBe('rgb(15, 23, 42)');
+  });
+
+  test('declares `color-scheme: light dark`, so the UA paints its own surfaces to match', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    // Not decoration: this is what makes scrollbars, focus rings, and the NATIVE DATE PICKER inside
+    // the as-of control render dark rather than light-on-dark.
+    expect(await computed(page, ':root', 'color-scheme')).toBe('light dark');
   });
 });
