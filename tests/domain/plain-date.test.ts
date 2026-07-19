@@ -112,6 +112,12 @@ describe('parsePlainDate', () => {
     ['trailing whitespace', '2026-07-16 '],
     ['a prefix before the date', 'x2026-07-16'],
     ['a suffix after the date', '2026-07-16x'],
+    // Both anchors, proven independently. `x2026-07-16` alone does NOT prove `^` is load-bearing:
+    // drop the anchor and the parser still returns null, because the slices then land on garbage.
+    // A date concatenated with a second date is the case that separates them — unanchored at the
+    // start, the pattern matches the TAIL while the slices read the perfectly valid HEAD, and a
+    // 20-character string parses as 16 Jul 2026.
+    ['a date with a second date appended', '2026-07-162026-07-16'],
     ['letters in the year', 'abcd-07-16'],
     ['letters in the month', '2026-ab-16'],
     ['letters in the day', '2026-07-ab'],
