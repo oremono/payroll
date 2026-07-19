@@ -60,9 +60,10 @@ import {
  *
  * BOTH routes, not just the directory: `/employees/{id}` is rendered from `getEmployee`, so an edit
  * that invalidated only the list would leave the detail page serving the pre-edit name — a page
- * contradicting the list it was reached from. Story 4-2 renders the salary timeline into that same
- * detail route, which is why CAP-2 and CAP-3 must invalidate the SAME set: two lists would mean the
- * next route added here is added to one of them, and the other path silently serves a stale page.
+ * contradicting the list it was reached from. Story 4-2 puts CAP-3's record-change trigger on that
+ * same detail route — the salary TIMELINE is CAP-4 (Epic 5) and no surface displays a salary yet —
+ * which is why CAP-2 and CAP-3 must invalidate the SAME set: two lists would mean the next route
+ * added here is added to one of them, and the other path silently serves a stale page.
  *
  * The handlers call this only after a write that COMMITTED, and only with an id the repository
  * matched to a row, so the interpolated segment is a UUID by then.

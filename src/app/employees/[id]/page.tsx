@@ -1,12 +1,16 @@
 import { notFound } from 'next/navigation';
+import { connection } from 'next/server';
 
+import { systemClock } from '@/adapters/clock';
 import { getEmployee, loadEmployeeFormOptions } from '@/application/use-cases/employees';
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { currencyLineFor, EMPLOYEE_FORM_FIELDS } from '@/ui/employee-form';
 import { EmployeeFormPanel } from '@/ui/employee-form-panel';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { salaryChangeAvailability } from '@/ui/salary-change-form';
+import { SalaryChangePanel } from '@/ui/salary-change-panel';
 
-import { updateEmployeeAction } from '../actions';
+import { recordSalaryChangeAction, updateEmployeeAction } from '../actions';
 import { employeeReadDeps } from '../employee-deps';
 
 /**
@@ -19,10 +23,17 @@ import { employeeReadDeps } from '../employee-deps';
  * Epic 3 assigns "row-to-detail navigation" here, and `reconcile-stitch.md` puts the `Edit employee`
  * control on the detail screen.
  *
- * So it is a thin identity page and nothing more. NO current salary — the AD-8 resolver does not
- * exist yet and belongs to CAP-3/CAP-4. No salary timeline (DR9 → Epic 5), no peer comparison
- * (Epic 6), no record-a-change entry point (Epic 4). Epic 5 will add content to an existing page
- * rather than inventing one.
+ * So it is a thin identity page plus CAP-3's entry point, and nothing more. NO current salary — the
+ * AD-8 resolver belongs to CAP-4. No salary timeline (DR9 → Epic 5), no percent-change chip, no
+ * `(Hire)` label, no peer comparison (Epic 6). Story 4-2 adds the record-a-change TRIGGER named in
+ * the docstring's original hole and nothing else; Epic 5 adds the surface that displays a salary.
+ *
+ * ## `today`, read once, here
+ *
+ * `await connection()` then `systemClock.todayUtc()` — the `src/app/layout.tsx` pattern exactly.
+ * Without `connection()` Next would evaluate the clock at BUILD time and bake the build date in as
+ * "today". The resulting `PlainDate` travels inward as a prop; no `Date` exists in `src/ui`,
+ * `src/domain` or `src/application` (Law 6 / AD-11).
  *
  * ## The three arms, and why two of them are different answers
  *
@@ -42,6 +53,9 @@ export default async function EmployeeDetailPage({
   readonly params: Promise<{ readonly id: string }>;
 }) {
   const { id } = await params;
+  // The clock port is the ONLY source of "now", read at the delivery boundary and passed inward.
+  await connection();
+  const today = systemClock.todayUtc();
   const deps = employeeReadDeps();
 
   // The id comes from a URL segment a person can hand-edit. That is ordinary input, not an
@@ -68,6 +82,17 @@ export default async function EmployeeDetailPage({
   const currencyLine =
     options.kind === 'options' ? currencyLineFor(options.options, employee.countryCode) : null;
 
+  // Whether CAP-3's form can be offered at all. Withheld — with an explanatory statement in place of
+  // the control — when the employee's currency cannot be resolved to a format, and when their hire
+  // date is later than today, because every effective date such a form could submit would be
+  // refused (deferred #3). The decision is in the pure module; this reads its answer.
+  const salaryChange = salaryChangeAvailability(
+    options.kind === 'options' ? options.options : null,
+    employee.countryCode,
+    employee.hireDate,
+    today,
+  );
+
   return (
     <section
       aria-labelledby="employee-detail-heading"
@@ -80,18 +105,35 @@ export default async function EmployeeDetailPage({
           {employee.name}
         </h2>
 
-        {options.kind === 'options' ? (
-          <EmployeeFormPanel
-            mode={{ kind: 'edit', employee, action: updateEmployeeAction }}
-            options={options.options}
-          />
-        ) : (
-          // No Edit button when the reference tables cannot be read: the form's selects would have
-          // nothing to offer, and an empty select is worse than an absent control.
-          <p className="text-body-sm text-ink-muted">
-            The reference tables could not be read, so this employee cannot be edited right now.
-          </p>
-        )}
+        <div className="flex flex-wrap items-start gap-3">
+          {options.kind === 'options' ? (
+            <EmployeeFormPanel
+              mode={{ kind: 'edit', employee, action: updateEmployeeAction }}
+              options={options.options}
+            />
+          ) : (
+            // No Edit button when the reference tables cannot be read: the form's selects would
+            // have nothing to offer, and an empty select is worse than an absent control.
+            <p className="text-body-sm text-ink-muted">
+              The reference tables could not be read, so this employee cannot be edited right now.
+            </p>
+          )}
+
+          {salaryChange.kind === 'available' ? (
+            // The Server Action arrives from HERE, the composition root — `src/ui` may not import
+            // `@/app/*`.
+            <SalaryChangePanel
+              employeeId={employee.id}
+              currency={salaryChange.currency}
+              today={today}
+              action={recordSalaryChangeAction}
+            />
+          ) : (
+            // Mirrors the arm above: an absent control with a statement beside it, rather than a
+            // control that cannot work.
+            <p className="text-body-sm text-ink-muted">{salaryChange.statement}</p>
+          )}
+        </div>
       </div>
 
       {/* A description list, not a table: this is one subject's attributes, and `<dt>`/`<dd>` is

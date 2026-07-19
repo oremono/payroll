@@ -74,15 +74,7 @@ export function formatMoney(money: Money, format: CurrencyFormat): string | null
   if (money.currency !== format.code) {
     return null;
   }
-  // `minorUnitExponent` is typed `number`, so a fractional, NaN, or Infinite value is reachable
-  // from a bad cast or a JSON round-trip — and `BigInt(2.5)` THROWS, which would break this
-  // module's central promise that a failure is a `null` return. The upper bound is not decoration
-  // either: `10n ** BigInt(1e6)` computes a million-digit number and would hang the request.
-  if (
-    !Number.isInteger(format.minorUnitExponent) ||
-    format.minorUnitExponent < 0 ||
-    format.minorUnitExponent > MAX_MINOR_UNIT_EXPONENT
-  ) {
+  if (!isSupportedExponent(format.minorUnitExponent)) {
     return null;
   }
 
@@ -98,6 +90,150 @@ export function formatMoney(money: Money, format: CurrencyFormat): string | null
   const sign = negative ? '-' : '';
 
   return `${sign}${format.symbol}${groupMajor(major.toString(), format.groupingStyle)}${fraction} ${format.code}`;
+}
+
+/**
+ * Whether a minor-unit exponent can be USED at all — shared by the formatter, the parser, and the
+ * delivery boundary that resolves a currency format, so none of the three can disagree about which
+ * currencies they are able to handle.
+ *
+ * EXPORTED for that third caller. A boundary that resolved a `CurrencyFormat` by PRESENCE alone
+ * would offer a form whose every submission the parser then answers `'unsupported-exponent'` to —
+ * a form that cannot be satisfied, which is exactly what the withholding arm exists to avoid.
+ *
+ * `minorUnitExponent` is typed `number`, so a fractional, NaN, or Infinite value is reachable from
+ * a bad cast or a JSON round-trip — and `BigInt(2.5)` THROWS, which would break this module's
+ * central promise that a failure is a returned value rather than an exception. The upper bound is
+ * not decoration either: `10n ** BigInt(1e6)` computes a million-digit number and would hang the
+ * request.
+ */
+export function isSupportedExponent(exponent: number): boolean {
+  return (
+    Number.isInteger(exponent) && exponent >= 0 && exponent <= MAX_MINOR_UNIT_EXPONENT
+  );
+}
+
+/**
+ * Why a major-unit amount could not be converted.
+ *
+ * `'too-precise'` is held apart from `'malformed'` because the two are different facts about the
+ * person's typing and want different copy: `25000.005` is a perfectly well-formed amount that this
+ * currency cannot hold, and rounding it away would alter someone's money under them.
+ */
+export type MajorAmountParseFailure = 'malformed' | 'too-precise' | 'unsupported-exponent';
+
+/** The result of converting typed major units into the boundary's minor-unit decimal string. */
+export type MajorAmountParse =
+  | { readonly ok: true; readonly amountMinor: string }
+  | { readonly ok: false; readonly reason: MajorAmountParseFailure };
+
+/**
+ * Digits, optional `,` separators BETWEEN digit groups, and an optional fraction — anchored.
+ *
+ * Anchored on both ends, and that is doing real work in both directions: without `^`, `-1` matches
+ * at index 1 and a negative amount converts to a positive one; without `$`, `1.2.3` matches its
+ * `1.2` prefix and a typo becomes a plausible salary.
+ *
+ * Separators are permitted between groups but their SIZE is not enforced. `21,50,000` and
+ * `2,150,000` are the same number under two grouping styles, and a parser that also judged the
+ * style would refuse an Indian amount typed the western way — a judgement about presentation, in a
+ * function whose whole job is conversion. `1,,0`, `,100` and `100,` are still rejected, because
+ * those are not groupings of anything.
+ *
+ * No sign, and that is not a positivity judgement: the sign is simply not part of the grammar a
+ * salary form accepts. `0` parses (and `checkSalaryAmount` refuses it) — the one rule this function
+ * would be a second copy of if it decided that itself.
+ */
+const MAJOR_AMOUNT_PATTERN = /^\d+(?:,\d+)*(?:\.\d+)?$/;
+
+/**
+ * Zeros at the END of a fraction, which carry no precision at all.
+ *
+ * `25000.500` at exponent 2 is EXACTLY 2500050 minor units, and refusing it as `'too-precise'`
+ * told someone their perfectly representable amount was "more precise than INR records" — a false
+ * sentence about a true amount, on the one input this form is entirely about.
+ *
+ * ANCHORED AT THE END, and only there: `25000.105` is genuinely over-precise and its internal zero
+ * is a significant digit, so it must still be refused.
+ */
+const TRAILING_ZEROS = /0+$/;
+
+/**
+ * The longest amount this parser will look at, in characters, measured after trimming.
+ *
+ * Bounded for the same reason `normalizeSearchTerm` bounds its term and the grouping loop was made
+ * iterative: the length is CALLER-CONTROLLED, and an unbounded one is an unbounded amount of work.
+ * A 3,000,000-digit string measured 1881ms inside this function — blocking the tab that typed it,
+ * and then the server that was handed the same string.
+ *
+ * 64 is generous by a wide margin rather than tuned. `MAX_AMOUNT_MINOR` is 9223372036854775807 —
+ * nineteen digits — so the largest amount this system can store is nineteen major digits at
+ * exponent 0, and even written with Indian grouping separators and a four-digit fraction that is
+ * about thirty-four characters. Anything past 64 is not a salary anybody typed.
+ *
+ * Refused as `'malformed'` rather than as its own reason: it is not a statement about precision or
+ * about the currency, and the form already words a malformed amount honestly.
+ */
+export const MAX_MAJOR_AMOUNT_LENGTH = 64;
+
+/**
+ * Convert an amount typed in MAJOR units into the minor-unit decimal string the boundary carries —
+ * the inverse of `formatMoney`, and never a second money parser. (Law 4 / AD-4)
+ *
+ * `exponent` is the currency's own `minorUnitExponent`, resolved from the reference table at the
+ * delivery boundary and handed in. It is NEVER a hard-coded 100: JPY is exponent 0, so `2500.50`
+ * yen has no representation and is refused rather than rounded to `2500`.
+ *
+ * Exact throughout — string slicing and `BigInt`, no IEEE double anywhere. `21,50,000` at exponent
+ * 2 becomes `'215000000'` by appending two zeros to the digits, not by multiplying a float by 100.
+ *
+ * Total: every input answers with a value.
+ */
+export function parseMajorAmount(text: string, exponent: number): MajorAmountParse {
+  // Checked FIRST, so a caller holding an unreadable currency format is told which of the two
+  // things is actually wrong rather than being told their perfectly good typing is malformed.
+  if (!isSupportedExponent(exponent)) {
+    return { ok: false, reason: 'unsupported-exponent' };
+  }
+
+  const trimmed = text.trim();
+  // Length BEFORE the pattern, because the pattern is the expensive half: a hostile or accidental
+  // paste is refused in constant time rather than being scanned first.
+  if (trimmed.length > MAX_MAJOR_AMOUNT_LENGTH) {
+    return { ok: false, reason: 'malformed' };
+  }
+  if (!MAJOR_AMOUNT_PATTERN.test(trimmed)) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  // Split at the point rather than reading capture groups: an optional group is `string |
+  // undefined` under `noUncheckedIndexedAccess`, and the `?? ''` that would appease it is a branch
+  // no input can reach — uncoverable in a module held to 100%, and a guaranteed surviving mutant.
+  // The pattern has already established there is at most one point and digits on both sides of it.
+  const pointIndex = trimmed.indexOf('.');
+  const hasFraction = pointIndex !== -1;
+  const majorDigits = (hasFraction ? trimmed.slice(0, pointIndex) : trimmed).replaceAll(',', '');
+  const fractionDigits = hasFraction ? trimmed.slice(pointIndex + 1) : '';
+
+  // Trailing zeros are dropped BEFORE precision is judged, and the significant remainder is what is
+  // scaled below. They carry no precision — `25000.500` at exponent 2 is exactly 2500050 minor
+  // units — so measuring them would refuse an amount this currency holds perfectly, with a sentence
+  // claiming it was too precise. `25000.005` is untouched by this and is still refused.
+  const significantFraction = fractionDigits.replace(TRAILING_ZEROS, '');
+
+  if (significantFraction.length > exponent) {
+    // More precision than the currency has. Never truncated: the money someone typed is not
+    // altered under them (the matrix calls this out for `25000.005` and for JPY alike).
+    return { ok: false, reason: 'too-precise' };
+  }
+
+  // Append the fraction, zero-PADDED ON THE RIGHT to the exponent — `.5` at exponent 2 is 50 minor
+  // units, not 5. This concatenation IS the multiplication, done in base 10 on digits.
+  const minorDigits = majorDigits + significantFraction.padEnd(exponent, '0');
+
+  // Through `BigInt` so the answer is the canonical decimal string `fromBoundaryMoney` demands:
+  // `007` typed at exponent 2 is `'700'`, never `'00700'`, which that parser would refuse.
+  return { ok: true, amountMinor: BigInt(minorDigits).toString() };
 }
 
 /** Serialize money for a JSON / Server-Action boundary (AD-4). Total — every value serializes. */

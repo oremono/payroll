@@ -158,7 +158,7 @@ function roleFor(name: string, index: number): string {
  * Exactly ONE employee sits on the retired country, so the "no currency line for an inactive
  * country" branch is reachable while every other detail page shows one.
  */
-function countryFor(name: string, index: number): string {
+export function countryFor(name: string, index: number): string {
   if (name === 'Beatriz Gomez') {
     return INACTIVE_COUNTRY.code;
   }
