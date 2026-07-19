@@ -18,6 +18,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Node 24 runs `scripts/**` DIRECTLY via native type-stripping, and Node's ESM loader needs a
+    // full specifier — so those modules import each other as `./to-css.ts`. Safe under `noEmit`:
+    // nothing is ever written, so no emitted specifier can point at a non-existent `.ts` file.
+    "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "incremental": true,
     "plugins": [

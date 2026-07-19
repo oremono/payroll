@@ -1,8 +1,25 @@
 /*
  * Global stylesheet — Tailwind CSS v4 pipeline.
  *
- * The theme is intentionally EMPTY in Story 1-1: no `@theme` block, no color tokens, no hex
- * literals. Real design tokens are generated from DESIGN.md frontmatter in Story 1-5 (AD-15) — do
- * not hand-author them here. This file exists so Tailwind compiles into `next build` from day one.
+ * The theme is GENERATED, never hand-authored (AD-15). `tokens.generated.css` is emitted from
+ * DESIGN.md's frontmatter by `npm run tokens:build`; CI proves it is in sync with
+ * `npm run tokens:check`. To change a color, a type style, a radius, or a spacing step, edit
+ * DESIGN.md and rebuild — a value written here is a token that has escaped the contract.
+ *
+ * No COLOR LITERAL belongs in this file, or in any stylesheet under src/ other than the generated
+ * one — hex and every CSS color function alike (rgb, rgba, hsl, hsla, hwb, lab, lch, oklab, oklch,
+ * and the color function itself). `tests/tokens/no-hex.test.ts` enforces that (ESLint does not lint
+ * CSS), and `colorLiteralBanConfig` in eslint.config.mjs covers the .ts/.tsx side. Both halves ban
+ * the same notations, so a color cannot slip across the boundary one of them cannot see.
+ *
+ * Yes, the ban applies to this comment too: it is why the function names above are spelled without
+ * their parentheses. A blanket text scan is the only kind a stylesheet admits, and a slightly
+ * awkward comment is a cheap price for a gate with no holes in it.
+ *
+ * Dark mode rides `prefers-color-scheme` inside the generated file: one token name, two values, so
+ * nothing in the app ever writes a `dark:` variant.
+ *
+ * Tailwind's own import comes first so its layers are established before the theme extends them.
  */
 @import "tailwindcss";
+@import "./tokens.generated.css";

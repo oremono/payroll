@@ -342,3 +342,100 @@ this story's problem. Recorded in the dev-auto triage format.
     exhaustiveness branch, which is unreachable under the current closed union and would therefore
     break the 100% coverage and 100% mutation-score gates this story is held to. Closing it properly
     means generating `GroupingStyle` from the Prisma enum, or relaxing the gate for a `never` guard.
+
+## Deferred from: 1-5-design-token-build (2026-07-19)
+
+Named by the story's own Design Notes as items to **record rather than resolve**. `DESIGN.md` is
+read-only to this story, so none of them could have been closed here without amending the single
+source of visual truth.
+
+- **`input-border` misses DESIGN's own 3:1 floor on two of the three surfaces.** Computed from the
+  ratified frontmatter: `input-border` on `surface-card` is **3.09:1** (passes), but on
+  `surface-base` it is **2.96:1** and on `surface-tint` **2.82:1** — both below the ≥ 3:1
+  non-text floor DESIGN.md § Contrast floor states for input borders. This is a defect in the source
+  document, not in the generator. `tests/tokens/contrast.test.ts` therefore gates **only** the pair
+  that actually occurs (forms sit on `surface-card`), because gating the other two would block the
+  story on a token it may not change — but the token is one shade too light the moment a form is
+  placed on `surface-base` or a tinted section. Dark mode has no such problem (`input-border-dark`
+  on `surface-card-dark` is 4.74:1). **Re-entry:** the first story that puts an input on
+  `surface-base` or `surface-tint` — realistically 1-6's shell or the CAP-2 employee form. The fix
+  is a darker `input-border` in DESIGN.md and a rebuild; if the two pairs are instead ruled
+  acceptable, the ruling belongs in DESIGN.md § Contrast floor, which currently claims otherwise.
+- **The dark token set is still flagged provisional, and nothing here can clear it.** DESIGN.md
+  § Dark mode records `[ASSUMPTION]`: the 17 `*-dark` values are one agent's conservative derivation
+  by inversion, never mocked and never verified against a real render. This story proves they meet
+  the contrast floor **by computation** — which is exactly what DESIGN already claimed and is a
+  strictly weaker statement than "they look right". The generator now ships them to every
+  environment, so the provisional set is live in production the moment 1-6 renders anything.
+  **Re-entry:** whoever first views a real dark render (1-6's app shell is the earliest surface) —
+  DESIGN.md says the flag comes off only after verification against real renders, and the values
+  change in DESIGN.md followed by `npm run tokens:build`, never in the generated file.
+- **shadcn/ui copy-in in 1-6 is where AD-15 is most likely to be violated.** shadcn primitives ship
+  their own CSS variables (`--background`, `--foreground`, `--primary`, `--border`, `--ring`, …)
+  with hard-coded values in their own `:root` block, plus a `.dark` class block — all three of which
+  contradict the contract landed here: values that are not from DESIGN.md, a second set of names for
+  colors that already have tokens, and a class-based dark hook where only `prefers-color-scheme` is
+  ratified. `npx shadcn add` writes them without asking. **Re-entry: story 1-6, at copy-in.** They
+  must be **re-pointed** at the generated tokens (`--primary: var(--color-primary)`), never added
+  alongside them, and the `.dark` block dropped. The ESLint hex ban catches a hex literal in a
+  `.tsx` primitive but **not** one written into a `.css` file — `tests/tokens/no-hex.test.ts` is
+  what catches that, and it is worth re-reading before the copy-in rather than after.
+
+Also surfaced while landing the story, outside the Design Notes:
+
+- **The `--font-sans` / `--font-mono` tokens are emitted, but no webfont is loaded.** Loading Hanken
+  Grotesk and JetBrains Mono (`next/font`) is explicitly 1-6's shell work and out of scope here, so
+  today the fallback stacks in the generated file are what actually renders. That is a real visual
+  gap, not merely a deferred nicety: DESIGN's binding rule is that ALL numerals are monospaced, and
+  a fallback `ui-monospace` satisfies the monospacing but not the identity. **Re-entry:** story 1-6.
+- **The mono/proportional split is decided by a regex on the family name.** `liftFontFamilies`
+  classifies a family as monospaced by `/mono/i`. It is guarded on both sides — exactly one family
+  must land in each bucket, so a third face or a rename fails the build by name — but a mono face
+  that does not carry "mono" in its name (Iosevka, Fira Code, Courier) would be misfiled as
+  `--font-sans` and fail with a confusing message. The frontmatter carries no other signal.
+  **Re-entry:** if DESIGN.md ever changes either face, add an explicit `role: mono` key to the
+  typography block rather than widening the regex.
+
+## Deferred from: code review of 1-5-design-token-build (2026-07-19)
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: Border tokens that form the visual boundary of interactive controls are excluded from the contrast gate, at ratios far below WCAG 2.2 SC 1.4.11's 3:1.
+  evidence: `tests/tokens/contrast.test.ts` excludes `border-hairline`/`border-strong` as "decorative rules and table dividers", but DESIGN.md's own `components:` block makes them control boundaries — `button-secondary.border` is `1px solid {colors.border-hairline}` (measured **1.18:1** on `surface-base`, **1.23:1** on `surface-card`), `preset-chip.border` is `border-strong`, and `outlier-badge.border` is `amber-badge-border` (**1.11:1** on `surface-card`). Same class as the recorded `input-border` item, and neither gated nor previously recorded. DESIGN.md is read-only to this story, so it could not be closed here. **Re-entry:** story 1-6, which renders the first real button and badge.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: `refusal-fill` is a fourth surface that the contrast gate never checks, and it passes today only by coincidence.
+  evidence: `components.refusal-panel` sets `background: {colors.refusal-fill}` with `foreground: {colors.ink-muted}`, but `SURFACES` in `tests/tokens/contrast.test.ts` is only base/card/tint. It is numerically safe purely because `refusal-fill` and `surface-tint` happen to hold identical values in both modes — nothing asserts that, so a future DESIGN.md change to `refusal-fill` alone would ship an ungated refusal panel. Refusals are a first-class product surface (AD-20), not an edge case. **Re-entry:** the first story that renders a refusal (CAP-5, story 6-2), or sooner if DESIGN.md touches `refusal-fill`.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: The contrast gate enumerates the tokens it checks, so a color added to DESIGN.md is silently never contrast-checked.
+  evidence: `TEXT_INKS` and `SURFACES` are hard-coded lists. Adding a new ink or surface to DESIGN.md rebuilds the theme, passes `tokens:check`, and ships — with no contrast assertion ever written for it and no failure to prompt one. DESIGN § Contrast floor commits that "Any future token change must re-verify the matrix", which an enumerated list cannot honor. **Re-entry:** add a completeness assertion (every non-`-dark` color is either gated or explicitly excluded by name) — cheap now, and it is what makes the other two entries above self-reporting rather than dependent on a reviewer noticing.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: `~550` lines of generator logic sit outside the coverage floor and the mutation gate that the rest of the repo is held to.
+  evidence: `vitest.config.ts` coverage `include` is `src/domain/**` + `src/application/**` and stryker `mutate` is domain-only, so `scripts/design-tokens/**` carries neither — while deciding what colors the entire product renders and whether the accessibility claim holds. The story deliberately did not move those gates (correctly: they are domain-purity gates). The review found three real validation holes in exactly this uncovered code, all now closed with direct tests, but the *gate* asymmetry remains. **Re-entry:** consider a separate coverage project for `scripts/**` with its own floor, rather than widening the domain gate.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: `allowImportingTsExtensions` was enabled repo-wide to serve a `scripts/`-only need.
+  evidence: `tsconfig.json` `include` is `**/*.ts`, so `src/**` and `tests/**` may now write `import … from './money.ts'` and typecheck clean, while Next's bundler resolves such specifiers differently — the gate that would have caught a bad specifier no longer does. The setting is needed only because Node's ESM loader requires full specifiers when type-stripping `scripts/**` in place. **Re-entry:** scope it with a `scripts/tsconfig.json` extending the root, and drop it from the root config.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: No `.gitattributes` pins the generated stylesheet to LF, so a CRLF checkout would fail the drift gate permanently with zero real drift.
+  evidence: `tokens:check` compares the committed file byte-for-byte against freshly generated output, which always uses `\n`. On a platform or clone where git normalizes checkout to CRLF, every run fails and no rebuild can fix it — the failure message would send the reader to `npm run tokens:build`, which regenerates an identical-but-LF file. No Windows developer is in play today. **Re-entry:** add `*.css text eol=lf` (or `-text`) to `.gitattributes` before anyone clones on Windows.
+
+## Deferred from: follow-up code review of 1-5-design-token-build (2026-07-19)
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: Nothing declares `color-scheme` and nothing paints the page canvas, so dark mode renders a white body around a dark island.
+  evidence: `tokens.generated.css` re-points every `--color-*` under `prefers-color-scheme: dark`, but `:root` carries no `color-scheme: light dark` and `<body>` carries no background. With OS dark mode, `main` renders `#0f172a` while the surrounding canvas stays UA-white, and native form controls, scrollbars and focus rings render light-on-dark from the first real form onward. `e2e/tokens.spec.ts` asserts computed styles on `main` in dark mode and never observes the canvas behind it. 1-5's Never clause explicitly scopes out `body` background and layout styling, so this could not be closed here. **Re-entry:** story 1-6, which builds the app shell — add `color-scheme: light dark` and the body surface together, and extend the token e2e to assert the canvas.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: The "no component ever writes `dark:`" prohibition is stated in five places and enforced nowhere — the same unenforced-prohibition shape this story exists to fix.
+  evidence: `src/ui/README.md`, `src/app/globals.css`, `scripts/design-tokens/README.md`, `to-css.ts`'s header and the spec all state that a `dark:` variant must never appear, because there is no `-dark` token to reach for. `eslint.config.mjs` mechanizes the hex ban but not this one. Story 1-6's shadcn copy-in is the most likely violator — its primitives ship `dark:bg-*` variants by default — and lint, `tokens:check` and `no-hex` would all stay green. **Re-entry:** story 1-6, alongside the copy-in; a `Literal[value=/\bdark:/]` selector in the existing `colorLiteralBanConfig` block is roughly four lines.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: Both halves of the AD-15 color ban are scoped to `src/**`, so a stylesheet anywhere else in the repo is invisible to it.
+  evidence: `tests/tokens/no-hex.test.ts` hard-codes `SRC` and the ESLint block is scoped to `src/**`. A future `styles/print.css`, `.storybook/preview.css`, or an email template at the repo root carrying `#1e293b` passes every gate. The `src/`-only scope is a reasonable default but the READMEs describe the ban as if it were total. **Re-entry:** the first story that adds a stylesheet outside `src/` — widen both halves together, or state the scope limit in the README so it is a decision rather than an oversight.
+
+- source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
+  summary: Named CSS colors (`red`, `white`, `transparent`) escape both halves of the color ban entirely.
+  evidence: `COLOR_LITERAL` in `tests/tokens/no-hex.test.ts` and the mirrored patterns in `eslint.config.mjs` match hex and color *functions* only. `color: 'red'` or `background: white` in a component or a stylesheet under `src/` is a hard-coded color outside the token contract that neither gate can see. It is a genuinely different class from the hex ban this story mechanized, and widening it needs care — `transparent` and `currentColor` are legitimate and must stay allowed. **Re-entry:** story 1-6, when real components start writing color declarations; add a named-color alternation to both patterns with an explicit allowlist.

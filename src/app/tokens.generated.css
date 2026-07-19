@@ -1,0 +1,115 @@
+/*
+ * GENERATED FILE — DO NOT EDIT.
+ *
+ * Source:  docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/DESIGN.md (YAML frontmatter)
+ * Rebuild: npm run tokens:build
+ * Verify:  npm run tokens:check  (CI fails on drift between DESIGN.md and this file)
+ *
+ * DESIGN.md is the single source of visual truth (AD-15). To change a token, change it THERE and
+ * rebuild — an edit made here is erased by the next build and rejected by the drift gate before
+ * that. This is the only file in src/ permitted to contain a color literal; everywhere else the
+ * color ban in eslint.config.mjs and tests/tokens/no-hex.test.ts hold the line.
+ */
+
+@theme static {
+  /* Colors — LIGHT values. Every name below is re-declared in the dark block at the foot of
+     this file with its `*-dark` counterpart: one token name, two values. No component ever
+     writes a `dark:` variant. (AD-15, F-5) */
+  --color-surface-base: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-surface-tint: #f1f5f9;
+  --color-border-hairline: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-input-border: #8494a9;
+  --color-ink: #191c1e;
+  --color-ink-muted: #45474c;
+  --color-ink-faint: #5f6672;
+  --color-primary: #1e293b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #64748b;
+  --color-accent-indigo: #4f46e5;
+  --color-amber-badge-bg: #fffbeb;
+  --color-amber-badge-border: #fef3c7;
+  --color-amber-badge-text: #b45309;
+  --color-refusal-fill: #f1f5f9;
+
+  /* Type faces. DESIGN binds ALL numerals to the mono face and everything else to the
+     proportional one, so eight styles collapse to two families. The webfonts are not loaded
+     yet — that is story 1-6 — so today the fallback stacks are what renders. */
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Type scale, with the Tailwind v4 `--text-*--<property>` sub-properties. */
+  --text-headline-lg: 24px;
+  --text-headline-lg--line-height: 32px;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-md: 18px;
+  --text-headline-md--line-height: 24px;
+  --text-headline-md--font-weight: 600;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 16px;
+  --text-body-sm--font-weight: 400;
+  --text-number-lg: 24px;
+  --text-number-lg--line-height: 32px;
+  --text-number-lg--font-weight: 600;
+  --text-number-md: 14px;
+  --text-number-md--line-height: 20px;
+  --text-number-md--font-weight: 500;
+  --text-number-sm: 12px;
+  --text-number-sm--line-height: 16px;
+  --text-number-sm--font-weight: 400;
+  --text-label-caps: 11px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--font-weight: 700;
+  --text-label-caps--letter-spacing: 0.05em;
+
+  /* Radii. `DEFAULT` is the bare `--radius`, which is what the `rounded` utility reads. */
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Spacing. `unit` is the bare `--spacing`: v4 computes the numeric scale from it. */
+  --spacing: 4px;
+  --spacing-gutter: 12px;
+  --spacing-container-margin: 24px;
+  --spacing-cell-padding-v: 8px;
+  --spacing-cell-padding-h: 12px;
+}
+
+/*
+ * Dark mode is SYSTEM PREFERENCE ONLY — no manual toggle, no class hook, no attribute hook,
+ * no persistence cookie; none of those is ratified. Re-declaring the same variables re-points
+ * every Tailwind utility that reads them, which is why there is no second token and no `dark:`
+ * variant anywhere in the app.
+ *
+ * These values are flagged PROVISIONAL in DESIGN.md § Dark mode — derived by inversion, never
+ * verified against a real render. They already meet the contrast floor by computation.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface-base: #0f172a;
+    --color-surface-card: #1e293b;
+    --color-surface-tint: #334155;
+    --color-border-hairline: #334155;
+    --color-border-strong: #475569;
+    --color-input-border: #8494ab;
+    --color-ink: #e2e8f0;
+    --color-ink-muted: #b4c0d0;
+    --color-ink-faint: #a3b0c4;
+    --color-primary: #e2e8f0;
+    --color-primary-foreground: #0f172a;
+    --color-secondary: #8494ab;
+    --color-accent-indigo: #a5b4fc;
+    --color-amber-badge-bg: #422006;
+    --color-amber-badge-border: #78350f;
+    --color-amber-badge-text: #fcd34d;
+    --color-refusal-fill: #334155;
+  }
+}

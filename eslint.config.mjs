@@ -79,23 +79,146 @@ const layerBoundaryConfig = {
 };
 
 /**
+ * ## The `no-restricted-syntax` layering — READ THIS BEFORE EDITING ANY BLOCK BELOW
+ *
+ * Four config blocks in this file set `no-restricted-syntax`. Flat-config rule entries **REPLACE
+ * rather than merge**: for any given file, the LAST matching block's selector array is the only one
+ * that runs. A narrower block that forgets a selector does not weaken it — it REVOKES it, silently,
+ * for every file it matches. Ordering is therefore load-bearing, and every block must carry every
+ * selector that should still apply to the files it matches.
+ *
+ * The order, widest to narrowest:
+ *
+ *   1. randomnessBanConfig  — no `files`: every linted file. Randomness only.
+ *   2. colorLiteralBanConfig — `src/**`: randomness (re-declared) + color literals.
+ *   3. prngExemptionConfig  — `src/adapters/prng.ts`: color literals ONLY. The AD-14 exemption.
+ *   4. purityConfig         — `src/domain/**` + `src/application/**`: clock/env/randomness/import
+ *                             bans + color literals (re-declared).
+ *
+ * This is not hypothetical: the AD-14 PRNG exemption was lost exactly this way when block 2 was
+ * introduced with no `ignores` and no re-declaration accounting. `tests/tokens/eslint-config.test.ts`
+ * now pins every intersection through `ESLint.lintText` against this very file.
+ */
+
+/**
  * Repo-wide randomness ban (AD-14): `Math.random` is banned everywhere by lint — the seeded PRNG
  * port (src/adapters/prng.ts, the single exemption) is the only randomness source. This block has
- * no `files`, so it applies to every linted file. NOTE: it sits BEFORE purityConfig on purpose —
- * flat-config rule entries replace (not merge), so for the pure layers purityConfig's fuller
- * selector array (which re-includes this ban) wins, and this block covers everything else.
+ * no `files`, so it applies to every linted file, and `ignores` lifts it for the port itself.
  */
+const RANDOMNESS_BAN_SELECTOR = {
+  selector: "MemberExpression[object.name='Math'][property.name='random']",
+  message:
+    'Math.random is banned repo-wide (AD-14). Randomness comes only from the seeded PRNG port (src/adapters/prng.ts).',
+};
+
 const randomnessBanConfig = {
   ignores: ['src/adapters/prng.ts'],
   rules: {
-    'no-restricted-syntax': [
-      'error',
-      {
-        selector: "MemberExpression[object.name='Math'][property.name='random']",
-        message:
-          'Math.random is banned repo-wide (AD-14). Randomness comes only from the seeded PRNG port (src/adapters/prng.ts).',
-      },
-    ],
+    'no-restricted-syntax': ['error', RANDOMNESS_BAN_SELECTOR],
+  },
+};
+
+/**
+ * Color-literal ban (AD-15) — the enforcement half of "no color literal appears in application
+ * code".
+ *
+ * AD-1 and AD-14 both NAME lint as their gate; AD-15's prohibition had none, which made it a wish
+ * (review-rubric F). Colors come from the generated theme — `var(--color-…)`, or a Tailwind utility
+ * that compiles to one — and the theme comes from DESIGN.md's frontmatter via `npm run tokens:build`.
+ * A color literal in a component is a token that has escaped the contract, invisible to the drift
+ * gate and to the contrast gate both.
+ *
+ * ALL CSS color notations, not just hex. AD-15's subject is a color that escaped the token
+ * contract, not a color spelled in base 16, and a hex-only ban waves through the exact threat this
+ * story names as highest-risk: the shadcn/ui copy-in in story 1-6, whose Tailwind v4 templates ship
+ * **oklch**, not hex. `color-mix()` is deliberately absent — it composes existing tokens rather than
+ * naming a color, and its arguments are caught on their own if they are literals.
+ *
+ * Scoped to `src/**` on purpose: the generator, its tests, and the contrast gate under `scripts/`
+ * and `tests/` all handle color strings as DATA and must keep being able to. The counterpart ban
+ * inside `src/**\/*.css` (which ESLint structurally cannot see) is tests/tokens/no-hex.test.ts; the
+ * one sanctioned file, src/app/tokens.generated.css, is not JS/TS and is not matched here.
+ *
+ * The regexes deliberately catch an EMBEDDED literal (`'1px solid #e2e8f0'`), not only a whole-value
+ * one, and hex covers 3/4/6/8-digit forms. Template literals need their own selector because their
+ * text lives on TemplateElement, not on a Literal node.
+ *
+ * ### The known false positive, and its escape hatch
+ *
+ * `#feed`, `#face`, `#dad`, `#beef`, `#decade` are all valid hex spellings AND valid fragment
+ * identifiers, so `<a href="#feed">` and `querySelector('#beef')` are rejected. The two are not
+ * separable syntactically, and contorting the selector to guess intent would cost the ban its
+ * teeth — so this is an ACCEPTED, tested edge (see tests/tokens/eslint-config.test.ts). When it
+ * fires on a genuine fragment identifier, silence that ONE line with a reason:
+ *
+ *     // eslint-disable-next-line no-restricted-syntax -- fragment identifier, not a color.
+ *     <a href="#feed">…</a>
+ *
+ * Renaming the anchor to something that is not four hex digits is usually the better fix.
+ *
+ * See the layering note above `randomnessBanConfig`: this block re-declares the randomness selector
+ * because it REPLACES that block's array for `src/**`.
+ */
+const HEX_COLOR_PATTERN = String.raw`#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])`;
+
+/**
+ * Every CSS color FUNCTION notation. `\b` keeps `getColor(` and `color-mix(` out; the trailing `\(`
+ * keeps the bare words (`lab`, `color`) out — only a call shape is a color.
+ */
+const CSS_COLOR_FUNCTION_PATTERN = String.raw`\b(rgba?|hsla?|hwb|oklch|oklab|lab|lch|color)\(`;
+
+const COLOR_LITERAL_BAN_MESSAGE =
+  'No color literal in application code (AD-15) — hex, rgb/rgba, hsl/hsla, hwb, lab/lch, ' +
+  'oklab/oklch, and color() alike. Colors come from the generated theme — use a Tailwind token ' +
+  'utility or var(--color-…). To change a value, edit DESIGN.md and run `npm run tokens:build`; ' +
+  'src/app/tokens.generated.css is the only file in src/ allowed to hold a color literal. For a ' +
+  'fragment identifier that merely spells hex (`#feed`), silence this one line with ' +
+  '`// eslint-disable-next-line no-restricted-syntax -- fragment identifier, not a color.`';
+
+const COLOR_LITERAL_BAN_SELECTORS = [
+  {
+    selector: `Literal[value=/${HEX_COLOR_PATTERN}/]`,
+    message: COLOR_LITERAL_BAN_MESSAGE,
+  },
+  {
+    selector: `TemplateElement[value.raw=/${HEX_COLOR_PATTERN}/]`,
+    message: COLOR_LITERAL_BAN_MESSAGE,
+  },
+  {
+    selector: `Literal[value=/${CSS_COLOR_FUNCTION_PATTERN}/]`,
+    message: COLOR_LITERAL_BAN_MESSAGE,
+  },
+  {
+    selector: `TemplateElement[value.raw=/${CSS_COLOR_FUNCTION_PATTERN}/]`,
+    message: COLOR_LITERAL_BAN_MESSAGE,
+  },
+];
+
+const colorLiteralBanConfig = {
+  files: [`src/**/*.${SRC_EXTENSIONS}`],
+  rules: {
+    'no-restricted-syntax': ['error', RANDOMNESS_BAN_SELECTOR, ...COLOR_LITERAL_BAN_SELECTORS],
+  },
+};
+
+/**
+ * The AD-14 exemption, restored (code review 2026-07-19).
+ *
+ * `randomnessBanConfig` lifts the randomness ban for the seeded PRNG port via `ignores` — but
+ * `colorLiteralBanConfig` above matches `src/**`, which INCLUDES prng.ts, and its array re-declares
+ * the randomness selector. Because rule entries replace rather than merge, that silently put the
+ * ban back for the one file AD-14 exempts. It went unnoticed only because prng.ts is still a
+ * throwing stub; story 1-12 (the seeded PRNG itself) would have hit it.
+ *
+ * Adding prng.ts to `colorLiteralBanConfig.ignores` would have traded the randomness hole for a
+ * color hole — the port has no more business holding a color literal than any other file. So the
+ * exemption is a block of its own, LAST-matching for prng.ts, carrying the color selectors and
+ * omitting only the randomness one.
+ */
+const prngExemptionConfig = {
+  files: ['src/adapters/prng.ts'],
+  rules: {
+    'no-restricted-syntax': ['error', ...COLOR_LITERAL_BAN_SELECTORS],
   },
 };
 
@@ -155,6 +278,10 @@ const purityConfig = {
         message:
           'No dynamic import() in the pure core (Law 2) — the pure layers are static, synchronous logic; dynamic loading is shell business.',
       },
+      // Re-declared, not inherited: this array REPLACES colorLiteralBanConfig's for domain and
+      // application files. Dropping them here would make the pure core the one corner of src/
+      // where a color literal lints clean.
+      ...COLOR_LITERAL_BAN_SELECTORS,
     ],
     'no-restricted-imports': [
       'error',
@@ -203,7 +330,12 @@ const purityConfig = {
 const config = [
   ...next,
   layerBoundaryConfig,
+  // Order matters — see the `no-restricted-syntax` layering note above randomnessBanConfig.
+  // Widest block first, narrowest last; each narrower one re-declares every selector that should
+  // still apply to the files it matches, because rule entries REPLACE rather than merge.
   randomnessBanConfig,
+  colorLiteralBanConfig,
+  prngExemptionConfig,
   purityConfig,
   {
     ignores: [
