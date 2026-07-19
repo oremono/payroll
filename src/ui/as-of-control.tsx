@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { resolveAsOf } from '@/application/as-of';
 import { formatPlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
@@ -35,6 +35,13 @@ import { useAnnounce } from '@/ui/announcer';
  * SC 2.5.3 Label in Name holds. The calendar glyph is decorative and `aria-hidden`; it adds nothing
  * a screen reader needs and would otherwise be read as a stray graphic.
  *
+ * The panel is a real modal, and holds up all three halves of EXPERIENCE § Interaction Primitives'
+ * dialog contract: it takes focus on open (the input autofocuses), it CONTAINS `Tab` while open,
+ * and it returns focus to the trigger on close. It also dismisses on an outside pointer press —
+ * without which a click into `main` left it open and left `aria-expanded="true"` asserting
+ * something false. (Containment and dismissal added by code review 2026-07-19; the role was
+ * claiming a contract the component did not keep.)
+ *
  * The panel sits on `surface-card` deliberately, not on `surface-base` or `surface-tint`:
  * `input-border` measures 3.09:1 on card but only 2.96:1 and 2.82:1 on the other two, below
  * DESIGN's own 3:1 non-text floor. Recorded in deferred-work.md; this is the layout that stays
@@ -47,6 +54,17 @@ import { useAnnounce } from '@/ui/announcer';
  */
 
 const ANNOUNCE_PREFIX = 'Findings updated as of';
+
+/**
+ * Everything inside the dialog that can hold focus, in DOM order.
+ *
+ * Queried live on every `Tab` rather than captured once: the popover's contents are small but they
+ * are React-rendered, and a list captured at open time would go stale the moment anything inside it
+ * became conditional. `[tabindex="-1"]` is excluded because it marks an element that is
+ * programmatically focusable but deliberately NOT in the Tab sequence.
+ */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function CalendarGlyph() {
   return (
@@ -74,6 +92,8 @@ export function AsOfControl({ today }: { today: PlainDate }) {
   const [draft, setDraft] = useState('');
   const [, startTransition] = useTransition();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // `getAll`, not `get`: a repeated param is ambiguous, and `resolveAsOf` is the one place that
   // decides so. Reading the URL rather than a prop is what makes a pasted link reproduce the view.
@@ -93,6 +113,90 @@ export function AsOfControl({ today }: { today: PlainDate }) {
     buttonRef.current?.focus();
   }
 
+  /**
+   * Close WITHOUT moving focus. Used only for an outside pointer press, where the person has just
+   * chosen where they want to be: yanking focus back to the trigger would undo their own click.
+   * Every keyboard path (Esc, the second Enter on the trigger, Apply) still goes through `close`,
+   * so the "returns focus to the invoking control" half of EXPERIENCE § Interaction Primitives is
+   * untouched.
+   */
+  function dismiss() {
+    setIsOpen(false);
+  }
+
+  /**
+   * Dismiss on an outside pointer press (code review 2026-07-19).
+   *
+   * Without this the popover stayed open when the person clicked into `main` — and, worse, the
+   * trigger kept asserting `aria-expanded="true"`, which is a statement about the document that was
+   * simply false. `pointerdown` rather than `click`: dismissal should follow the press, the way it
+   * does in every other popover in the world, and a `click` listener would also fire after a drag
+   * that merely ended outside.
+   *
+   * The whole control — trigger AND panel — is "inside". A press on the trigger must reach the
+   * button's own `onClick` toggle rather than being closed here and immediately reopened.
+   */
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      const root = rootRef.current;
+      if (root !== null && event.target instanceof Node && !root.contains(event.target)) {
+        dismiss();
+      }
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isOpen]);
+
+  /**
+   * Contain `Tab` inside the open dialog (code review 2026-07-19).
+   *
+   * EXPERIENCE § Interaction Primitives: modals "take focus on open, contain `Tab` while open, and
+   * return focus to the invoking control on close". Only the first and third held. A `role="dialog"`
+   * that lets `Tab` walk out into the page behind it tells a screen reader it is a modal and then
+   * behaves like a tooltip — the assistive-technology contract and the actual behaviour disagree,
+   * which is worse than never having claimed the role.
+   *
+   * The wrap is computed from the LIVE focusable list rather than from remembered endpoints, so it
+   * stays correct if the panel's contents ever change.
+   */
+  function onDialogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = dialogRef.current;
+    if (dialog === null) {
+      return;
+    }
+
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (first === undefined || last === undefined) {
+      return;
+    }
+
+    const active = document.activeElement;
+    // A focus that is somehow already outside the dialog is pulled back in on the next Tab rather
+    // than left where it is — containment, not merely edge-wrapping.
+    if (event.shiftKey) {
+      if (active === first || active === null || !dialog.contains(active)) {
+        event.preventDefault();
+        last.focus();
+      }
+      return;
+    }
+    if (active === last || active === null || !dialog.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function commit() {
     // Resolved, not trusted: the native input can be typed into as well as picked from, and a
     // future or malformed value must land on today rather than on an error surface.
@@ -107,6 +211,7 @@ export function AsOfControl({ today }: { today: PlainDate }) {
 
   return (
     <div
+      ref={rootRef}
       className="relative"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && isOpen) {
@@ -135,8 +240,10 @@ export function AsOfControl({ today }: { today: PlainDate }) {
 
       {isOpen ? (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-label="Change as-of date"
+          onKeyDown={onDialogKeyDown}
           className="absolute top-full right-0 z-30 mt-2 rounded border border-border-strong bg-surface-card p-3"
         >
           <form

@@ -83,6 +83,20 @@ function asOfInput(page: Page) {
   return page.getByRole('textbox', { name: 'As-of date' });
 }
 
+/**
+ * Whether focus is currently inside the open as-of dialog.
+ *
+ * The containment claim is about the DOCUMENT's active element, not about any one control, so it is
+ * read as such: a dialog that has lost focus to the page behind it is not containing anything, no
+ * matter which element you happen to query.
+ */
+async function focusIsInsideDialog(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    return dialog !== null && document.activeElement !== null && dialog.contains(document.activeElement);
+  });
+}
+
 test.describe('landmarks and bypass', () => {
   for (const route of ROUTES) {
     test(`${route.path} exposes exactly one nav and one main landmark`, async ({ page }) => {
@@ -306,6 +320,70 @@ test.describe('the as-of control', () => {
     // Focus must come back to the trigger — leaving it on a removed element strands a keyboard
     // user at the top of the document.
     await expect(button).toBeFocused();
+  });
+
+  // EXPERIENCE § Interaction Primitives: side panels and modals "take focus on open, contain `Tab`
+  // while open, and return focus to the invoking control on close". Containment is the half that
+  // was missing — a `role="dialog"` that lets Tab walk into the page behind it tells a screen
+  // reader it is a modal and then behaves like a tooltip.
+  test('contains Tab inside the open popover rather than letting it walk into the page', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await asOfButton(page).click();
+
+    // Takes focus on open.
+    await expect(asOfInput(page)).toBeFocused();
+
+    // Pressed far more times than the dialog has stops, because a native `<input type="date">`
+    // carries INTERNAL focusable segments (day / month / year) that Tab walks before it leaves the
+    // field at all. Counting stops would pin Chromium's segment count; asserting the invariant on
+    // every press pins the thing that actually matters. Unpatched, focus escapes into the sidebar's
+    // seven links within four presses.
+    let reachedApply = false;
+    for (let press = 0; press < 10; press += 1) {
+      await page.keyboard.press('Tab');
+      expect(await focusIsInsideDialog(page), `after Tab #${press + 1}`).toBe(true);
+      reachedApply ||= await page.getByRole('button', { name: 'Apply' }).evaluate(
+        (node) => node === document.activeElement,
+      );
+    }
+
+    // Contained AND traversable: a trap that never reaches the submit button would satisfy the
+    // invariant above while making the dialog unusable.
+    expect(reachedApply).toBe(true);
+  });
+
+  test('contains Shift+Tab too — containment is not a one-directional trick', async ({ page }) => {
+    await page.goto('/');
+    await asOfButton(page).click();
+    await expect(asOfInput(page)).toBeFocused();
+
+    // Backwards out of the first stop is the one press that needs no segment-walking: it wraps
+    // straight to the last focusable element in the dialog.
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'Apply' })).toBeFocused();
+
+    for (let press = 0; press < 10; press += 1) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await focusIsInsideDialog(page), `after Shift+Tab #${press + 1}`).toBe(true);
+    }
+  });
+
+  test('closes on a pointer press outside it, and says so in aria-expanded', async ({ page }) => {
+    await page.goto('/');
+    const button = asOfButton(page);
+
+    await button.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
+
+    // A press in the content area is a dismissal everywhere else in the world; leaving the dialog
+    // open also leaves `aria-expanded="true"` asserting something false.
+    await page.locator('main').click({ position: { x: 5, y: 5 } });
+
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('is reachable and operable by keyboard alone', async ({ page }) => {
