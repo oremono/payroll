@@ -93,7 +93,7 @@ development_status:
 
   # Epic 4 — CAP-3 Record a Salary Change
   epic-4: backlog
-  4-1-record-salary-change-backend: backlog
+  4-1-record-salary-change-backend: done
   4-2-record-salary-change-ui: backlog
   epic-4-retrospective: optional
 

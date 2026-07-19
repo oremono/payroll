@@ -6,6 +6,7 @@ import type {
   EmployeeUpdate,
   NewEmployee,
   NewEmployeeWithSalary,
+  NewSalaryRecord,
 } from '@/application/ports/employee-repository';
 import type { EmployeeUseCaseDeps } from '@/application/use-cases/employees';
 import type { PlainDate } from '@/domain/plain-date';
@@ -52,6 +53,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
     listEmployees: async (query: EmployeeListQuery) =>
       createEmployeeRepository().listEmployees(query),
     loadFormOptions: async () => createEmployeeRepository().loadFormOptions(),
+    appendSalaryRecord: async (salaryRecord: NewSalaryRecord, today: PlainDate) =>
+      createEmployeeRepository().appendSalaryRecord(salaryRecord, today),
   };
 }
 
