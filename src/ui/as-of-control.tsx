@@ -203,8 +203,16 @@ export function AsOfControl({ today }: { today: PlainDate }) {
     const chosen = resolveAsOf(draft, today);
     close();
 
+    // MERGED into the existing query, never rebuilt from it. Rebuilding the string as `?asOf=…`
+    // destroyed every other param on the surface — `?q=rossi&page=2` became `?asOf=…` and the
+    // person's search and page position vanished as a side effect of changing the date. `set`
+    // replaces the key in place, which also collapses a repeated `asOf` to the one value that now
+    // holds. (Code review 2026-07-19.)
+    const query = new URLSearchParams(searchParams);
+    query.set('asOf', plainDateToIso(chosen));
+
     startTransition(() => {
-      router.push(`${pathname}?asOf=${plainDateToIso(chosen)}`);
+      router.push(`${pathname}?${query.toString()}`);
       announce(`${ANNOUNCE_PREFIX} ${formatPlainDate(chosen)}`);
     });
   }

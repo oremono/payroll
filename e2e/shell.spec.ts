@@ -386,6 +386,24 @@ test.describe('the as-of control', () => {
     await expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('preserves every OTHER search param when a date is applied', async ({ page }) => {
+    const past = PAST();
+    // Nothing on Home reads these yet — they stand in for the query and pagination state the
+    // capability surfaces will carry. Rebuilding the query string as `?asOf=…` destroyed them.
+    await page.goto('/?q=rossi&page=2');
+
+    await asOfButton(page).click();
+    await asOfInput(page).fill(past.iso);
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    await expect(page.getByTestId('as-of-echo')).toHaveText(past.label);
+
+    const url = new URL(page.url());
+    expect(url.searchParams.get('q')).toBe('rossi');
+    expect(url.searchParams.get('page')).toBe('2');
+    expect(url.searchParams.get('asOf')).toBe(past.iso);
+  });
+
   test('is reachable and operable by keyboard alone', async ({ page }) => {
     const past = PAST();
     await page.goto('/');
