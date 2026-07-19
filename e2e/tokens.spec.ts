@@ -273,6 +273,91 @@ test.describe('Tailwind utilities resolve to the generated tokens', () => {
     expect(await computed(page, '#as-of-date', 'border-top-color')).toBe('rgb(132, 148, 169)');
   });
 
+  // Story 2-2 discharges a deferred gate gap: `refusal-fill` was the one color token nothing
+  // rendered, so every claim made about it was made by COMPUTATION over DESIGN.md's frontmatter.
+  // The import refusal panel is the first surface in the product to paint it, and this is the
+  // first time a browser resolves it on a real element with real text on top.
+  //
+  // Measured, not asserted against a literal: the ratio is computed from the COMPUTED colors the
+  // browser reports, so it stays true if a token moves — and fails loudly if a move takes the
+  // panel below the floor. Retuning a DESIGN.md brand token to make this pass is a human decision
+  // (story Block-If), not something a session may do on its own.
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`refusal text clears the 4.5:1 text floor on \`refusal-fill\` in ${scheme} mode`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      // The panel does not exist until an upload is refused, so the endpoint is stubbed exactly as
+      // e2e/import.spec.ts stubs it. No database is involved and none is needed.
+      await page.route('**/api/import', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            kind: 'refusal',
+            reason: { kind: 'empty-file' },
+            statement: 'The uploaded file is empty.',
+          }),
+        }),
+      );
+
+      await page.goto('/import');
+      await page.getByLabel('Spreadsheet file').setInputFiles({
+        name: 'payroll.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('name\n'),
+      });
+      await page.getByRole('button', { name: 'Import file' }).click();
+
+      const panel = page.getByRole('region', { name: 'The file was not imported' });
+      await expect(panel).toBeVisible();
+
+      const measured = await panel.evaluate((element) => {
+        // WCAG 2.x relative luminance, over the `rgb(r, g, b)` form `getComputedStyle` returns.
+        const luminance = (color: string): number => {
+          const channels = (/rgba?\(([^)]+)\)/.exec(color)?.[1] ?? '')
+            .split(',')
+            .slice(0, 3)
+            .map((part) => Number(part.trim()) / 255)
+            .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * (channels[0] ?? 0) + 0.7152 * (channels[1] ?? 0) + 0.0722 * (channels[2] ?? 0);
+        };
+
+        const statement = element.querySelector('p');
+        const panelStyle = getComputedStyle(element);
+        const textStyle = getComputedStyle(statement ?? element);
+
+        const background = luminance(panelStyle.backgroundColor);
+        const text = luminance(textStyle.color);
+        const lighter = Math.max(background, text);
+        const darker = Math.min(background, text);
+
+        return {
+          ratio: (lighter + 0.05) / (darker + 0.05),
+          background: panelStyle.backgroundColor,
+          borderColor: panelStyle.borderTopColor,
+          borderWidth: panelStyle.borderTopWidth,
+        };
+      });
+
+      // The panel paints `refusal-fill` itself — #f1f5f9 light, #334155 dark — rather than
+      // inheriting a card surface that happens to look similar.
+      expect(measured.background).toBe(
+        scheme === 'light' ? 'rgb(241, 245, 249)' : 'rgb(51, 65, 85)',
+      );
+      expect(measured.ratio).toBeGreaterThanOrEqual(4.5);
+
+      // DESIGN § Components → Refusal panel: "flat {colors.refusal-fill} block, 1px
+      // {colors.border-hairline}". The hairline is asserted as the TOKEN it must be, not against a
+      // contrast floor — DESIGN scopes border-hairline to decorative rules and dividers, and the
+      // token contrast suite excludes it for that reason.
+      expect(measured.borderWidth).toBe('1px');
+      expect(measured.borderColor).toBe(
+        scheme === 'light' ? 'rgb(226, 232, 240)' : 'rgb(51, 65, 85)',
+      );
+    });
+  }
+
   test('declares `color-scheme: light dark`, so the UA paints its own surfaces to match', async ({
     page,
   }) => {
