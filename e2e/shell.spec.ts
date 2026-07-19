@@ -404,6 +404,69 @@ test.describe('the as-of control', () => {
     expect(url.searchParams.get('asOf')).toBe(past.iso);
   });
 
+  test('announces again when the SAME date is re-applied', async ({ page }) => {
+    const past = PAST();
+    await page.goto('/');
+
+    await asOfButton(page).click();
+    await asOfInput(page).fill(past.iso);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator('#app-announcer')).toHaveText(`Findings updated as of ${past.label}`);
+
+    // A live region announces its MUTATIONS. `setMessage(sameString)` is a React no-op, so the
+    // second apply recomputed the view while the region's text never changed and the screen reader
+    // said nothing. That is why this asserts on the mutation record rather than on the text — the
+    // text is identical before and after, by construction, so no text assertion could tell the
+    // fixed component from the broken one.
+    await page.evaluate(() => {
+      const region = document.querySelector('#app-announcer');
+      const probe = { mutations: 0 };
+      (window as unknown as { announcerProbe: typeof probe }).announcerProbe = probe;
+      if (region !== null) {
+        new MutationObserver(() => {
+          probe.mutations += 1;
+        }).observe(region, { childList: true, characterData: true, subtree: true });
+      }
+    });
+
+    await asOfButton(page).click();
+    await asOfInput(page).fill(past.iso);
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as unknown as { announcerProbe: { mutations: number } }).announcerProbe
+              .mutations,
+        ),
+      )
+      .toBeGreaterThan(0);
+    // And it settles back on the sentence, not on the empty string the clear-then-set passes
+    // through.
+    await expect(page.locator('#app-announcer')).toHaveText(`Findings updated as of ${past.label}`);
+  });
+
+  test('stops asserting a stale as-of date once the surface changes', async ({ page }) => {
+    const past = PAST();
+    await page.goto('/');
+
+    await asOfButton(page).click();
+    await asOfInput(page).fill(past.iso);
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.locator('#app-announcer')).toHaveText(`Findings updated as of ${past.label}`);
+
+    // The region is polite and atomic, so whatever it holds is what a screen reader re-reads if the
+    // person asks for it. Holding "Findings updated as of 12 May 2026" on a surface they have since
+    // navigated away from is a false statement left lying around.
+    await page.getByRole('link', { name: 'Employees' }).click();
+    await expect(page).toHaveURL(/\/employees/);
+
+    await expect(page.locator('#app-announcer')).toHaveText('');
+    // Cleared, not REMOUNTED — the node's identity is the whole of AD-20.
+    await expect(page.locator('#app-announcer')).toHaveCount(1);
+  });
+
   test('is reachable and operable by keyboard alone', async ({ page }) => {
     const past = PAST();
     await page.goto('/');
