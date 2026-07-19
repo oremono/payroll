@@ -126,9 +126,17 @@ type SalaryRow = {
 /** Every salary row for one employee, oldest `seq` first, as the database actually holds it. */
 async function readSalaryRows(employeeId: string): Promise<SalaryRow[]> {
   const { rows } = await owner.query<SalaryRow>(
+    // ORDER BY is QUALIFIED deliberately. PostgreSQL resolves a bare `ORDER BY seq` to the OUTPUT
+    // COLUMN alias in preference to the input column, and `seq::text AS seq` shadows the bigint
+    // with its own text cast — so the bare form sorts LEXICOGRAPHICALLY: 10, 11, 9.
+    //
+    // That is invisible until two rows straddle a digit-width boundary, which is why this passed
+    // locally (a long-lived database whose seq sat in the 14,000s, all five digits) and failed in
+    // CI on a fresh sequence, where the two rows were seq 9 and 10. A test asserting Law 5's
+    // append-only proof must not depend on how many rows happen to precede it.
     `SELECT id, seq::text AS seq, amount_minor::text AS amount_minor, currency_code,
             to_char(effective_from, 'YYYY-MM-DD') AS effective_from
-       FROM salary_record WHERE employee_id = $1 ORDER BY seq`,
+       FROM salary_record WHERE employee_id = $1 ORDER BY salary_record.seq`,
     [employeeId],
   );
   return rows;
