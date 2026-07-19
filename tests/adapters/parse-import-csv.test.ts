@@ -144,14 +144,24 @@ describe('parseImportCsv — the CSV quoting contract', () => {
     );
   });
 
-  it('reads a newline inside a quoted cell as data, not as a record break', () => {
+  it('treats a newline as a record break even inside a quoted cell', () => {
+    // The one clause of the spec's quoting contract this parser deliberately does not implement,
+    // because it CONTRADICTS the clause the story was re-derived for. Allowing a quoted cell to
+    // span lines makes a stray opening quote indistinguishable from a legitimate embedded newline
+    // — the stray quote below would close against the quote two rows later and silently merge
+    // three rows into one nine-cell record that no cell-count check can catch. Since no column in
+    // this file format can hold a newline (a name, four reference codes, two ISO dates, an
+    // integer, an ISO-4217 code), the newline is given up and containment becomes STRUCTURAL.
     const row = `"Ada\nLovelace",software_engineer,L3,IN,FEMALE,2021-06-01,234000000,INR,2025-04-01`;
     const records = recordsOf(`${HEADER}\n${row}\n${VALID_ROW}`);
 
-    expect(records).toHaveLength(2);
+    expect(records).toHaveLength(3);
     expect(records[0]).toEqual(
-      expect.objectContaining({ ok: true, row: { ...VALID_ROW_CELLS, name: 'Ada\nLovelace' } }),
+      expect.objectContaining({ ok: false, reason: { kind: 'unterminated-quote' } }),
     );
+    // And the damage stops there: the remainder of the split cell is its own ragged row, and the
+    // untouched row after it still imports.
+    expect(records[2]).toEqual(expect.objectContaining({ ok: true, row: VALID_ROW_CELLS }));
   });
 
   it('reads a doubled quote inside a quoted cell as one literal quote', () => {
@@ -310,11 +320,24 @@ describe('parseImportCsv — ragged and blank records', () => {
     expect(recordsOf(`${HEADER}\n${short}`)[0]?.name).toBe('Grace Hopper');
   });
 
-  it('carries a null name when the record has no name cell at all', () => {
-    const shuffled = `role_code,${HEADER}`;
-    const short = 'software_engineer';
+  it('carries a null name when the record is too short to reach the name cell', () => {
+    // `name` is required, so it is always SOMEWHERE in the header — but a truncated row may stop
+    // before it, and the report must not invent a name it never saw.
+    const nameLast =
+      'role_code,level_code,country_code,gender,hire_date,amount_minor,currency,effective_from,name';
 
-    expect(recordsOf(`${shuffled}\n${short}`)[0]?.name).toBeNull();
+    expect(recordsOf(`${nameLast}\nsoftware_engineer`)[0]).toEqual({
+      rowNumber: 2,
+      name: null,
+      ok: false,
+      reason: { kind: 'wrong-cell-count', expected: 9, actual: 1 },
+    });
+  });
+
+  it('carries a null name when the record never became cells at all', () => {
+    const broken = `"Ada Lovelace,software_engineer,L3,IN,FEMALE,2021-06-01,234000000,INR,2025-04-01`;
+
+    expect(recordsOf(`${HEADER}\n${broken}`)[0]?.name).toBeNull();
   });
 
   it('accounts for every data record, so counts can reconcile', () => {
