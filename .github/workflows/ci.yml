@@ -153,3 +153,65 @@ jobs:
       # `next build` and reach the browser as real custom properties in both color schemes (AD-15).
       - name: Accessibility pass and design-token resolution
         run: npm run test:browser
+
+  # Story 3-2. The DB-backed browser gate: the Employees directory, its detail route and the create
+  # form are Server Components reading REAL rows, so they cannot be exercised by the `a11y` job —
+  # that one builds and serves with no database at all, deliberately (`client.ts` is lazy so the
+  # build never opens a connection).
+  #
+  # Kept as its own job rather than folded into `integration` (which has no browser) or `a11y`
+  # (which has no database) because it is the only gate needing both, and because a Postgres
+  # service plus a Playwright browser is a materially slower setup than either.
+  #
+  # The Postgres block below is a deliberate clone of the `integration` job's: same pinned 18, same
+  # bootstrap-then-migrate ordering, same two-role split. That ordering is not stylistic — the
+  # AP002 guard in 20260718163326_append_only_and_checks fails `migrate deploy` with P3018 if
+  # payroll_app does not exist yet.
+  browser-db:
+    name: Browser + DB (Postgres 18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: payroll
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/payroll?schema=public
+      DATABASE_URL_APP: postgresql://payroll_app:payroll_app@localhost:5432/payroll?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Provision the restricted runtime role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d payroll \
+            -v ON_ERROR_STOP=1 \
+            -v payroll_app_password=payroll_app \
+            -f prisma/sql/bootstrap-roles.sql
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      # Deterministic fixture, connecting as the OWNER: the seed writes employees and salary
+      # records, and payroll_app deliberately cannot create reference data.
+      - name: Seed the deterministic employee fixture
+        run: npm run e2e:seed
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Employees directory, detail and form (real rows)
+        run: npm run test:browser:db

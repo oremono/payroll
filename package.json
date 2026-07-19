@@ -24,6 +24,8 @@
     "test:shell": "playwright test e2e/shell.spec.ts",
     "test:import": "playwright test e2e/import.spec.ts",
     "test:browser": "playwright test e2e/accessibility.spec.ts e2e/tokens.spec.ts e2e/shell.spec.ts e2e/import.spec.ts",
+    "test:browser:db": "playwright test e2e/employees.spec.ts",
+    "e2e:seed": "node e2e/fixtures/seed-employees.ts",
     "tokens:build": "node scripts/generate-design-tokens.ts",
     "tokens:check": "node scripts/generate-design-tokens.ts --check",
     "db:generate": "prisma generate",

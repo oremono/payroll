@@ -126,6 +126,19 @@ export function formRejectionText(rejection: FieldRejection): string {
     return `${label} is required.`;
   }
 
+  // An UNCHOSEN `<select>` submits `''`, which the domain judges as an unknown code — correctly,
+  // since `''` is in no reference table. But the natural projection of that judgement quotes
+  // nothing back (`Level “” is not in the reference tables.`) at someone whose actual mistake was
+  // not choosing at all. An empty offending value is the ABSENCE of a choice, not a wrong one, so
+  // it reads as the same "required" the genuinely blank fields report. Still a projection over the
+  // payload's own fields; no rule is re-judged here.
+  if (
+    value === '' &&
+    (UNKNOWN_CODE.test(rejection.sentence) || UNKNOWN_GENDER.test(rejection.sentence))
+  ) {
+    return `${label} is required.`;
+  }
+
   if (UNKNOWN_CODE.test(rejection.sentence)) {
     return value === null
       ? `${label} is not in the reference tables.`

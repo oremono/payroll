@@ -290,5 +290,5 @@ export function directoryEmptyState(
     // what it said. The link to `/import` is the component's; the sentence is this module's.
     return { kind: 'first-run', statement: 'No employees yet. Import a spreadsheet to begin.' };
   }
-  return { kind: 'no-match', statement: `No employee's name contains “${q}”.` };
+  return { kind: 'no-match', statement: `No employee’s name contains “${q}”.` };
 }

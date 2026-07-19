@@ -102,9 +102,20 @@ test.describe('landmarks and bypass', () => {
     test(`${route.path} exposes exactly one nav and one main landmark`, async ({ page }) => {
       await page.goto(route.path);
 
-      await expect(page.locator('nav')).toHaveCount(1);
+      // Scoped to the PRIMARY nav rather than counted document-wide (story 3-2). The shell
+      // contributes exactly one navigation landmark; a route may legitimately add its own,
+      // distinctly labelled one — the Employees pager and the import rejection pager both do, and
+      // a labelled <nav> is the recommended pattern for pagination. What must stay singular is the
+      // SHELL's nav, which is what the aria-label assertion below was always really about.
+      await expect(page.locator('nav[aria-label="Primary"]')).toHaveCount(1);
       await expect(page.locator('main')).toHaveCount(1);
-      await expect(page.locator('nav')).toHaveAttribute('aria-label', 'Primary');
+
+      // Any other nav on the route must be distinctly labelled — an unlabelled second navigation
+      // landmark is the actual accessibility defect this test exists to catch.
+      const otherNavs = page.locator('nav:not([aria-label="Primary"])');
+      for (let i = 0; i < (await otherNavs.count()); i++) {
+        await expect(otherNavs.nth(i)).toHaveAttribute('aria-label', /.+/);
+      }
     });
   }
 

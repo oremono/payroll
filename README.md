@@ -131,10 +131,11 @@ protection.
 | Mutation testing | `npm run test:mutation` | A surviving mutant over `src/domain` fails the build (AD-23) |
 | Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9). Scoped to `e2e/accessibility.spec.ts` — it must **not** widen to other specs |
 | Integration (Postgres 18) | `npm run test:integration` | The schema's DB-enforced invariants — append-only `salary_record`, the positive-amount CHECK, single-row `settings` — against a real disposable Postgres 18, never a mock (AD-24) |
+| Browser + DB (Postgres 18) | `npm run test:browser:db` | The Employees directory, its detail route and the create form against **real rows** — the only gate with both a browser and a database, since the axe job builds with none and the integration job has no browser (story 3-2) |
 
 **Branch protection:** require these status checks on `master` — **`Lint · Typecheck · Build ·
-Unit + Coverage`**, **`Mutation testing (domain)`**, **`Accessibility (axe)`**, and
-**`Integration (Postgres 18)`** (the job names in `ci.yml`). Configuring branch protection is a
+Unit + Coverage`**, **`Mutation testing (domain)`**, **`Accessibility (axe)`**,
+**`Integration (Postgres 18)`**, and **`Browser + DB (Postgres 18)`** (the job names in `ci.yml`). Configuring branch protection is a
 repository-admin action in GitHub settings, not part of the code.
 
 The `test:mutation` and `test:a11y` gates need extra local setup on first run: Stryker downloads

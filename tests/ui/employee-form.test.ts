@@ -157,6 +157,27 @@ describe('formRejectionText — a value that is not in the reference tables', ()
     expect(text).not.toContain('code "');
   });
 
+  // An unchosen `<select>` submits `''`, which the domain judges as an unknown code — correctly, but
+  // the resulting copy would be `Level “” is not in the reference tables.`, which quotes nothing back
+  // at someone whose actual mistake was not choosing. An empty offending value is the ABSENCE of a
+  // choice, not a wrong one, so it projects onto the same "is required" the blank fields use.
+  it('says a field is required when the offending value is the empty choice', () => {
+    expect(
+      formRejectionText({
+        field: 'level',
+        offendingValue: '',
+        sentence: 'Level code "" is not in the level reference table.',
+      }),
+    ).toBe('Level is required.');
+    expect(
+      formRejectionText({
+        field: 'gender',
+        offendingValue: '',
+        sentence: 'Gender "" is neither MALE nor FEMALE.',
+      }),
+    ).toBe('Gender is required.');
+  });
+
   it('stays a sentence when a recognized shape carries no value to quote', () => {
     const text = formRejectionText({
       field: 'role',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -116,6 +117,7 @@ export function EmployeeFormPanel({
   readonly options: EmployeeFormOptions;
 }) {
   const announce = useAnnounce();
+  const router = useRouter();
 
   const isEdit = mode.kind === 'edit';
   const employee = mode.kind === 'edit' ? mode.employee : null;
@@ -126,6 +128,13 @@ export function EmployeeFormPanel({
   const [isPending, setIsPending] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
+  /**
+   * Whether the NEXT close should return focus to the trigger.
+   *
+   * A ref rather than state because nothing renders differently for it, and it is read from the
+   * effect cleanup below — see `close` for why the focus move cannot happen where it is requested.
+   */
+  const returnFocusRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const formLevelRef = useRef<HTMLDivElement>(null);
@@ -142,10 +151,19 @@ export function EmployeeFormPanel({
     setIsOpen(true);
   }
 
-  /** Close and RETURN FOCUS to the trigger — Esc must never strand focus on a removed element. */
+  /**
+   * Close, and ask for focus to be returned to the trigger — Esc must never strand focus on a
+   * removed element.
+   *
+   * The focus move is REQUESTED here and performed in the effect cleanup, which is not indirection
+   * for its own sake. `as-of-control.tsx` can call `buttonRef.current?.focus()` inline because it
+   * inerts nothing; this dialog does. Calling `focus()` here runs while the trigger is still inside
+   * an `inert` subtree, and an inert element cannot take focus — so the call was silently doing
+   * nothing and Esc left focus on `body`. (Found by `e2e/employees.spec.ts`.)
+   */
   function close() {
+    returnFocusRef.current = true;
     setIsOpen(false);
-    triggerRef.current?.focus();
   }
 
   /**
@@ -171,6 +189,9 @@ export function EmployeeFormPanel({
     }
 
     const wrapper = wrapperRef.current;
+    // Captured inside the effect, not read from the ref in the cleanup: the ref may point somewhere
+    // else by the time cleanup runs, and this is the node that must get focus back.
+    const trigger = triggerRef.current;
     const inerted: HTMLElement[] = [];
     for (const child of Array.from(document.body.children)) {
       if (!(child instanceof HTMLElement)) {
@@ -198,6 +219,13 @@ export function EmployeeFormPanel({
         child.removeAttribute('inert');
       }
       document.documentElement.style.overflow = previousOverflow;
+
+      // AFTER the background is released, never before: the trigger is one of the elements that was
+      // inert a line ago, and an inert element cannot take focus.
+      if (returnFocusRef.current) {
+        returnFocusRef.current = false;
+        trigger?.focus();
+      }
     };
   }, [isOpen]);
 
@@ -290,10 +318,21 @@ export function EmployeeFormPanel({
     announce(composeFormAnnouncement(result));
 
     if (result.kind === 'created' || result.kind === 'updated') {
-      // No `revalidatePath` here and no `router.refresh()`: the Server Actions already invalidate
-      // `/employees` and `/employees/{id}`, and Next applies that revalidation to the router as
-      // part of this very response. The frontend adds nothing to the contract (Law 7).
       close();
+      // Ask the router for the current route again.
+      //
+      // This is NOT a second cache invalidation and adds nothing to the contract (Law 7): the
+      // Server Actions own `revalidatePath('/employees')` and `revalidatePath('/employees/{id}')`,
+      // and nothing here calls either. What this does is make the CLIENT re-request the route it is
+      // already on.
+      //
+      // It is here because the implicit path is not reliable enough to build on: measured against
+      // the built app, a create sometimes left the directory showing the pre-create rows even
+      // though the row was committed and `revalidatePath` had run — reproducibly, depending on what
+      // had been navigated to earlier in the session (`e2e/employees.spec.ts` catches it). A
+      // directory that silently omits the employee someone just created is the worst available
+      // outcome, so the refresh is asked for explicitly rather than inferred.
+      router.refresh();
       return;
     }
 

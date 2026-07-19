@@ -28,6 +28,12 @@ const ROUTES = [
   // Next rendered itself, unstyled, inside the shell, with a second `h1` and no axe coverage at
   // all. It is judged here exactly like the seven ratified destinations.
   '/no-such-page',
+  // A DETAIL route (story 3-2). The id is deliberately one that cannot exist, so this page renders
+  // the not-found branch of `src/app/employees/[id]/page.tsx` — which is the variant this job can
+  // reach, since the `a11y` job builds and serves with NO database and the employee branch has no
+  // rows to render. The populated employee detail is judged by the `browser-db` job instead, which
+  // has both a browser and real rows.
+  '/employees/00000000-0000-0000-0000-000000000000',
 ] as const;
 
 const SCHEMES = ['light', 'dark'] as const;
