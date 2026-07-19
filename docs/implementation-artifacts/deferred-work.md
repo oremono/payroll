@@ -48,10 +48,28 @@
   commits, which survived only because a timeout ended the run before the story commit consolidated
   them.
 
-  **RULED 2026-07-19 (rk): option 1 — switched to worktree isolation.** `.bmad-loop/policy.toml` now
-  has `isolation = "worktree"` with `merge_strategy = "merge"`, so each story's unit branch keeps
-  the session's own red/green commits and the merge preserves them in history. The standing practice
-  and the pipeline now agree, and nothing about the practice needed weakening.
+  **RULED 2026-07-19 (rk): option 1 — switched to worktree isolation. THE STATED BENEFIT DID NOT
+  MATERIALISE; corrected below.** `.bmad-loop/policy.toml` now has `isolation = "worktree"` with
+  `merge_strategy = "merge"`.
+
+  ⚠️ **CORRECTION (2026-07-19, after story 4-1).** I claimed the unit branch would keep the
+  session's red/green commits and that the merge would preserve them. **It does not.** Story 4-1's
+  unit branch genuinely carried 17 granular commits — observed mid-run, a clean
+  `test(domain): red — the ONE current-salary resolver (AD-8)` → `feat(domain): green — …`
+  sequence across domain, application, adapters and the Server Action. What landed on `master` was
+  two commits: `88d05e6 story 4-1-…: implemented and reviewed via bmad-loop` (a squash of all 23
+  files, 3,496 insertions) and the merge commit `5e90454`. The 17 are unreachable from any ref;
+  the unit branch was deleted per `delete_branch = true`, and they survive only as dangling objects
+  until `git gc` prunes them.
+
+  So the squash happens BEFORE the merge and is independent of isolation mode — `merge_strategy`
+  only chooses merge-commit vs fast-forward, operating on an already-consolidated branch. Option 1
+  as I described it is not achievable through these two keys alone.
+
+  **Worktree isolation was still worth doing**, on its other merits: the main checkout is never
+  touched (proved when a host process died mid-run and cost no recovery, unlike the 2-2 and 3-2
+  exits), and `npm ci` inside the worktree works. But the red/green artifact problem is UNSOLVED,
+  and option 2 — accept the squash and amend the standing practice — is now the live choice.
 
   One non-obvious step was required to make it work: `worktree_seed = [".env"]`. A git worktree
   checks out **tracked files only**, and `.env` is gitignored yet read by both `prisma.config.ts`

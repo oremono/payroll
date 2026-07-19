@@ -330,3 +330,25 @@ describe('an adapter that THROWS becomes a payload, never a 500', () => {
     });
   }
 });
+
+describe('recordSalaryChange — total against an outcome the switch does not know', () => {
+  it('answers a write failure for an unknown append outcome, never `undefined`', () => {
+    // Mirrors the identical guard in `updateEmployee` (tests/application/employees.test.ts), which
+    // `record-salary-change.ts` names explicitly in its own default arm — the pattern was already
+    // established there and is followed here rather than left to coverage's mercy.
+    //
+    // The switch over `AppendSalaryRecordOutcome` is total only by TYPESCRIPT's grace. At runtime
+    // the adapter is ordinary JavaScript behind a port: a widened union, a stale build, or a second
+    // implementation can hand back a kind this module has never heard of. Without the guard the
+    // switch falls through and the function resolves to `undefined` — in a module whose header
+    // promises every function is total — and `undefined` reaching story 4-2 is a blank screen with
+    // no sentence on it.
+    const deps = fakeDeps({
+      appendOutcome: { kind: 'no-such-outcome' } as unknown as AppendSalaryRecordOutcome,
+    });
+
+    return expect(recordSalaryChange(deps, ADA.id, VALID, TODAY)).resolves.toEqual(
+      expect.objectContaining({ kind: 'rejected' }),
+    );
+  });
+});
