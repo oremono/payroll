@@ -20,6 +20,7 @@ import {
   formRejectionText,
   initialFormValues,
   rejectionsFor,
+  SUBMISSION_FAILED_STATEMENT,
   toCreateInput,
   toUpdateInput,
 } from '@/ui/employee-form';
@@ -404,6 +405,26 @@ describe('composeFormAnnouncement', () => {
     const gone: UpdateEmployeeResult = { kind: 'not-found', employeeId: '' };
     expect(composeFormAnnouncement(gone)).toBe(EMPLOYEE_VANISHED_STATEMENT);
     expect(EMPLOYEE_VANISHED_STATEMENT).not.toContain('""');
+  });
+});
+
+describe('SUBMISSION_FAILED_STATEMENT', () => {
+  // The one outcome the form words itself, and the only one it may: the Server Actions are total,
+  // so every reachable INPUT has a backend sentence — but a request that never arrived was never
+  // judged, and there is no `FieldRejection` for that. The analogue of `UPLOAD_FAILED`.
+  it('says nothing was changed, so a person knows resubmitting cannot duplicate', () => {
+    expect(SUBMISSION_FAILED_STATEMENT).toContain('nothing was changed');
+  });
+
+  // It rides the form-level region, so it must survive `formRejectionText` unaltered.
+  it('passes through the projection verbatim as a form-level reason', () => {
+    expect(
+      formRejectionText({
+        field: null,
+        offendingValue: null,
+        sentence: SUBMISSION_FAILED_STATEMENT,
+      }),
+    ).toBe(SUBMISSION_FAILED_STATEMENT);
   });
 });
 

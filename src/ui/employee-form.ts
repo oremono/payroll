@@ -274,6 +274,20 @@ export function currencyLineFor(
 export const EMPLOYEE_VANISHED_STATEMENT =
   'This employee no longer exists, so nothing was changed.';
 
+/**
+ * The one outcome the form words itself: the request never reached the Server Action.
+ *
+ * The action is TOTAL — story 3-1 made every one of them answer with a payload. The TRANSPORT is
+ * not: a dropped connection, a deploy swapping under the submission, a proxy timing out. There is
+ * no `FieldRejection` for "nothing was ever judged", so this is the analogue of `import-report.ts`'s
+ * `UPLOAD_FAILED` — the UI authors a sentence only where no backend reason can exist.
+ *
+ * It says "nothing was changed" because that is what a request that never arrived means, and it is
+ * the fact the person needs in order to know whether resubmitting would create a duplicate.
+ */
+export const SUBMISSION_FAILED_STATEMENT =
+  'The submission did not reach the server, so nothing was changed. Try again when the connection is back.';
+
 /** `1 reason` / `2 reasons` — the singular is exact. */
 function reasonsPhrase(count: number): string {
   return `${String(count)} ${count === 1 ? 'reason' : 'reasons'}`;
