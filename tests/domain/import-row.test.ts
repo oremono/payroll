@@ -485,6 +485,48 @@ describe('validateImportRow — totality', () => {
 describe('validateImportRow — the order of judgements', () => {
   // The reported reason must be the FIRST thing wrong with the row, deterministically. Each case
   // below spoils two cells and pins which one is named.
+
+  it('walks the WHOLE cascade in order when every cell is bad at once', () => {
+    // The pairwise cases below pin each adjacent pair; this one pins the entire sequence as a
+    // single fact. Story 3-1 extracts these checks into `employee-fields.ts` so a form can reuse
+    // them, and 2-1's first-fault ordering is contractual and not renegotiable there — a
+    // reordering that slipped past every pairwise test would still fail here.
+    const allBad = {
+      name: '',
+      roleCode: 'wizard',
+      levelCode: 'L9',
+      countryCode: 'XX',
+      gender: 'X',
+      hireDate: 'nope',
+      amountMinor: 'x',
+      currency: 'USD',
+      effectiveFrom: 'also-nope',
+    };
+
+    // Repair the named cell, re-run, and the NEXT reason in the contractual order must appear.
+    const repairs: [Partial<ImportRowInput>, string][] = [
+      [{}, 'blank-name'],
+      [{ name: 'Ada Lovelace' }, 'unknown-role'],
+      [{ roleCode: 'software_engineer' }, 'unknown-level'],
+      [{ levelCode: 'L3' }, 'unknown-country'],
+      [{ countryCode: 'IN' }, 'unknown-gender'],
+      [{ gender: 'FEMALE' }, 'malformed-date'],
+      [{ hireDate: '2021-06-01' }, 'malformed-date'],
+      [{ effectiveFrom: '2025-04-01' }, 'malformed-amount'],
+      [{ amountMinor: '234000000' }, 'currency-mismatch'],
+    ];
+
+    let row: ImportRowInput = allBad;
+    const observed: string[] = [];
+    for (const [repair] of repairs) {
+      row = { ...row, ...repair };
+      const result = validateImportRow(row, REFS, TODAY);
+      observed.push(result.ok ? 'ok' : result.reason.kind);
+    }
+
+    expect(observed).toEqual(repairs.map(([, expected]) => expected));
+  });
+
   it('names the blank name before the unknown role', () => {
     expect(validateImportRow(validRow({ name: '', roleCode: 'wizard' }), REFS, TODAY)).toEqual({
       ok: false,

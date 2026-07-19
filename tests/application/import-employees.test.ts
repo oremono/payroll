@@ -30,12 +30,31 @@ const HEADER =
 
 const VALID_ROW = 'Ada Lovelace,software_engineer,L3,IN,FEMALE,2021-06-01,234000000,INR,2025-04-01';
 
+/**
+ * The CAP-2 half of the port (story 3-1), which import never touches.
+ *
+ * They THROW rather than returning a benign value on purpose: if a future edit to the import
+ * use-case ever reaches one of these, the test that did so should fail loudly rather than quietly
+ * pass against a stub. Import creates employees only through `createEmployeesWithSalaries`.
+ */
+const NOT_USED_BY_IMPORT = {
+  createEmployee: () => Promise.reject(new Error('import does not create single employees')),
+  updateEmployee: () => Promise.reject(new Error('import never updates')),
+  findEmployeeById: () => Promise.reject(new Error('import never reads by id')),
+  listEmployees: () => Promise.reject(new Error('import never lists')),
+  loadFormOptions: () => Promise.reject(new Error('import never loads form options')),
+} satisfies Pick<
+  EmployeeRepository,
+  'createEmployee' | 'updateEmployee' | 'findEmployeeById' | 'listEmployees' | 'loadFormOptions'
+>;
+
 /** A repository that records what it was asked to write, and can be told to fail. */
 function fakeRepository(options: { readonly refs?: ReferenceData } = {}): EmployeeRepository & {
   readonly written: NewEmployeeWithSalary[][];
 } {
   const written: NewEmployeeWithSalary[][] = [];
   return {
+    ...NOT_USED_BY_IMPORT,
     written,
     loadReferenceData: () => Promise.resolve(options.refs ?? REFS),
     createEmployeesWithSalaries: (batch) => {
@@ -163,6 +182,7 @@ describe('importEmployees — the report', () => {
     // A refused file must not cost a database round-trip.
     let loads = 0;
     const repository: EmployeeRepository = {
+      ...NOT_USED_BY_IMPORT,
       loadReferenceData: () => {
         loads += 1;
         return Promise.resolve(REFS);
@@ -295,6 +315,7 @@ describe('importEmployees — what reaches the write funnel', () => {
   it('passes today through to the funnel, never a clock reading', async () => {
     let seen: PlainDate | undefined;
     const repository: EmployeeRepository = {
+      ...NOT_USED_BY_IMPORT,
       loadReferenceData: () => Promise.resolve(REFS),
       createEmployeesWithSalaries: (_batch, today) => {
         seen = today;

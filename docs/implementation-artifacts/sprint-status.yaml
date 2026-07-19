@@ -55,6 +55,7 @@ project: payroll
 # 1-4 implemented 2026-07-19: src/domain/money.ts + reference-data and value-constraint migrations
 # 1-5 implemented 2026-07-19: DESIGN.md -> src/app/tokens.generated.css generator, WCAG contrast gate, AD-15 hex ban
 # 1-6 implemented 2026-07-19: app shell (sidebar/header/skip link/live region), as-of date in the URL, F-5 dark: lint ban
+# 3-1 implemented 2026-07-19: typed repository port (create/update/read/list), CAP-2 validation shared with import, Server Actions
 project_key: NOKEY
 tracking_system: file-system
 story_location: docs/implementation-artifacts
@@ -85,8 +86,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3 — CAP-2 Employee CRUD
-  epic-3: backlog
-  3-1-employee-crud-backend: backlog
+  epic-3: in-progress
+  3-1-employee-crud-backend: done
   3-2-employee-crud-ui: backlog
   epic-3-retrospective: optional
 

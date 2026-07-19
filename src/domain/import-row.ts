@@ -24,14 +24,19 @@
  * CSV *export* stories pick their own spelling.
  */
 
-import { fromBoundaryMoney, type Money } from './money';
 import {
-  comparePlainDate,
-  parsePlainDate,
-  plainDateToIso,
-  type PlainDate,
-} from './plain-date';
-import { blankToNull } from './text';
+  checkCountryCode,
+  checkDateCell,
+  checkGender,
+  checkLevelCode,
+  checkName,
+  checkRoleCode,
+  type FieldRejectionReason,
+  type Gender,
+  type ReferenceData,
+} from './employee-fields';
+import { fromBoundaryMoney, type Money } from './money';
+import { comparePlainDate, plainDateToIso, type PlainDate } from './plain-date';
 
 /**
  * The largest value the `salary_record.amount_minor` column can hold — PostgreSQL `bigint` is a
@@ -45,8 +50,13 @@ import { blankToNull } from './text';
  */
 export const MAX_AMOUNT_MINOR = 9223372036854775807n;
 
-/** The two date columns, spelled as they appear in the file's header. */
-export type DateColumn = 'hire_date' | 'effective_from';
+/**
+ * The per-field vocabulary and validators now live in `employee-fields.ts`, shared with CAP-2's
+ * `validateEmployeeInput` so there is exactly one implementation of each field rule (story 3-1).
+ * They are RE-EXPORTED here because this module is the name every existing consumer imports them
+ * by, and moving an import path is not what the extraction is for.
+ */
+export type { DateColumn, Gender, ReferenceData } from './employee-fields';
 
 /** One CSV data row, every cell still a raw string exactly as the file spelled it. */
 export type ImportRowInput = {
@@ -60,24 +70,6 @@ export type ImportRowInput = {
   readonly currency: string;
   readonly effectiveFrom: string;
 };
-
-/**
- * The reference tables, reduced to exactly what a judgement needs. Passed IN — the domain cannot
- * read a database, and would not want to: an argument is what makes every branch here testable
- * from a literal.
- *
- * `countryCurrencies` is a map rather than a set because AD-6 needs the country's currency, not
- * merely the country's existence: `salary_record.currency_code` is DERIVED from it and the file's
- * cell is only ever validated against it.
- */
-export type ReferenceData = {
-  readonly roleCodes: ReadonlySet<string>;
-  readonly levelCodes: ReadonlySet<string>;
-  readonly countryCurrencies: ReadonlyMap<string, string>;
-};
-
-/** Gender is exactly these two values, verbatim (Law 3). */
-export type Gender = 'MALE' | 'FEMALE';
 
 /** A row that survived every judgement — parsed values, ready for the write funnel. */
 export type ValidatedRow = {
@@ -100,13 +92,9 @@ export type ValidatedRow = {
  * anywhere would mean a second sentence composer, and then two ways to say the same thing.
  */
 export type RejectionReason =
-  | { readonly kind: 'blank-name' }
-  | { readonly kind: 'unknown-role'; readonly value: string }
-  | { readonly kind: 'unknown-level'; readonly value: string }
-  | { readonly kind: 'unknown-country'; readonly value: string }
-  | { readonly kind: 'unknown-gender'; readonly value: string }
-  | { readonly kind: 'missing-date'; readonly column: DateColumn }
-  | { readonly kind: 'malformed-date'; readonly column: DateColumn; readonly value: string }
+  // The per-field half, shared verbatim with CAP-2's employee validator: blank-name,
+  // unknown-role/level/country/gender, missing-date, malformed-date.
+  | FieldRejectionReason
   | {
       readonly kind: 'future-effective-from';
       readonly effectiveFrom: string;
@@ -164,41 +152,44 @@ export function validateImportRow(
   refs: ReferenceData,
   today: PlainDate,
 ): RowValidation {
-  const name = blankToNull(raw.name);
-  if (name === null) {
-    return { ok: false, reason: { kind: 'blank-name' } };
+  // Each judgement below is the SHARED validator from `employee-fields.ts` — the same code CAP-2's
+  // form runs. Only the COLLECTION differs: this function returns on the FIRST fault, because a
+  // batch report names one reason per row and that order is contractual.
+  const name = checkName(raw.name);
+  if (!name.ok) {
+    return { ok: false, reason: name.reason };
   }
 
-  const roleCode = raw.roleCode.trim();
-  if (!refs.roleCodes.has(roleCode)) {
-    return { ok: false, reason: { kind: 'unknown-role', value: roleCode } };
+  const role = checkRoleCode(raw.roleCode, refs);
+  if (!role.ok) {
+    return { ok: false, reason: role.reason };
   }
 
-  const levelCode = raw.levelCode.trim();
-  if (!refs.levelCodes.has(levelCode)) {
-    return { ok: false, reason: { kind: 'unknown-level', value: levelCode } };
+  const level = checkLevelCode(raw.levelCode, refs);
+  if (!level.ok) {
+    return { ok: false, reason: level.reason };
   }
 
   // AD-6, the load-bearing line: the currency is RESOLVED from the country here, and the file's
   // own currency cell is validated against it below. This is also why an unknown country must be a
   // rejection rather than a guess — it would produce a salary record with no resolvable currency.
-  const countryCode = raw.countryCode.trim();
-  const expectedCurrency = refs.countryCurrencies.get(countryCode);
-  if (expectedCurrency === undefined) {
-    return { ok: false, reason: { kind: 'unknown-country', value: countryCode } };
+  const country = checkCountryCode(raw.countryCode, refs);
+  if (!country.ok) {
+    return { ok: false, reason: country.reason };
+  }
+  const { countryCode, currency: expectedCurrency } = country.value;
+
+  const gender = checkGender(raw.gender);
+  if (!gender.ok) {
+    return { ok: false, reason: gender.reason };
   }
 
-  const gender = raw.gender.trim();
-  if (gender !== 'MALE' && gender !== 'FEMALE') {
-    return { ok: false, reason: { kind: 'unknown-gender', value: gender } };
-  }
-
-  const hireDate = parseDateCell(raw.hireDate, 'hire_date');
+  const hireDate = checkDateCell(raw.hireDate, 'hire_date');
   if (!hireDate.ok) {
     return { ok: false, reason: hireDate.reason };
   }
 
-  const effectiveFrom = parseDateCell(raw.effectiveFrom, 'effective_from');
+  const effectiveFrom = checkDateCell(raw.effectiveFrom, 'effective_from');
   if (!effectiveFrom.ok) {
     return { ok: false, reason: effectiveFrom.reason };
   }
@@ -262,39 +253,14 @@ export function validateImportRow(
   return {
     ok: true,
     value: {
-      name,
-      roleCode,
-      levelCode,
+      name: name.value,
+      roleCode: role.value,
+      levelCode: level.value,
       countryCode,
-      gender,
+      gender: gender.value,
       hireDate: hireDate.value,
       salary: parsedAmount,
       effectiveFrom: effectiveFrom.value,
     },
   };
-}
-
-/**
- * One date cell, judged. A BLANK cell and a MALFORMED cell are deliberately different reasons: a
- * blank `effective_from` is the AD-7 case the epic calls out by name ("never defaulted to today or
- * to the hire date"), and telling a reader "the cell is blank" is a different instruction from
- * telling them "the cell reads 01/06/2021".
- */
-function parseDateCell(
-  cell: string,
-  column: DateColumn,
-):
-  | { readonly ok: true; readonly value: PlainDate }
-  | { readonly ok: false; readonly reason: RejectionReason } {
-  const trimmed = blankToNull(cell);
-  if (trimmed === null) {
-    return { ok: false, reason: { kind: 'missing-date', column } };
-  }
-
-  const parsed = parsePlainDate(trimmed);
-  if (parsed === null) {
-    return { ok: false, reason: { kind: 'malformed-date', column, value: trimmed } };
-  }
-
-  return { ok: true, value: parsed };
 }

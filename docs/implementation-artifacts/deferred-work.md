@@ -669,3 +669,100 @@ Also surfaced while landing the story, outside the Design Notes:
 - source_spec: `docs/implementation-artifacts/spec-2-1-bulk-import-backend.md`
   summary: The integration suite cannot clean up after itself, so every CI run permanently accumulates employees and reference rows in the shared database.
   evidence: `salary_record` has UPDATE/DELETE revoked at the `payroll_app` role (AD-18), which is correct and deliberate — but it means integration fixtures are immortal. Later stories asserting population counts will inherit the accumulated debris, and any fixture scheme deriving a value against a UNIQUE column will eventually collide. Needs a disposable-branch-per-run policy or an owner-role teardown path.
+
+- source_spec: `spec-3-1-employee-crud-backend.md`
+  summary: Integration suites derive their `level.rank` band from a hashed UUID prefix modulo a
+    fixed span, so runs collide with no retry once enough rows accumulate — and `rank` is UNIQUE
+    with no cleanup path.
+  evidence: The scheme is inherited from `tests/integration/import-employees.test.ts`, so this is a
+    pre-existing pattern rather than anything story 3-1 introduced. A collision surfaces as a
+    unique-violation thrown from `beforeAll`, which errors every test in the file with a message
+    that names neither the cause nor the fix. This dissolves the moment the outstanding "provision a
+    fresh database per run" item is taken; until then a retry or an `ON CONFLICT (rank) DO NOTHING`
+    on the taxonomy insert would make it self-healing.
+
+- source_spec: `spec-3-1-employee-crud-backend.md`
+  summary: Neither Server Action nor any Route Handler performs authentication or authorization —
+    anyone who can reach the deployment can create and edit the employee directory.
+  evidence: There is no `middleware.ts`, no session check, and no auth story anywhere in the sprint
+    plan; the CAP-1 upload endpoint shipped under the same posture, so this is a product-level gap
+    rather than a story-3-1 regression. Recorded because the surface just widened from one
+    file-upload endpoint to structured create/edit RPCs over the whole directory, which makes the
+    absence materially more consequential than it was in Epic 2.
+
+- source_spec: `spec-3-1-employee-crud-backend.md`
+  summary: `createEmployeesWithSalaries` re-resolves country only inside its transaction and never
+    re-checks role or level activity, so the batch import can still write an employee against a role
+    deactivated between judgement and write.
+  evidence: Surfaced by story 3-1, which closed the same window on both single-employee write paths
+    and so made the batch path's gap visible by contrast. The country re-resolution exists to protect
+    the AD-6 currency written onto the salary record, not to guard activity generally; role and level
+    were simply never considered. The FKs target `code` and check existence, not `is_active`, so
+    nothing else notices. This is story 2-1's code — 3-1 deliberately did not widen its blast radius
+    by editing the import funnel.
+
+- source_spec: `spec-3-1-employee-crud-backend.md`
+  summary: `payroll_app` holds `DELETE` on `employee` — granted in 1-3 and, unlike `salary_record`,
+    never revoked — so the "no delete path" guarantee rests entirely on the port omitting a method.
+  evidence: Verified against the live database: `role_table_grants` for `payroll_app` on `employee`
+    returns SELECT, INSERT, DELETE. Story 3-1 asserted the guarantee with a regex over repository
+    method names, which a method called `archive` or `purge` would pass. `salary_record` shows the
+    intended pattern (`REVOKE UPDATE, DELETE` plus a trigger); `employee` never received it. A
+    migration revoking DELETE would make the invariant structural rather than conventional.
+
+- source_spec: `spec-3-1-employee-crud-backend.md`
+  summary: `hasErrorCode`'s depth bound of 5 is a guess unvalidated against real driver nesting, and
+    the walk descends only `cause`/`meta`, missing errors nested in arrays such as `meta.errors[]`.
+  evidence: A miss silently converts the AP004 hire-date rejection — which the user must see and can
+    act on — into a generic "could not be saved". Nothing in the migrations or the adapter
+    establishes how deeply `@prisma/adapter-pg` actually wraps a raised SQLSTATE, so the bound is
+    asserted by a test rather than derived from the driver's behaviour.
+
+- source_spec: `docs/implementation-artifacts/spec-3-1-employee-crud-backend.md`
+  summary: The reference-activity re-resolution in `createEmployee` / `updateEmployee` narrows but
+    does not close the deactivation race; a `FOR SHARE` lock on the role/level/country rows would.
+  evidence: Both transactions issue plain `SELECT`s at PostgreSQL's default READ COMMITTED, which
+    take no row lock, so a concurrent `UPDATE role SET is_active = false` can commit between the
+    re-read and the write and the FK — targeting `code`, checking existence rather than activity —
+    will not notice. This repo already establishes the remedy: `20260719060000_hire_date_lock`
+    takes `FOR SHARE` on the parent row and argues at length that "no amount of trigger logic that
+    only READS can prevent it". Consequence is small (one employee holding a code retired moments
+    earlier, which the system tolerates for existing holders anyway), which is why review pass 3
+    corrected the overclaiming comments rather than churning a green adapter; the lock is the real
+    fix and needs `$queryRaw` plus stub-test rework.
+
+- source_spec: `docs/implementation-artifacts/spec-3-1-employee-crud-backend.md`
+  summary: Every error in the CAP-2 stack is swallowed with no diagnostic trail — eight bare
+    `catch` blocks discard the error object entirely, leaving no way to tell an outage from a bug.
+  evidence: Five in `src/application/use-cases/employees.ts`, two in
+    `src/app/employees/handle-employee-write.ts`, one in `revalidateCommitted`. A deadlock, a
+    connection failure, a schema mismatch and a genuine `TypeError` all become the same opaque
+    `{ kind: 'unavailable' }` or "The employee could not be saved". The story's own headers cite
+    2-1's "HTTP 500 carrying no report at all" as the defect being fixed, and the fix substitutes a
+    payload carrying no report while additionally destroying the stack trace the 500 preserved.
+    Pre-existing in shape — `handle-import-request.ts` swallows identically — so the resolution is a
+    logging port decided once for the codebase, not a patch inside this story.
+
+- source_spec: `docs/implementation-artifacts/spec-3-1-employee-crud-backend.md`
+  summary: `updateEmployee` is a blind full-column overwrite with no optimistic concurrency, so two
+    editors of the same employee silently lose one set of edits.
+  evidence: Every call writes all five granted columns from a form snapshot with no precondition on
+    the row's prior state. `employee.updated_at` exists (`prisma/schema.prisma`) and is inside the
+    column-level UPDATE grant, so the token an optimistic check would use is already there and
+    already writable. `UpdateEmployeeOutcome` has no arm for a stale write, so adding one is a
+    change to a contract this story finalized for 3-2 — which is why it is a decision rather than a
+    patch. CAP-2's deliverable is a shared multi-user edit form, so the lost update is reachable.
+
+- source_spec: `docs/implementation-artifacts/spec-3-1-employee-crud-backend.md`
+  summary: CAP-2 form rejections reuse the CSV importer's sentence composer verbatim, so a form
+    user is shown spreadsheet vocabulary — "The hire_date cell is blank" — including the raw column
+    token the same module goes to trouble to strip elsewhere.
+  evidence: `src/domain/employee.ts` reuses `composeRejectionSentence`, and
+    `tests/domain/employee.test.ts` pins outputs like `'The name cell is blank.'` and
+    `'The hire_date cell reads "31-12-2020", which is not a date in YYYY-MM-DD form.'` as the form's
+    copy. Meanwhile `EMPLOYEE_FIELD_LABELS` and `employeeOffendingValue` carry long comments arguing
+    `hire_date` is "a database column token" with "no business in a sentence a user reads", and a
+    test asserts no underscore reaches any `nonTextFieldRejection` sentence. The care is real but
+    applied to the rejection a user will almost never see. The spec's Code Map mandates reusing the
+    composer "verbatim", so a form projection of the sentences is a spec-level decision for 3-2's
+    copy pass, not a unilateral contract change.
