@@ -304,6 +304,13 @@ describe('composeRefusalStatement', () => {
     );
   });
 
+  it('separates several duplicated columns', () => {
+    // A single-column case cannot see the separator at all, which left a `join('')` mutant alive.
+    expect(
+      composeRefusalStatement({ kind: 'duplicate-columns', columns: ['name', 'gender'] }),
+    ).toBe('The header row names these columns more than once: name, gender.');
+  });
+
   it('states an upload that carried no file', () => {
     expect(composeRefusalStatement({ kind: 'no-file-part' })).toBe(
       'The upload carried no file.',
