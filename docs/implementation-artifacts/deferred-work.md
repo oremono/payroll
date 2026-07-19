@@ -24,10 +24,24 @@
   assessment reads commit history, and because TDD ordering is a Law (Law 1) whose only durable
   evidence is the commit sequence.
 
-  **Re-entry:** check whether the loop's squash is configurable (a `[scm]` policy key, or preserving
-  the dev session's own commits as it already does on the escalation path — that path demonstrably
-  keeps them). Failing that, decide deliberately whether the squash is an acceptable trade and
-  record the ruling, so the practice and the pipeline stop disagreeing.
+  **Investigated 2026-07-19 — it is by design, not a bug.** `.bmad-loop/policy.toml` `[scm]` has
+  `merge_strategy = "merge"` with `ff | merge | squash`, but its own comment scopes it to worktree
+  mode ("worktree mode merges the unit branch into target locally"), and this project runs
+  `isolation = "none"` (in place). `commit_message_template` is documented as *"the commit message
+  dev sessions use for **a story's commit**"* — singular. One commit per story is the intended
+  shape, and the generated message ("story X: implemented and reviewed via bmad-loop") is the
+  loop's own. The granular per-step commits visible on 1-6/2-1/2-2 are the dev session's working
+  commits, which survived only because a timeout ended the run before the story commit consolidated
+  them.
+
+  **Re-entry — two real options, needs a ruling:**
+  1. Switch to `isolation = "worktree"` with `merge_strategy = "merge"`. The unit branch keeps the
+     session's own red/green commits and the merge preserves them in history. This also removes the
+     in-place-checkout hazard that produced every manual recovery this session.
+  2. Accept the squash deliberately and amend the standing practice in this file, so a ratified
+     rule and the pipeline stop contradicting each other. If this is chosen, the red/green evidence
+     has to live somewhere else that is not the author's own narrative — otherwise the practice
+     reverts to exactly what 1-3's review rejected.
 
 ## Deferred from: loop operation (2026-07-19)
 
