@@ -2,7 +2,7 @@
 title: 'Story 1-6: App Shell and As-Of Control'
 type: 'feature'
 created: '2026-07-19'
-status: 'in-review'
+status: 'done'
 baseline_revision: '8b7ae384ba2b7a70dc63a917eaf43d61d1770103'
 review_loop_iteration: 0
 followup_review_recommended: false
