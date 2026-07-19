@@ -34,7 +34,26 @@
   commits, which survived only because a timeout ended the run before the story commit consolidated
   them.
 
-  **Re-entry — two real options, needs a ruling:**
+  **RULED 2026-07-19 (rk): option 1 — switched to worktree isolation.** `.bmad-loop/policy.toml` now
+  has `isolation = "worktree"` with `merge_strategy = "merge"`, so each story's unit branch keeps
+  the session's own red/green commits and the merge preserves them in history. The standing practice
+  and the pipeline now agree, and nothing about the practice needed weakening.
+
+  One non-obvious step was required to make it work: `worktree_seed = [".env"]`. A git worktree
+  checks out **tracked files only**, and `.env` is gitignored yet read by both `prisma.config.ts`
+  and `vitest.integration.config.ts` — without seeding it, every worktree session would have no
+  `DATABASE_URL` and each migrate/integration step would fail in a way that reads like a database
+  outage rather than a config gap. `node_modules` and `src/adapters/db/generated/` are gitignored
+  too but are rebuilt by `npm ci` + `postinstall`, so they are deliberately not seeded; if a first
+  worktree run dies on a missing module, that is the place to look before debugging anything else.
+
+  This also retires the in-place hazard behind every manual recovery in this session — the two
+  timeout escalations, the two killed host processes, and the stale-`master` checkout that briefly
+  reverted the working tree all trace to the loop operating directly in the main checkout.
+
+  Note the policy file itself is gitignored, so this ruling lives here rather than in the diff.
+
+  **Original options, kept for the record:**
   1. Switch to `isolation = "worktree"` with `merge_strategy = "merge"`. The unit branch keeps the
      session's own red/green commits and the merge preserves them in history. This also removes the
      in-place-checkout hazard that produced every manual recovery this session.
