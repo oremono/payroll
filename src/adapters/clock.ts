@@ -72,3 +72,20 @@ export function toUtcPlainDate(epochMs: number): PlainDate {
 export const systemClock: Clock = {
   todayUtc: () => toUtcPlainDate(Date.now()),
 };
+
+/**
+ * The raw instant in milliseconds — and deliberately NOT a member of the `Clock` port.
+ *
+ * UUIDv7 (AD-10) encodes the generation time in its leading 48 bits, so `src/adapters/id.ts`
+ * genuinely needs milliseconds. It lives here rather than there because this file is the ONLY
+ * sanctioned home for `Date.now()` in the codebase, and a second spelling of "now" elsewhere is
+ * exactly what that rule exists to prevent.
+ *
+ * It stays off the port on purpose. `Clock.todayUtc()` returns a `PlainDate` and DISCARDS the
+ * instant precisely so no time-of-day can leak into a calendar comparison downstream; widening the
+ * port would hand that instant to every caller that only ever needed a date. One id generator
+ * needing more is not a reason to give everyone more.
+ */
+export function epochMillisUtc(): number {
+  return Date.now();
+}
