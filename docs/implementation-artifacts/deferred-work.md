@@ -1,5 +1,22 @@
 # Deferred Work
 
+## Deferred from: loop operation (2026-07-19)
+
+- **Two stories shipped without an independent review pass.** `1-6-app-shell-and-as-of-control` and
+  `2-1-bulk-import-backend` both record `dev x1 review x0`, against `1-4` (review x2) and `1-5`
+  (review x1). In both cases the dev session hit `limits.session_timeout_min = 90` *after* finishing
+  the work, so the loop escalated before its review phase ever ran. The only review those two
+  received was the dev pass reviewing itself, and the `followup_review_recommended: false` flag that
+  waved them through is that same pass's self-assessment. rk was offered an adversarial review of
+  2-1 and declined it (2026-07-19), accepting the green gates plus Law spot-checks (Law 4 no
+  hard-coded exponent, Law 6 single `Date.now`, Law 8 refusals returned not thrown, AD-21 route
+  handler count) as sufficient. Recorded because this epic repeatedly produced defects that survived
+  a fully green gate run — the `.env`-pointed-at-production fixture leak, the silently dropped `L3`,
+  and a false "no host committed" claim in a Dev Agent Record were all found by reading, not by
+  gates. **Re-entry:** 2-1 is the boundary payload 2-2 consumes as fixed, so if anything in the
+  import contract later proves wrong, look here first. Raising `session_timeout_min` to ~120 would
+  stop the review phase being skipped by timeout.
+
 ## Deferred from: 2-1-bulk-import-backend (2026-07-19)
 
 - **The CSV money-cell encoding needs ratifying into the spine's Consistency Conventions before the
