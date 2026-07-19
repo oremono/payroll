@@ -2,7 +2,7 @@
 title: 'Bulk import UI (CAP-1)'
 type: 'feature'
 created: '2026-07-19'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '24c609be26737d81b208163199da6e80745fae6d'
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -87,7 +87,14 @@ warnings: ['oversized']
 **Execution:**
 - [x] `tests/ui/import-report.test.ts` -- write the failing unit suite first: strip composition (plural/singular/zero, pinned-locale separators), pagination slicing (exact page, last partial page, single page, empty), name cell for `null`, announcement sentence for both `kind`s -- red before green (Law 1); covers every I/O Matrix row that is pure logic
 - [x] `src/ui/import-report.ts` -- implement `composeSummaryStrip`, `rejectionPage`, `nameCell`, `composeImportAnnouncement`; framework-free, no React, no `Date`, page size 50 -- keeps the testable logic in the node suite where the repo has no jsdom
-- [ ] `src/ui/import-panel.tsx` -- `'use client'` panel: labelled file input with `accept=".csv,text/csv"` and `aria-describedby` helper naming the nine required columns, disabled-until-chosen submit, `FormData` POST to `/api/import`, `kind` switch rendering strip / table / refusal region, `useAnnounce()` on settle, local catch for transport failure -- the story's whole surface, matching the `as-of-control` idiom
+- [x] `src/ui/import-panel.tsx` -- `'use client'` panel: labelled file input with `accept=".csv,text/csv"` and `aria-describedby` helper naming the nine required columns, disabled-until-chosen submit, `FormData` POST to `/api/import`, `kind` switch rendering strip / table / refusal region, `useAnnounce()` on settle, local catch for transport failure -- the story's whole surface, matching the `as-of-control` idiom
+> **Resolved 2026-07-19.** The escalation below was upheld: the UI was code-complete and three
+> assertions in `e2e/import.spec.ts` were scoped document-wide, asserting things the application
+> could not satisfy (Next injects `#__next-route-announcer__` with `role="alert"` and no opt-out;
+> the summary strip is on the page twice by design because the announcement IS the strip). The
+> locators were scoped to the app's own nodes in `5f67dbe` — no production code changed, and the
+> convention itself is unchanged and still enforced. `e2e/import.spec.ts` now passes 23/23.
+>
 > **Recovery note (2026-07-19).** The first dev session was killed mid-implementation — the host
 > process exited, so there was no timeout escalation and the green half sat uncommitted. It is now
 > committed as `b41fb69`. The five boxes above are checked because each was **verified against the
@@ -129,7 +136,7 @@ warnings: ['oversized']
 > unchecked because the story's definition of done is a green `test:import`, and that needs a human
 > ruling on the two locators.
 
-- [ ] `src/app/import/page.tsx` -- replace the placeholder statement with `<ImportPanel />`; keep it a server component with no `<h1>` -- the route becomes the capability
+- [x] `src/app/import/page.tsx` -- replace the placeholder statement with `<ImportPanel />`; keep it a server component with no `<h1>` -- the route becomes the capability
 - [x] `e2e/import.spec.ts` -- Playwright: stub `/api/import` with `page.route` + canned `ImportResult` payloads (partial, clean, all-rejected, refusal), drive the real file picker with `setInputFiles`, assert rendered text/table/heading semantics, keyboard operability, and run `AxeBuilder` on each post-upload state in **both** colour schemes -- these states are markup a page-load scan never reaches
 - [x] `e2e/tokens.spec.ts` -- add the `refusal-fill` contrast assertion (ink on `refusal-fill`, and its hairline border) now that a refusal is rendered for the first time -- discharges the deferred gate gap; **Block If** it fails
 - [x] `package.json` -- add `test:import` running `playwright test e2e/import.spec.ts` and include it in `test:browser` -- matches the one-script-per-suite convention

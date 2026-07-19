@@ -79,9 +79,9 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2 — CAP-1 Bulk Import
-  epic-2: in-progress
+  epic-2: done
   2-1-bulk-import-backend: done
-  2-2-bulk-import-ui: backlog
+  2-2-bulk-import-ui: done
   epic-2-retrospective: optional
 
   # Epic 3 — CAP-2 Employee CRUD
