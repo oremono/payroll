@@ -1,5 +1,36 @@
 # Deferred Work
 
+## Deferred from: 4-1 CI red — the employees suite's read-after-write race (2026-07-19)
+
+- **`e2e/employees.spec.ts`'s read-after-write assertions race Next's router refresh, and the suite
+  does not pass in isolation.** After story 4-1, `Browser + DB (Postgres 18)` went red on `master`
+  twice, each time on a DIFFERENT test — run 1 on "the edit dialog … saves a change" (the detail
+  heading), run 2 on "a successful create … lands in the directory" (the new row). Both are the
+  first read-after-write in their test, and in both cases **the write demonstrably committed**:
+  queried the database directly after a failing local run and the created employee was there, 31
+  rows.
+
+  So the write path is sound; what is unreliable is the CLIENT re-render after the Server Action's
+  `revalidatePath`. The wiring was verified correct — `revalidateEmployee()` calls both
+  `/employees` and `/employees/{id}`, `deps()` injects it, and the handler invokes it only after a
+  commit — and 4-1's refactor of those two calls into one shared helper preserved both.
+
+  **The suite is also order-dependent**, which is the sharper problem: `npx playwright test
+  e2e/employees.spec.ts` passes 42/42 against a freshly seeded database, but running the create
+  test ALONE (`--grep`) against the same fresh seed fails — the row never appears, even at a 15s
+  ceiling. Something earlier in the file makes the refresh work. A suite that passes only as a
+  whole cannot tell you which test is broken when one fails.
+
+  Raised the two read-after-write ceilings to 15s as an empirical measure, with the reasoning
+  recorded at each site. That cannot mask a broken revalidation — the isolated run still fails at
+  15s — but it is not a proven fix either, and it does not address the ordering dependency at all.
+
+  **Re-entry:** this belongs to story 4-2, which renders the salary timeline into the same detail
+  route and will add more read-after-write surfaces to the same race. Find the real signal to wait
+  on (the RSC payload landing, not a wall-clock ceiling), and make each test seed and assert its own
+  starting state so it passes alone. Note the related 3-2 entry above: the suite already mutates
+  state and needs a fresh seed per run.
+
 ## Deferred from: 3-2-employee-crud-ui (2026-07-19)
 
 - **`e2e/employees.spec.ts` is not re-runnable without re-seeding, and fails confusingly when it

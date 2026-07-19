@@ -519,10 +519,18 @@ test.describe('a successful create', () => {
 
     // The directory refreshed itself — the Server Action's own `revalidatePath` did that; this
     // surface adds no cache invalidation of its own (Law 7).
-    await expect(page.getByRole('cell', { name: 'Aaliyah Keyboard' })).toBeVisible();
+    // Generous timeout, deliberately. Everything above proves the WRITE committed — the dialog
+    // closed, focus returned, and the app-level live region carries its sentence. What is still in
+    // flight is Next's client-side router refresh re-rendering the directory's RSC payload after
+    // the Server Action's `revalidatePath`, and on a loaded CI runner that regeneration can outrun
+    // Playwright's 5s default. Raising the ceiling cannot mask a broken revalidation: if the
+    // invalidation never happened the row never appears and this still fails, just later.
+    await expect(page.getByRole('cell', { name: 'Aaliyah Keyboard' })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(
       page.getByText(`Employees 1–${String(PAGE_SIZE)} of ${String(TOTAL + 1)}`),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -555,7 +563,11 @@ test.describe('the edit dialog', () => {
     await expect(page.locator('#app-announcer')).toHaveText('Employee updated.');
     // The DETAIL page revalidated too, not only the list — an edit that invalidated one would leave
     // a page contradicting the list it was reached from.
-    await expect(page.getByRole('heading', { name: 'Elena Rossi-Bianchi' })).toBeVisible();
+    // Same reasoning as the create case above: the write is already proven committed by the
+    // announcer assertion; only the detail route's re-render is still in flight.
+    await expect(page.getByRole('heading', { name: 'Elena Rossi-Bianchi' })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });
 
