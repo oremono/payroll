@@ -532,3 +532,93 @@ Also surfaced while landing the story, outside the Design Notes:
 - source_spec: `docs/implementation-artifacts/spec-1-5-design-token-build.md`
   summary: Named CSS colors (`red`, `white`, `transparent`) escape both halves of the color ban entirely.
   evidence: `COLOR_LITERAL` in `tests/tokens/no-hex.test.ts` and the mirrored patterns in `eslint.config.mjs` match hex and color *functions* only. `color: 'red'` or `background: white` in a component or a stylesheet under `src/` is a hard-coded color outside the token contract that neither gate can see. It is a genuinely different class from the hex ban this story mechanized, and widening it needs care — `transparent` and `currentColor` are legitimate and must stay allowed. **Re-entry:** story 1-6, when real components start writing color declarations; add a named-color alternation to both patterns with an explicit allowlist.
+
+## Deferred from: 1-6-app-shell-and-as-of-control (2026-07-19)
+
+Named by the story's own Design Notes as items to **record rather than resolve**, plus what surfaced
+while landing the shell. `DESIGN.md` is read-only to this story, so nothing that needs a token change
+could have closed here.
+
+- ~~**The shadcn/ui copy-in re-enters at story 1-6.**~~ **MOVED, not taken.** 1-5's review recorded
+  the copy-in as 1-6's obligation and as the place AD-15 was most likely to be violated. 1-6 built
+  no shadcn primitive at all: the only one it needed was a date picker, and shadcn's is
+  `react-day-picker` + `popover` + `button` — five runtime dependencies whose Tailwind v4 templates
+  ship `oklch` literals, a second set of variable names (`--background`, `--primary`, `--ring`) with
+  hard-coded values, and a `.dark` class block. A native `<input type="date">` inside a hand-built
+  popover is fully keyboard-accessible, inherits `color-scheme`, adds nothing, and violates nothing.
+  **Re-entry: the first capability form that needs a primitive the shell does not build** —
+  realistically CAP-2's employee form (story 3-2). The obligation is unchanged: primitives must be
+  **re-pointed** at the generated tokens (`--primary: var(--color-primary)`), never added alongside
+  them, and the `.dark` block dropped. Note that the ESLint ban now also catches a `dark:` variant,
+  which shadcn primitives ship by default — but it still cannot see a `.css` file, so
+  `tests/tokens/no-hex.test.ts` is what catches a literal written there and is worth re-reading
+  before the copy-in rather than after.
+- **`ui → application` types-only is still mechanically unenforced, and now there is something to
+  enforce against.** Open since the 1-2 review, when the `ui` layer was empty. It no longer is:
+  `src/ui/as-of-control.tsx` imports `resolveAsOf` as a VALUE, because a client component must turn
+  a URL param into a displayed date where no server render is available to do it. **1-6 rules that
+  this is allowed** — `ui` may call PURE, total, clock-free functions from `domain` and
+  `application`; what stays banned is a use-case, a repository port, or anything under
+  `src/adapters/**`. That ruling is recorded in `src/ui/README.md`, but the ESLint zone message
+  still says "types only, by convention" and lint still passes on any value import from
+  `application`, including one that would not be pure. So the gate and the rule now disagree in a
+  new way: previously the rule was unenforced, now it is also mis-stated. **Re-entry:** either
+  amend the zone message to the ruling above and add a narrower rule that bans `application/
+  use-cases/**` and `adapters/**` from `ui` specifically, or reverse the ruling and resolve the
+  as-of date server-side into pre-formatted strings passed as props. This also closes the still-open
+  "May `src/ui` import a pure domain FUNCTION, or only types?" item from the 1-4 deferral, which
+  named 1-6 as its re-entry point — the answer is above, but the enforcement is not.
+- **Named CSS colors (`red`, `white`, `transparent`) still escape both halves of the color ban.**
+  Unchanged from the 1-5 follow-up review, which named 1-6 as re-entry "when real components start
+  writing color declarations". Real components now exist, and none of them writes a named color —
+  every surface, ink, and border in the shell is a token utility — so nothing was violated and there
+  was no forcing case to design the rule against. `COLOR_LITERAL` in `tests/tokens/no-hex.test.ts`
+  and the mirrored patterns in `eslint.config.mjs` still match hex and color *functions* only.
+  **Re-entry:** the first component that needs a non-token color at all, or a routine hardening
+  pass; widening needs an explicit allowlist because `transparent` and `currentColor` are legitimate
+  and in use (`as-of-control.tsx`'s glyph is `stroke="currentColor"`).
+- **The dark token set's `[ASSUMPTION]` flag can now be assessed against a real render for the first
+  time — and this story could only do half of it.** DESIGN.md § Dark mode says the flag comes off
+  only after verification against real renders. `e2e/accessibility.spec.ts` now runs axe over all
+  seven routes in BOTH color schemes and the opened popover besides, so the 17 derived values are
+  measured by a browser on real elements rather than computed over frontmatter — a strictly stronger
+  statement than 1-5 could make, and it is green. But axe measures CONTRAST, and the flag is about
+  whether the values *look right*, which no automated gate can answer. **Re-entry:** a human loads
+  the deployed app with the OS in dark mode and rules. If they clear, the flag comes off in
+  DESIGN.md; if they do not, the values change in DESIGN.md followed by `npm run tokens:build` —
+  never in the generated file, and never in a story that may not amend DESIGN.md, which this one
+  could not.
+- **`input-border` on `surface-base` / `surface-tint` was avoided, not fixed.** 1-5 recorded that
+  the token misses DESIGN's own 3:1 non-text floor on two of the three surfaces (2.96:1 and 2.82:1
+  against 3.09:1 on `surface-card`) and named 1-6's shell as a likely re-entry. The shell put its
+  one form control — the as-of picker's panel and its date input — on `surface-card`, which is
+  inside the floor, so the defect is untouched rather than triggered. Same for the border tokens the
+  1-5 code review flagged (`border-hairline` at 1.18:1 as `button-secondary.border`): the shell's
+  buttons use `input-border` and `bg-primary`, not the hairline, so no control boundary in it sits
+  below 3:1. **Re-entry unchanged:** the first story that puts an input on `surface-base` or
+  `surface-tint`, or renders DESIGN's `button-secondary` / `outlier-badge` as specified. The fix is
+  a darker token in DESIGN.md and a rebuild.
+- **The `/`-focuses-search shortcut is deferred to the first surface with a search field.**
+  EXPERIENCE § Interaction Primitives specifies it ("active only when focus is outside editable
+  fields"), and the shell deliberately does not implement it: there is no search field anywhere in
+  the product yet, so the shortcut would either do nothing or focus something invented.
+  **Re-entry:** the Employees capability (story 3-2), which is the first surface with a search
+  field. Implementing it there also means implementing the "focus is outside editable fields" guard
+  — with a date input now in the header, a naive global key handler would swallow `/` while someone
+  is typing in it.
+
+Also surfaced while landing the story, outside the Design Notes:
+
+- **The six placeholder pages are near-identical files with no shared component.** Each is one
+  `<p className="rounded bg-surface-card p-3 text-body-md">` differing only in its sentence. Not
+  factored into a shared `ui` primitive because every one of them is due to be replaced wholesale by
+  a real capability surface, and a shared placeholder component would be an abstraction with a
+  guaranteed lifetime of one epic. **Re-entry:** none expected — the duplication disappears as the
+  capability epics land. Worth naming only so a reviewer sees it was a choice.
+- **`e2e/shell.spec.ts` mirrors the seven routes and labels rather than importing `nav-items.ts`.**
+  Deliberate: a gate that imported the thing it gates passes on any renaming of both at once, and
+  the labels are ratified requirements, not implementation detail. The cost is that adding a
+  destination means editing two lists, and forgetting the second is a silent coverage gap rather
+  than a failure. **Re-entry:** if the nav ever grows past a handful of stable entries, consider
+  asserting the two lists agree in `tests/ui/nav-items.test.ts` — which keeps the e2e list
+  independent while making a divergence loud.

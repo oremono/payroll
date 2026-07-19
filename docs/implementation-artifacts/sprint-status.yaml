@@ -54,6 +54,7 @@ project: payroll
 # 1-7 elaborated via create-story 2026-07-19: Vercel + Neon, migrate-deploy-at-build, branch-per-PR, pool bound
 # 1-4 implemented 2026-07-19: src/domain/money.ts + reference-data and value-constraint migrations
 # 1-5 implemented 2026-07-19: DESIGN.md -> src/app/tokens.generated.css generator, WCAG contrast gate, AD-15 hex ban
+# 1-6 implemented 2026-07-19: app shell (sidebar/header/skip link/live region), as-of date in the URL, F-5 dark: lint ban
 project_key: NOKEY
 tracking_system: file-system
 story_location: docs/implementation-artifacts
@@ -74,7 +75,7 @@ development_status:
   1-7-deployment-and-environments: done
   1-4-money-currency-domain-primitives: done
   1-5-design-token-build: done
-  1-6-app-shell-and-as-of-control: backlog
+  1-6-app-shell-and-as-of-control: review
   epic-1-retrospective: optional
 
   # Epic 2 — CAP-1 Bulk Import
