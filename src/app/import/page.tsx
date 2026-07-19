@@ -1,20 +1,18 @@
+import { ImportPanel } from '@/ui/import-panel';
+
 /**
- * Import — placeholder route (story 1-6).
+ * Import — the CAP-1 surface (story 2-2). Until now this route was story 1-6's placeholder
+ * statement; the capability it stood in for is what renders here.
  *
- * The shell is this story's deliverable; the capability is not. No database read, no Prisma
- * import, no Server Action, no use-case (story constraint) — the page exists so the sidebar has a
- * real destination, `aria-current="page"` has something to be current ON, and the axe pass has all
- * seven surfaces to judge.
+ * Still a SERVER component, and deliberately empty of logic. There is nothing to read: the report
+ * is produced by an upload, not by a query, so this page has no use-case call, no database read,
+ * and no as-of date to resolve. It renders one client component and gets out of the way — the
+ * composition root remains `src/app/layout.tsx` and the Route Handler.
  *
- * The statement below is the ratified first-run copy. A statement, never a celebration
- * (EXPERIENCE § Cross-cutting state patterns: "in a calm register — statements, never
- * celebrations"), and no invented capability copy beyond it.
- *
- * There is no `<h1>` here: the header's page title is the document's one `<h1>` and the first
- * heading in DOM order, derived from `nav-items` so it cannot disagree with the sidebar.
+ * There is no `<h1>` here. The header's page title is the document's one `<h1>` and the first
+ * heading in DOM order, derived from `nav-items` so it cannot disagree with the sidebar; the panel
+ * starts its own headings at `<h2>`.
  */
 export default function ImportPage() {
-  return (
-    <p className="rounded bg-surface-card p-3 text-body-md">Bulk import is not available yet.</p>
-  );
+  return <ImportPanel />;
 }
