@@ -1,5 +1,19 @@
 # Deferred Work
 
+## Deferred from: 3-2-employee-crud-ui (2026-07-19)
+
+- **`e2e/employees.spec.ts` is not re-runnable without re-seeding, and fails confusingly when it
+  is.** The suite MUTATES state — "a successful create" adds an employee — while other assertions
+  pin the directory at the fixture's 30 rows. `e2e/fixtures/seed-employees.ts` truncates and
+  reseeds, but it is a separate command (`npm run e2e:seed`), so a second local run of
+  `npm run test:browser:db` without reseeding sees 31 employees and fails in a way that looks like
+  a product defect rather than stale fixture state. Observed exactly that during 3-2's
+  verification. CI is unaffected — the `browser-db` job seeds a fresh database once per run — so
+  this is a local-developer trap only. **Re-entry:** have the Playwright suite seed in a
+  `globalSetup`, or assert the expected starting count in a `beforeAll` and fail with a message
+  naming `npm run e2e:seed`. This is the same family as the standing fixture-accumulation entries
+  above.
+
 ## Deferred from: loop operation — squashed stories lose the red/green artifact (2026-07-19)
 
 - **A cleanly-completed `bmad-loop` run squashes the whole story into ONE commit, which erases the
