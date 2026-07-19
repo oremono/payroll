@@ -2,7 +2,8 @@
 title: 'Story 1-6: App Shell and As-Of Control'
 type: 'feature'
 created: '2026-07-19'
-status: 'ready-for-dev'
+status: 'in-review'
+baseline_revision: '8b7ae384ba2b7a70dc63a917eaf43d61d1770103'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -104,24 +105,24 @@ warnings: ['oversized']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/domain/plain-date.test.ts` -- failing suite over every plain-date row of the I/O matrix (parse shapes, impossible dates, leap years, format padding, compare) -- Law 1: red is committed before `plain-date.ts` exists.
-- [ ] `src/domain/plain-date.ts` -- implement the value object and its four total functions -- green in a separate commit; must reach 100% coverage and survive Stryker.
-- [ ] `tests/application/as-of.test.ts` + `src/application/ports/clock.ts` + `src/application/as-of.ts` -- red then green: the resolution policy (missing, valid, future-clamped, malformed, array) and the `Clock` port AD-11 has owed since 1-1.
-- [ ] `tests/adapters/clock.test.ts` + `src/adapters/clock.ts` -- red then green: `toUtcPlainDate` against fixed epoch values including a UTC day boundary; `systemClock` implements `Clock`. Deterministic — the test never reads the real clock. An adapter is production code and Law 1 binds it (1-3's recorded lesson).
-- [ ] `tests/ui/nav-items.test.ts` + `src/ui/nav-items.ts` -- red then green: the seven items in order with exact labels, Settings last, and exact-match `isActiveNavItem`.
-- [ ] `tests/tokens/eslint-config.test.ts` + `eslint.config.mjs` -- red then green: the `dark:` ban. Add the selector to the **shared** list so `colorLiteralBanConfig`, `prngExemptionConfig` and `purityConfig` all carry it -- closes the last unenforced prohibition in the token contract, and this is the exact block layering that silently revoked the PRNG exemption in 1-5.
-- [ ] `package.json` -- add the two Fontsource dependencies and import the needed weights in `layout.tsx` (sans 400/600/700, mono 400/500/600) -- DESIGN binds all numerals to JetBrains Mono; a fallback satisfies the monospacing but not the identity.
-- [ ] `src/app/globals.css` -- `color-scheme: light dark` and the body canvas -- without both, OS dark mode paints `main` dark inside a UA-white page and native controls render light-on-dark (`deferred-work.md`, 1-5 follow-up review).
-- [ ] `src/ui/announcer.tsx`, `src/ui/skip-link.tsx`, `src/ui/sidebar-nav.tsx`, `src/ui/app-header.tsx`, `src/ui/as-of-control.tsx` -- the shell primitives, hand-built on tokens.
-- [ ] `src/app/layout.tsx` -- compose them; `await connection()` before the clock read so "today" is per-request and never baked into a prerender.
-- [ ] `src/app/page.tsx` + the six new `page.tsx` files -- the placeholder routes. Data surfaces (Home, Employees, Gender Insights, Payroll Totals, Overdue for Review) carry the ratified first-run statement `No employees yet. Import a spreadsheet to begin.`; Home additionally echoes the resolved as-of date server-side from `searchParams`, which is what makes recompute observable. Import carries `Bulk import is not available yet.` and Settings carries `Settings are not available yet.` — statements, never celebrations, and no invented capability copy beyond these.
-- [ ] `e2e/shell.spec.ts` -- the browser-level gate: landmarks, skip link reachable by Tab from page start, `aria-current="page"` follows navigation, the as-of button's accessible name, the picker round trip (open → set → URL param → server-rendered echo changes → announcement text lands in the live region), the live region is the **same DOM node** before and after, Esc closes and returns focus to the button.
-- [ ] `e2e/accessibility.spec.ts` -- run axe over all seven routes, in both color schemes.
-- [ ] `e2e/tokens.spec.ts` -- retarget the three assertions the shell moves and assert the canvas repaints under dark.
-- [ ] `package.json`, `.github/workflows/ci.yml` -- add `e2e/shell.spec.ts` to `test:browser` (the a11y job already builds and serves; a second Playwright invocation would cost a second `next build`).
-- [ ] `src/ui/README.md`, `src/app/README.md` -- record the shell contract, the no-shadcn decision, and the `dark:` gate.
-- [ ] `docs/implementation-artifacts/deferred-work.md` -- append the items named in Design Notes; mark the shadcn re-entry as moved.
-- [ ] `docs/implementation-artifacts/sprint-status.yaml` -- set `1-6-app-shell-and-as-of-control` to its new status.
+- [x] `tests/domain/plain-date.test.ts` -- failing suite over every plain-date row of the I/O matrix (parse shapes, impossible dates, leap years, format padding, compare) -- Law 1: red is committed before `plain-date.ts` exists.
+- [x] `src/domain/plain-date.ts` -- implement the value object and its four total functions -- green in a separate commit; must reach 100% coverage and survive Stryker.
+- [x] `tests/application/as-of.test.ts` + `src/application/ports/clock.ts` + `src/application/as-of.ts` -- red then green: the resolution policy (missing, valid, future-clamped, malformed, array) and the `Clock` port AD-11 has owed since 1-1.
+- [x] `tests/adapters/clock.test.ts` + `src/adapters/clock.ts` -- red then green: `toUtcPlainDate` against fixed epoch values including a UTC day boundary; `systemClock` implements `Clock`. Deterministic — the test never reads the real clock. An adapter is production code and Law 1 binds it (1-3's recorded lesson).
+- [x] `tests/ui/nav-items.test.ts` + `src/ui/nav-items.ts` -- red then green: the seven items in order with exact labels, Settings last, and exact-match `isActiveNavItem`.
+- [x] `tests/tokens/eslint-config.test.ts` + `eslint.config.mjs` -- red then green: the `dark:` ban. Add the selector to the **shared** list so `colorLiteralBanConfig`, `prngExemptionConfig` and `purityConfig` all carry it -- closes the last unenforced prohibition in the token contract, and this is the exact block layering that silently revoked the PRNG exemption in 1-5.
+- [x] `package.json` -- add the two Fontsource dependencies and import the needed weights in `layout.tsx` (sans 400/600/700, mono 400/500/600) -- DESIGN binds all numerals to JetBrains Mono; a fallback satisfies the monospacing but not the identity.
+- [x] `src/app/globals.css` -- `color-scheme: light dark` and the body canvas -- without both, OS dark mode paints `main` dark inside a UA-white page and native controls render light-on-dark (`deferred-work.md`, 1-5 follow-up review).
+- [x] `src/ui/announcer.tsx`, `src/ui/skip-link.tsx`, `src/ui/sidebar-nav.tsx`, `src/ui/app-header.tsx`, `src/ui/as-of-control.tsx` -- the shell primitives, hand-built on tokens.
+- [x] `src/app/layout.tsx` -- compose them; `await connection()` before the clock read so "today" is per-request and never baked into a prerender.
+- [x] `src/app/page.tsx` + the six new `page.tsx` files -- the placeholder routes. Data surfaces (Home, Employees, Gender Insights, Payroll Totals, Overdue for Review) carry the ratified first-run statement `No employees yet. Import a spreadsheet to begin.`; Home additionally echoes the resolved as-of date server-side from `searchParams`, which is what makes recompute observable. Import carries `Bulk import is not available yet.` and Settings carries `Settings are not available yet.` — statements, never celebrations, and no invented capability copy beyond these.
+- [x] `e2e/shell.spec.ts` -- the browser-level gate: landmarks, skip link reachable by Tab from page start, `aria-current="page"` follows navigation, the as-of button's accessible name, the picker round trip (open → set → URL param → server-rendered echo changes → announcement text lands in the live region), the live region is the **same DOM node** before and after, Esc closes and returns focus to the button.
+- [x] `e2e/accessibility.spec.ts` -- run axe over all seven routes, in both color schemes.
+- [x] `e2e/tokens.spec.ts` -- retarget the three assertions the shell moves and assert the canvas repaints under dark.
+- [x] `package.json`, `.github/workflows/ci.yml` -- add `e2e/shell.spec.ts` to `test:browser` (the a11y job already builds and serves; a second Playwright invocation would cost a second `next build`).
+- [x] `src/ui/README.md`, `src/app/README.md` -- record the shell contract, the no-shadcn decision, and the `dark:` gate.
+- [x] `docs/implementation-artifacts/deferred-work.md` -- append the items named in Design Notes; mark the shadcn re-entry as moved.
+- [x] `docs/implementation-artifacts/sprint-status.yaml` -- set `1-6-app-shell-and-as-of-control` to its new status.
 
 **Acceptance Criteria:**
 - Given any of the seven routes, when it loads, then exactly one `<nav>` and one `<main>` landmark exist, the first Tab-focusable element is the skip link targeting `#main-content`, and the sidebar item matching the current path — and only that one — carries `aria-current="page"`.
