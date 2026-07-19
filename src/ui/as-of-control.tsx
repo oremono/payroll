@@ -99,7 +99,11 @@ export function AsOfControl({ today }: { today: PlainDate }) {
   // decides so. Reading the URL rather than a prop is what makes a pasted link reproduce the view.
   const asOf = resolveAsOf(searchParams.getAll('asOf'), today);
   const asOfIso = plainDateToIso(asOf);
-  const asOfLabel = formatPlainDate(asOf);
+  // `formatPlainDate` is total and returns `null` for a month outside 1..12 (the `money.ts` guard
+  // pattern). Unreachable here — `resolveAsOf` only ever yields a parsed date or `today` — but the
+  // fallback is spelled out rather than left to JSX's habit of rendering `null` as nothing: the
+  // canonical machine form is honest, reproduces the URL, and cannot be mistaken for a display bug.
+  const asOfLabel = formatPlainDate(asOf) ?? asOfIso;
   const todayIso = plainDateToIso(today);
 
   function open() {
@@ -213,7 +217,9 @@ export function AsOfControl({ today }: { today: PlainDate }) {
 
     startTransition(() => {
       router.push(`${pathname}?${query.toString()}`);
-      announce(`${ANNOUNCE_PREFIX} ${formatPlainDate(chosen)}`);
+      // Same fallback, and for a sharper reason: a template literal renders `null` as the WORD
+      // "null", so an unguarded interpolation would announce "Findings updated as of null".
+      announce(`${ANNOUNCE_PREFIX} ${formatPlainDate(chosen) ?? plainDateToIso(chosen)}`);
     });
   }
 

@@ -38,6 +38,17 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_ABBREVIATIONS = 'JanFebMarAprMayJunJulAugSepOctNovDec';
 const MONTH_ABBREVIATION_LENGTH = 3;
 
+/** January and December — the bounds every function here holds `month` to. */
+const FIRST_MONTH = 1;
+const LAST_MONTH = 12;
+
+/**
+ * The first year that exists. There is no year zero in the proleptic Gregorian calendar this module
+ * implements, and — the concrete harm, not the pedantic one — `<input type="date">` cannot hold
+ * one, so a `?asOf=0000-01-01` URL rendered a date the picker then showed as blank.
+ */
+const FIRST_YEAR = 1;
+
 /** The proleptic Gregorian rule, in full: every 4th year, except centuries, except every 400th. */
 function isLeapYear(year: number): boolean {
   if (year % 400 === 0) {
@@ -83,7 +94,10 @@ export function parsePlainDate(iso: string): PlainDate | null {
   const month = Number(iso.slice(5, 7));
   const day = Number(iso.slice(8, 10));
 
-  if (month < 1 || month > 12) {
+  if (year < FIRST_YEAR) {
+    return null;
+  }
+  if (month < FIRST_MONTH || month > LAST_MONTH) {
     return null;
   }
   if (day < 1 || day > daysInMonth(year, month)) {
@@ -95,16 +109,35 @@ export function parsePlainDate(iso: string): PlainDate | null {
 
 /**
  * The one display form for a date, per DESIGN: `16 Jul 2026` — zero-padded day, three-letter month,
- * four-digit year. Spelled "as of {this}" everywhere it appears; never "snapshot" (Law 3).
+ * FOUR-DIGIT year. Spelled "as of {this}" everywhere it appears; never "snapshot" (Law 3).
  *
  * `Intl.DateTimeFormat` is deliberately absent for the same reason `Intl.NumberFormat` is absent
  * from `money.ts`: its output depends on the Node ICU build, which makes it non-deterministic
  * across environments (Law 6).
+ *
+ * TOTAL, and now HONEST about it: returns `null` when `month` is not a whole number in 1..12. This
+ * follows `money.ts`'s `formatMoney` exactly (Law 4 / AD-4) — a value that arrives from outside is
+ * guarded before use, and a failure is a `null` return, never an exception. `PlainDate` is a
+ * structural type, so nothing stops a bad cast, a JSON round-trip, or a hand-built literal from
+ * presenting `{month: 13}`, and the consequence was silent: the index ran off the abbreviation
+ * table, `slice` (total for any input, which is why it was chosen) returned the empty string, and
+ * the function emitted `"15  2026"` — a double space where the month should be, on a date surface,
+ * reading exactly like an answer. Unreachable through `parsePlainDate` or `resolveAsOf`, which is
+ * the same thing `formatMoney`'s exponent guard is, and it is guarded for the same reason.
+ * (Code review 2026-07-19.)
  */
-export function formatPlainDate(date: PlainDate): string {
+export function formatPlainDate(date: PlainDate): string | null {
+  if (
+    !Number.isInteger(date.month) ||
+    date.month < FIRST_MONTH ||
+    date.month > LAST_MONTH
+  ) {
+    return null;
+  }
+
   const start = (date.month - 1) * MONTH_ABBREVIATION_LENGTH;
   const monthName = MONTH_ABBREVIATIONS.slice(start, start + MONTH_ABBREVIATION_LENGTH);
-  return `${padNumber(date.day, 2)} ${monthName} ${date.year}`;
+  return `${padNumber(date.day, 2)} ${monthName} ${padNumber(date.year, 4)}`;
 }
 
 /**

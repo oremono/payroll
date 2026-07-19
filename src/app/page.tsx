@@ -51,7 +51,10 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           dateTime={plainDateToIso(asOf)}
           className="font-mono text-number-sm"
         >
-          {formatPlainDate(asOf)}
+          {/* `formatPlainDate` returns `null` for an out-of-range month (the `money.ts` guard
+              pattern). Unreachable through `resolveAsOf`, but JSX renders `null` as NOTHING — an
+              empty `<time>` on a provenance line — so the canonical machine form is the fallback. */}
+          {formatPlainDate(asOf) ?? plainDateToIso(asOf)}
         </time>
         .
       </p>
