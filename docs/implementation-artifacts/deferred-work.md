@@ -1,5 +1,23 @@
 # Deferred Work
 
+## Deferred from: 2-1-bulk-import-backend (2026-07-19)
+
+- **The CSV money-cell encoding needs ratifying into the spine's Consistency Conventions before the
+  export stories pick their own.** Story 2-1 had to settle how money is spelled in a CSV cell, and
+  the answer is forced rather than chosen: AD-4 forbids a bare amount, so `2340000` alone is
+  illegal; AD-6 makes any currency in the file non-authoritative but *validated against* the
+  country's resolution, which presupposes something to validate; and a symbol-bearing cell
+  (`₹23,40,000`) would need locale- and grouping-aware parsing, which collides with "nothing is
+  guessed" (AD-7). Exactly one encoding survives all three, and it is what CAP-1 now implements:
+  **two columns, `amount_minor` (integer minor units) + `currency` (ISO-4217), with a mismatch
+  against the country's currency rejecting the row.** The derivation is sound, but the CONVENTION is
+  cross-cutting and currently lives only in `src/domain/import-row.ts` and this story's spec. Three
+  CSV *export* stories are still ahead of it, and if they each derive their own answer the product
+  will read and write money in different shapes. **Re-entry:** promote the two-column encoding to
+  the spine's Consistency Conventions (alongside the `snake_case` / calendar-`DATE` rules) so import
+  and all three exports inherit one spelling, and note there that the exponent for rendering comes
+  from the `currency` reference table, never a hard-coded 100.
+
 ## Deferred from: code review of 1-7-deployment-and-environments (2026-07-19)
 
 Migrated from the story's Review Findings when 1-7 was closed. All six were assessed as
@@ -622,3 +640,15 @@ Also surfaced while landing the story, outside the Design Notes:
   than a failure. **Re-entry:** if the nav ever grows past a handful of stable entries, consider
   asserting the two lists agree in `tests/ui/nav-items.test.ts` — which keeps the e2e list
   independent while making a divergence loud.
+
+- source_spec: `docs/implementation-artifacts/spec-2-1-bulk-import-backend.md`
+  summary: The coverage floor and the mutation gate both stop at `src/domain/**` + `src/application/**`, leaving every adapter — the hand-rolled CSV parser, the Prisma write funnel, the Route Handler — measured by nothing.
+  evidence: Story 2-1's review found two data-loss defects, both in `src/adapters/**`, in code that passed every CI gate. The gate set reads as rigor ("100% mutation score") while the riskiest code in the change is ungated. Widening the gates is a project-level decision, not a story call, but the asymmetry is now demonstrated rather than theoretical.
+
+- source_spec: `docs/implementation-artifacts/spec-2-1-bulk-import-backend.md`
+  summary: `epochMillisUtc()` in `src/adapters/clock.ts` is reachable from `src/app/**`, so a Server Component can branch on the time of day despite the clock port deliberately withholding milliseconds.
+  evidence: `eslint.config.mjs` grants `src/app/**` the composition-root exception to import `./adapters`. The restriction that keeps raw time out of rendering is currently a doc comment, not a lint rule, so nothing mechanically prevents the outcome the port exists to make impossible.
+
+- source_spec: `docs/implementation-artifacts/spec-2-1-bulk-import-backend.md`
+  summary: The integration suite cannot clean up after itself, so every CI run permanently accumulates employees and reference rows in the shared database.
+  evidence: `salary_record` has UPDATE/DELETE revoked at the `payroll_app` role (AD-18), which is correct and deliberate — but it means integration fixtures are immortal. Later stories asserting population counts will inherit the accumulated debris, and any fixture scheme deriving a value against a UNIQUE column will eventually collide. Needs a disposable-branch-per-run policy or an owner-role teardown path.
