@@ -66,6 +66,31 @@ const ANNOUNCE_PREFIX = 'Findings updated as of';
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * The dropdown affordance DESIGN.md:220 specifies for this control and the shell shipped without:
+ * "calendar glyph + `As of 16 Jul 2026` in {typography.number-sm} {colors.ink-muted}, dropdown
+ * affordance". There was no disclosure indicator at all, so nothing but the cursor said the control
+ * opens anything.
+ *
+ * `aria-hidden`, like the calendar glyph beside it, and for the same reason: `aria-haspopup="dialog"`
+ * and `aria-expanded` already carry this to a screen reader, exactly and in the right vocabulary. A
+ * second, graphical telling of the same fact would be read as a stray image.
+ */
+function DisclosureGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="h-3 w-3 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M4 6.5 8 10.5l4-4" />
+    </svg>
+  );
+}
+
 function CalendarGlyph() {
   return (
     <svg
@@ -244,12 +269,17 @@ export function AsOfControl({ today }: { today: PlainDate }) {
         className="flex items-center gap-2 rounded border border-input-border bg-surface-card px-3 py-2 text-ink-muted hover:text-ink"
       >
         <CalendarGlyph />
-        <span className="text-body-sm">As of</span>
-        {/* All numerals are JetBrains Mono, dates in data positions included (DESIGN
-            § Typography). `<time>` also gives the date a machine-readable value. */}
+        {/* One type step across the whole label, per DESIGN.md:220: "calendar glyph + `As of
+            16 Jul 2026` in {typography.number-sm} {colors.ink-muted}". The label had been split
+            between `text-body-sm` ("As of") and `text-number-sm` (the date) — two faces and two
+            sizes inside one four-word phrase, which reads as a mistake rather than as emphasis.
+            All numerals are JetBrains Mono, dates in data positions included (DESIGN § Typography);
+            `<time>` also gives the date a machine-readable value. */}
+        <span className="font-mono text-number-sm">As of</span>
         <time dateTime={asOfIso} className="font-mono text-number-sm">
           {asOfLabel}
         </time>
+        <DisclosureGlyph />
       </button>
 
       {isOpen ? (

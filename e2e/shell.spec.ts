@@ -265,10 +265,52 @@ test.describe('the as-of control', () => {
     await expect(button).toHaveAccessibleName(`As of ${TODAY().label} — change as-of date`);
   });
 
-  test('hides its calendar glyph from the accessibility tree', async ({ page }) => {
+  test('hides both its glyphs from the accessibility tree', async ({ page }) => {
     await page.goto('/');
 
-    await expect(asOfButton(page).locator('svg')).toHaveAttribute('aria-hidden', 'true');
+    // DESIGN.md:220 specifies a calendar glyph AND a dropdown affordance. Both are decorative:
+    // `aria-haspopup="dialog"` and `aria-expanded` already tell a screen reader that this opens
+    // something, exactly and in the right vocabulary, so a second graphical telling would be read
+    // as a stray image.
+    const glyphs = asOfButton(page).locator('svg');
+    await expect(glyphs).toHaveCount(2);
+    for (const glyph of await glyphs.all()) {
+      await expect(glyph).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
+  test('carries the disclosure affordance DESIGN specifies, without renaming the control', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    // The accessible name is pinned separately and SC 2.5.3 Label in Name depends on it, so the
+    // affordance must be additive in the DOM and invisible to the accessibility tree.
+    await expect(asOfButton(page)).toHaveAccessibleName(
+      `As of ${TODAY().label} — change as-of date`,
+    );
+  });
+
+  test('sets the whole label in one type step, per DESIGN § As-of date control', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    // "calendar glyph + `As of 16 Jul 2026` in {typography.number-sm}" — one step across the whole
+    // phrase. It had been split between text-body-sm ("As of") and text-number-sm (the date): two
+    // faces and two sizes inside four words, which reads as a mistake rather than as emphasis.
+    const label = asOfButton(page).locator('span');
+    const time = asOfButton(page).locator('time');
+
+    const stepOf = (locator: ReturnType<typeof asOfButton>) =>
+      locator.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return `${style.fontSize}/${style.fontFamily.toLowerCase().split(',')[0]?.trim()}`;
+      });
+
+    // --text-number-sm is 12px, and the mono face is JetBrains Mono.
+    expect(await stepOf(label)).toBe('12px/"jetbrains mono"');
+    expect(await stepOf(time)).toBe(await stepOf(label));
   });
 
   test('defaults to today when the URL carries no asOf param', async ({ page }) => {
