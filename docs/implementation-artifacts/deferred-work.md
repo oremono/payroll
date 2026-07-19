@@ -26,6 +26,34 @@
   recorded at each site. That cannot mask a broken revalidation — the isolated run still fails at
   15s — but it is not a proven fix either, and it does not address the ordering dependency at all.
 
+  **Investigated further 2026-07-20, with the CI trace. Narrowed, not solved.**
+
+  The trace settled what the failure IS. At the moment of failure the directory had fully
+  re-rendered and read `Employees 1–25 of 30 · Page 1 of 2`, starting at `Aaron Fields`. The count
+  is **30, not 31** — so the list is serving STALE data. Not a sort or collation difference
+  (`Aaliyah Keyboard` is position 1 locally), not pagination (the total itself is wrong), and not a
+  wait-longer race (the page was fully rendered, and 15s ceilings changed nothing).
+
+  Ruled out by direct evidence, each having been a working hypothesis at some point:
+  - **Timing / router-refresh race** — the rendered page is complete, just old.
+  - **Sorting or Postgres collation** — the name sorts first under any collation.
+  - **Test ordering** — retracted above; that was a dead local database.
+  - **`revalidatePath` throwing and being swallowed** — plausible, and the swallow genuinely made
+    it invisible, so `revalidateCommitted` now logs instead of discarding. It does NOT fire: the
+    call does not throw.
+  - **The client not asking for a refresh** — `employee-form-panel.tsx` already calls
+    `router.refresh()` after a committed create/update, added in 3-2 for this same symptom.
+
+  **A local reproduction now exists**, which it did not before: `CI=1` (which disables
+  `reuseExistingServer`, so each run gets a COLD server) plus a fresh `npm run e2e:seed` plus the
+  full file. It is intermittent — it reproduces on some runs and not others — and it alternates
+  between the create test and the edit test exactly as CI does.
+
+  So: the write commits, the server is asked to invalidate, the client is asked to refresh, nothing
+  throws, and the client still renders the pre-write list. The remaining suspects are Next 16's
+  client Router Cache and the `/employees` Suspense boundary (`loading.tsx`), which is where a
+  streamed RSC payload could be resolved from a stale entry.
+
   **What is still unexplained:** the failure reproduces in CI on three consecutive runs and has
   never reproduced locally once the database was actually up. CI uploads no Playwright trace, so
   the only evidence is a one-line locator error — that gap is now closed by an `upload-artifact`

@@ -128,9 +128,19 @@ function coerceFields<K extends string>(
 function revalidateCommitted(deps: EmployeeWriteDeps, employeeId: string): void {
   try {
     deps.revalidate(employeeId);
-  } catch {
-    // Deliberately swallowed: see above. There is nothing to report and nothing to undo — the
-    // write is committed, and the answer must describe the write, not the cache.
+  } catch (cause) {
+    // Swallowed for the CALLER — see above: the write is committed, and the answer must describe
+    // the write, not the cache. But not swallowed SILENTLY.
+    //
+    // Silence here is how a stale directory becomes undiagnosable. If `revalidatePath` throws, the
+    // row is saved, the live region says "Employee created.", the list still shows the pre-create
+    // count, and nothing anywhere records why — which is exactly the shape of the CI-only failure
+    // in `e2e/employees.spec.ts` that this comment was written during. A cache failure is still a
+    // failure; it just is not the user's problem to hear about.
+    console.error('[employee-write] revalidatePath failed after a committed write', {
+      employeeId,
+      cause,
+    });
   }
 }
 
