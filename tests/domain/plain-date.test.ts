@@ -48,6 +48,22 @@ describe('parsePlainDate', () => {
     expect(parsePlainDate('0012-01-02')).toEqual({ year: 12, month: 1, day: 2 });
   });
 
+  // Code review 2026-07-19. `?asOf=0000-01-01` was ACCEPTED and displayed as "01 Jan 0": year zero
+  // does not exist in the proleptic Gregorian calendar this module implements, and — the concrete
+  // harm — `<input type="date">` cannot hold it, so reopening the picker on such a URL showed a
+  // blank field. A date the product can display but not edit is not a date.
+  it('rejects year 0000 — there is no year zero, and no date input can hold one', () => {
+    expect(parsePlainDate('0000-01-01')).toBeNull();
+  });
+
+  it('rejects year 0000 in December too — the floor is on the year, not on a month/day pairing', () => {
+    expect(parsePlainDate('0000-12-31')).toBeNull();
+  });
+
+  it('accepts year 0001 — the first year that exists, and the boundary the floor sits on', () => {
+    expect(parsePlainDate('0001-01-01')).toEqual({ year: 1, month: 1, day: 1 });
+  });
+
   it('rejects month 00 — a month is 1-based', () => {
     expect(parsePlainDate('2026-00-10')).toBeNull();
   });
@@ -137,6 +153,44 @@ describe('formatPlainDate', () => {
 
   it('does not pad a two-digit day it already has', () => {
     expect(formatPlainDate({ year: 2026, month: 7, day: 10 })).toBe('10 Jul 2026');
+  });
+
+  // Code review 2026-07-19. The format contract says FOUR-DIGIT year, and `plainDateToIso` had
+  // padded since day one — but this function did not, so `?asOf=0001-01-01` rendered "01 Jan 1"
+  // in the header while the URL and the `<time dateTime>` beside it said `0001-01-01`. Two
+  // spellings of one date on one screen is exactly the drift the single display form exists to
+  // prevent.
+  it('pads a year below 1000 to four digits, as the format contract states', () => {
+    expect(formatPlainDate({ year: 1, month: 1, day: 1 })).toBe('01 Jan 0001');
+  });
+
+  it('pads a three-digit year', () => {
+    expect(formatPlainDate({ year: 999, month: 12, day: 31 })).toBe('31 Dec 0999');
+  });
+
+  it('leaves a four-digit year alone', () => {
+    expect(formatPlainDate({ year: 1000, month: 1, day: 1 })).toBe('01 Jan 1000');
+  });
+
+  // Code review 2026-07-19. A month outside 1..12 ran the index off the abbreviation table and
+  // `slice` — total for any input, which is why it was chosen — returned the EMPTY string, so
+  // `formatPlainDate({year: 2026, month: 13, day: 15})` produced `"15  2026"`: a double space, no
+  // month, and no signal at all. `money.ts` is the precedent (Law 4 / AD-4): a value that arrives
+  // from outside is guarded, and the failure is a `null` return, never an exception and never a
+  // malformed string that reads like an answer.
+  it.each([
+    ['month 13', 13],
+    ['month 0', 0],
+    ['a negative month', -1],
+    ['a fractional month', 7.5],
+    ['NaN', Number.NaN],
+  ])('returns null rather than a malformed string for %s', (_name, month) => {
+    expect(formatPlainDate({ year: 2026, month, day: 15 })).toBeNull();
+  });
+
+  it('formats month 1 and month 12 — the boundaries the guard must not move', () => {
+    expect(formatPlainDate({ year: 2026, month: 1, day: 15 })).toBe('15 Jan 2026');
+    expect(formatPlainDate({ year: 2026, month: 12, day: 15 })).toBe('15 Dec 2026');
   });
 
   // All twelve abbreviations, because the month name is looked up positionally: an off-by-one or a
