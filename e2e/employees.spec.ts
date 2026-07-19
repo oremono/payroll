@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { fixtureId, NAMES, seedEmployees } from './fixtures/seed-employees';
+import { countryFor, fixtureId, NAMES, seedEmployees } from './fixtures/seed-employees';
 
 // The browser-level gate for the CAP-2 Employees surface (story 3-2).
 //
@@ -315,11 +315,31 @@ test.describe('the detail route', () => {
     // Currency FOLLOWS from country and is never chosen (AD-6).
     await expect(page.getByText(/Currency USD/)).toBeVisible();
 
-    // NOTHING CAP-3/4/5 owns. The current-salary resolver (AD-8) does not exist yet. Scoped to
+    // CAP-3's entry point, and ONLY its entry point (story 4-2). This assertion used to read
+    // `getByText(/salary/i)).toHaveCount(0)` — it encoded the hole this page's own docstring
+    // recorded ("no record-a-change entry point (Epic 4)"), and Epic 4 is what fills it. What
+    // replaces it is the same claim minus the part story 4-2 delivers.
+    await expect(page.getByRole('button', { name: 'Record a salary change' })).toBeVisible();
+
+    // NOTHING CAP-4/CAP-5 owns, and no salary AMOUNT anywhere. The timeline is Epic 5 and the
+    // percent change and `(Hire)` label are rendered there, not stored and not here. Scoped to
     // `main` because the shell's `<h1>` falls back to the product name — "Salary Management for
     // ACME HR" — on a route no nav item claims, which this one is.
-    await expect(page.locator('main').getByText(/salary/i)).toHaveCount(0);
+    await expect(page.locator('main').getByText(/current salary/i)).toHaveCount(0);
+    await expect(page.locator('main').getByText(/salary timeline/i)).toHaveCount(0);
+    await expect(page.locator('main').getByText('(Hire)')).toHaveCount(0);
+    await expect(page.locator('main').getByText(/%/)).toHaveCount(0);
     await expect(page.locator('main').getByText(/peer/i)).toHaveCount(0);
+    // A rendered MONEY AMOUNT, whatever currency it is in. The six probes that replaced the old
+    // blanket `getByText(/salary/i)).toHaveCount(0)` are all vocabulary probes, and a formatted
+    // amount matches none of them: `formatMoney` renders `symbol + grouped digits + ISO code` and
+    // says the word "salary" nowhere. This is the shape-level backstop for the claim that no salary
+    // is displayed on the detail page until Epic 5 renders the timeline.
+    // `\p{Sc}` — the Unicode CURRENCY SYMBOL category, not a hand-listed five. A salary rendered in
+    // any currency outside `$₹¥€£` evaded the enumerated set entirely, which made the backstop
+    // narrowest exactly where a missed case is most likely.
+    await expect(page.locator('main').getByText(/\p{Sc}\s*\d/u)).toHaveCount(0);
+    await expect(page.locator('main').getByText(/\d\s*(?:INR|USD|JPY|EUR|GBP)\b/)).toHaveCount(0);
   });
 
   test('says no employee has an id nobody holds', async ({ page }) => {
@@ -356,6 +376,23 @@ test.describe('the detail route', () => {
     await expect(page.getByRole('heading', { name: 'Beatriz Gomez' })).toBeVisible();
     await expect(page.getByText('ZZ', { exact: true })).toBeVisible();
     await expect(page.getByText(/Currency/)).toHaveCount(0);
+
+    // The WITHHELD arm of `salaryChangeAvailability`, asserted rather than inferred. The line above
+    // passes only because the withheld statement happens to spell "currency" in lower case — it
+    // says nothing about whether the statement is present, or correct.
+    //
+    // The tables were read PERFECTLY for this employee: `options.kind === 'options'`, which is why
+    // `Edit employee` renders right beside this paragraph. A statement claiming the reference
+    // tables could not be read would contradict the control next to it, so the copy names the
+    // outcome and no cause (deferred #6 owns telling the causes apart).
+    await expect(
+      page.getByText(
+        'The currency this employee is paid in could not be determined, so a salary change cannot be recorded right now.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit employee' })).toBeVisible();
+    // And no form is offered — the whole point of withholding it.
+    await expect(page.getByRole('button', { name: 'Record a salary change' })).toHaveCount(0);
   });
 });
 
@@ -571,6 +608,304 @@ test.describe('the edit dialog', () => {
   });
 });
 
+/**
+ * The detail page of an employee whose country is INDIA — so the currency is INR (AD-6).
+ *
+ * DERIVED from the seed's own country assignment rather than named. `countryFor` hands most
+ * employees `ACTIVE_COUNTRIES[index % 2]`, so any given name is Indian only by virtue of its
+ * POSITION in `NAMES`: inserting one name above it silently flips the country, and the four tests
+ * below that assert `Currency INR` and INR's two-digit precision would fail pointing at the salary
+ * panel rather than at the fixture that actually moved.
+ */
+const INR_EMPLOYEE = NAMES.findIndex((name, index) => countryFor(name, index) === 'IN');
+
+/**
+ * Press Tab until focus reaches `id`, or give up.
+ *
+ * A COUNT of Tab presses would be wrong here: Chrome's `<input type="date">` is three internal
+ * segments and Tab walks them one at a time, so "one Tab moves to the next field" is false for the
+ * first control on this form and would have this test typing an amount into a year segment. What
+ * the flow actually promises is that the next field is REACHABLE from the keyboard, which is what
+ * this asserts.
+ */
+async function tabTo(page: Page, id: string): Promise<void> {
+  for (let press = 0; press < 8; press += 1) {
+    if ((await page.evaluate(() => document.activeElement?.id ?? '')) === id) {
+      return;
+    }
+    await page.keyboard.press('Tab');
+  }
+  throw new Error(`Tab never reached #${id}`);
+}
+
+/**
+ * `YYYY-MM-DD` spelled the way `formatPlainDate` spells it — `20 Jul 2026`.
+ *
+ * Reimplemented here rather than imported: this file is the BROWSER-LEVEL gate, and asserting the
+ * rendered sentence with the very function that produced it would assert nothing about it. The
+ * spelling is fixed by `tests/domain/plain-date.test.ts`; this only has to agree with it.
+ */
+function spellDate(iso: string): string {
+  const [year, month, day] = iso.split('-');
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return `${day ?? ''} ${months[Number(month) - 1] ?? ''} ${year ?? ''}`;
+}
+
+/** `iso` and the calendar day either side of it, as `YYYY-MM-DD`. */
+function adjacentDates(iso: string): readonly string[] {
+  const midday = Date.parse(`${iso}T12:00:00Z`);
+  const DAY_MS = 86_400_000;
+  return [midday - DAY_MS, midday, midday + DAY_MS].map((at) =>
+    new Date(at).toISOString().slice(0, 10),
+  );
+}
+
+async function openSalaryPanel(page: Page): Promise<void> {
+  await page.goto(`/employees/${fixtureId(INR_EMPLOYEE)}`);
+  await page.getByRole('button', { name: 'Record a salary change' }).click();
+  await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toBeVisible();
+}
+
+// -------------------------------------------------------------------------------------------
+// CAP-3's one interactive surface (story 4-2).
+//
+// The panel's markup does not exist until it is opened, so a page-load scan never sees any of this.
+// Each test below starts from the `beforeEach` re-seed — thirty employees and ZERO salary records —
+// and asserts only its own starting state.
+//
+// Nothing here reads a recorded salary back. There is no surface that displays one: the salary
+// timeline is CAP-4 (Epic 5). The announcement is the receipt, which is Law 7's
+// one-capability-at-a-time cost rather than a defect.
+
+test.describe('recording a salary change', () => {
+  test('records a change with the keyboard alone, and announces it', async ({ page }) => {
+    await page.goto(`/employees/${fixtureId(INR_EMPLOYEE)}`);
+
+    // Opened from the keyboard, not the mouse: the whole flow must be completable without one.
+    const trigger = page.getByRole('button', { name: 'Record a salary change' });
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toBeVisible();
+
+    // Focus lands on the FIRST FIELD on open — not on the dialog, not on the close button.
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.id ?? ''))
+      .toBe('salary-field-effective_from');
+
+    // The date defaults to today, read once through the clock port at the page boundary (AD-11).
+    // Asserted as TODAY'S DATE, not merely non-empty: "today" in UTC is the whole content of the
+    // claim, and a field seeded with any other date would satisfy a non-empty check.
+    //
+    // "Today" is computed HERE, in the test process, and compared to a date the SERVER computed —
+    // two independent clock reads. They disagree for the one second per day either side of UTC
+    // midnight, which is a real intermittent failure and the third such source this file carries.
+    // So the boundary is tolerated in the ONE place it can be: the field must hold today or the day
+    // either side of it, and every assertion after this one is derived from the value the field
+    // actually holds rather than from a second reading of the clock.
+    const nowIso = new Date().toISOString().slice(0, 10);
+    const effectiveFrom = await dialogField(page, 'Effective date').inputValue();
+    expect(adjacentDates(nowIso)).toContain(effectiveFrom);
+
+    await tabTo(page, 'salary-field-amount_minor');
+    // Typed the way screen-09 specifies it: MAJOR units, with grouping separators.
+    await page.keyboard.type('21,50,000');
+    // Enter saves — a real submit button in a real form, no click required.
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toHaveCount(0);
+    // The announced date is the one the FIELD carried, spelled the way every other date on the
+    // surface is spelled. `\d{4}-\d{2}-\d{2}` asserted only that the string was date-shaped, which
+    // was never in doubt — a submit carrying the wrong date passed it. Derived from `effectiveFrom`
+    // rather than from a second clock read, so the midnight boundary cannot make this line flake.
+    await expect(page.locator('#app-announcer')).toHaveText(
+      `Salary change recorded, effective ${spellDate(effectiveFrom)}.`,
+    );
+  });
+
+  test('offers no currency control — currency follows from the country (AD-6)', async ({
+    page,
+  }) => {
+    await openSalaryPanel(page);
+
+    const dialog = page.getByRole('dialog', { name: 'Record a salary change' });
+    // Not a disabled control: offering one that can never be used is still offering a choice.
+    await expect(dialog.getByRole('combobox', { name: 'Currency' })).toHaveCount(0);
+    await expect(dialog.getByRole('textbox', { name: 'Currency' })).toHaveCount(0);
+    await expect(dialog.getByText(/Currency INR/)).toBeVisible();
+  });
+
+  test('renders the server’s refusal under the amount field, as data', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    // Zero PARSES — positivity is the server's rule, judged by the same code a CSV import is judged
+    // by — so this is a real round-trip through the Server Action, not a client-side guess.
+    await dialogField(page, 'Amount').fill('0');
+    await page.getByRole('button', { name: 'Record change' }).click();
+
+    await expect(dialogField(page, 'Amount')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('Amount must be greater than zero.')).toBeVisible();
+    // The panel stays open, holding everything that was typed.
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toBeVisible();
+    // No alarm: a rejection is data. No `role="alert"` and no second live region anywhere the app
+    // renders.
+    //
+    // APP-WIDE, not scoped to the dialog and `#main-content`. Next mounts its route announcer on
+    // `document.body` with `role="alert"` and `aria-live`, and that one is not ours to judge or to
+    // touch — so it is EXCLUDED BY ID rather than dodged by narrowing the search, which is what
+    // scoping did. Under the scoped form a second live region added to the header or the footer
+    // passed, and the acceptance criterion is that no second one appears anywhere.
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
+    await expect(page.locator('[aria-live]:not(#__next-route-announcer__)')).toHaveCount(1);
+    await expect(page.locator('[aria-live]:not(#__next-route-announcer__)')).toHaveAttribute(
+      'id',
+      'app-announcer',
+    );
+    await expect(page.locator('#app-announcer')).toHaveText(
+      'The salary change was not recorded. 1 reason.',
+    );
+  });
+
+  test('refuses an over-precise amount without submitting it', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    // INR has two decimal places. A third is a REJECTION, never a rounding — the money someone
+    // typed is not altered under them.
+    await dialogField(page, 'Amount').fill('25000.005');
+    await page.getByRole('button', { name: 'Record change' }).click();
+
+    await expect(
+      page.getByText('is more precise than INR records, which is 2 decimal places'),
+    ).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toBeVisible();
+  });
+
+  test('Esc cancels and returns focus to the trigger', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toHaveCount(0);
+    // Focus must never be stranded on a removed element, and never left on `body`.
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.textContent ?? ''))
+      .toBe('Record a salary change');
+  });
+
+  // The backdrop is the THIRD way out of this dialog, and it was the one no test covered. It is a
+  // pointer gesture, but where it leaves focus is a keyboard concern: focus stranded on `body` means
+  // the next Tab restarts from the top of the document instead of resuming beside the trigger
+  // (WCAG 2.2 AA SC 2.4.3). It dismissed by calling `setIsOpen` directly, which skips the ref that
+  // asks the effect cleanup to return focus — so it closed the panel and dropped focus on the floor.
+  test('dismisses on a backdrop press and returns focus to the trigger', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    // The top-left corner of the viewport: the backdrop covers the whole of it and the dialog is
+    // centred, so this lands on the backdrop rather than on any control.
+    await page.mouse.click(5, 5);
+
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toHaveCount(0);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.textContent ?? ''))
+      .toBe('Record a salary change');
+  });
+
+  // A NON-PRIMARY press is not a dismissal. The handler runs on `pointerdown`, which fires for every
+  // button — right, middle, stylus barrel — so a right-click aimed at the backdrop (to reach the
+  // context menu, or simply landing wide of the dialog) tore the panel down and discarded everything
+  // typed into it. Nothing warns and nothing is recoverable: the amount and the date are gone.
+  test('ignores a non-primary press on the backdrop, keeping what was typed', async ({ page }) => {
+    await openSalaryPanel(page);
+    await dialogField(page, 'Amount').fill('21,50,000');
+
+    await page.mouse.move(5, 5);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toBeVisible();
+    await expect(dialogField(page, 'Amount')).toHaveValue('21,50,000');
+  });
+
+  // Closing the panel does NOT cancel the submission already in flight — there is no abort, and the
+  // row it appends is undeletable (Law 5 / AD-18). What must not survive the dismissal is the
+  // PENDING FLAG: `open()` re-seeded the values and the reasons but left `isPending` and the
+  // `pendingRef` double-submit guard exactly as the interrupted submission left them. The reopened
+  // panel therefore showed a disabled "Recording…" button over a freshly seeded form, and the ref
+  // guard swallowed every subsequent submit — with no way back but a full page reload.
+  test('reopens usable after being dismissed mid-submission', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    // Hold the Server Action open so the dismissal lands while the submission is genuinely in
+    // flight. Released before the test ends, so nothing here leaves a request stuck.
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/employees/**', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback();
+        return;
+      }
+      await held;
+      await route.fallback();
+    });
+
+    await dialogField(page, 'Amount').fill('21,50,000');
+    await page.getByRole('button', { name: 'Record change' }).click();
+
+    // `aria-disabled`, NOT the `disabled` attribute. A disabled button leaves the focus order, so
+    // the press that started the submission stranded focus on `body` — Esc stopped dismissing the
+    // dialog and Tab restarted from the top of the document, for as long as the request was in
+    // flight (WCAG 2.2 AA SC 2.4.3). The state is still announced, the label still says the action
+    // is under way, and the press is still a no-op — but `pendingRef` is what refuses it now, which
+    // is the guard doing the job it was written for rather than the attribute doing it silently.
+    const pending = page.getByRole('button', { name: 'Recording…' });
+    await expect(pending).toHaveAttribute('aria-disabled', 'true');
+    await expect(pending).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Record a salary change' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Record a salary change' }).click();
+
+    // The reopened panel is a NEW submission: the button says so and accepts a press.
+    await expect(page.getByRole('button', { name: 'Record change' })).toBeEnabled();
+
+    release();
+  });
+
+  test('contains Tab in both directions', async ({ page }) => {
+    await openSalaryPanel(page);
+
+    // Focusable order inside the dialog: Close, Effective date, Amount, submit. Focus is moved to
+    // the FIRST focusable explicitly rather than Shift+Tabbed off the date input, because Chrome's
+    // `<input type="date">` is three internal segments and Shift+Tab walks them one at a time —
+    // this test is about the dialog's wrap, not about the date control's internals.
+    await page.getByRole('button', { name: 'Close' }).focus();
+
+    // Backwards off the FIRST focusable wraps to the LAST — it does not escape into the page.
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'Record change' })).toBeFocused();
+
+    // And forwards off the last wraps back to the first.
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Close' })).toBeFocused();
+  });
+
+  test('inerts the background while it is open, sparing the live region', async ({ page }) => {
+    await openSalaryPanel(page);
+    const report = await dialogInertReport(page);
+
+    // Asserted NON-EMPTY first. `for (const child of [])` asserts nothing at all, so this test
+    // passed vacuously if the report ever came back empty — including if the dialog never opened.
+    // The CAP-2 equivalent has always checked this; the salary panel's copy had lost it.
+    expect(report.length).toBeGreaterThan(0);
+    expect(report.every((child) => child.inert)).toBe(true);
+  });
+});
+
 // -------------------------------------------------------------------------------------------
 // The axe gate over every state, in both color schemes.
 //
@@ -594,6 +929,18 @@ const STATES = [
       await openCreateDialog(page);
       await page.getByRole('button', { name: 'Create employee' }).click();
       await expect(dialogField(page, 'Name')).toHaveAttribute('aria-invalid', 'true');
+    },
+  },
+  // The CAP-3 panel's markup does not exist until it is opened, so without these two the floor has
+  // a hole exactly the width of this story's deliverable (story 4-2).
+  { name: 'the open record-change panel', open: openSalaryPanel },
+  {
+    name: 'a rejected salary submission',
+    open: async (page: Page) => {
+      await openSalaryPanel(page);
+      await dialogField(page, 'Amount').fill('0');
+      await page.getByRole('button', { name: 'Record change' }).click();
+      await expect(dialogField(page, 'Amount')).toHaveAttribute('aria-invalid', 'true');
     },
   },
 ] as const;

@@ -61,6 +61,13 @@ const OPTIONS: EmployeeFormOptions = {
     { code: 'IN', name: 'India', currencyCode: 'INR' },
     { code: 'IT', name: 'Italy', currencyCode: 'EUR' },
   ],
+  // Story 4-2. CAP-2's form reads nothing here — currency FOLLOWS from country and this form never
+  // renders an amount — but `EmployeeFormOptions` is one type and a fake of it is complete or it is
+  // not a fake of it.
+  currencies: [
+    { code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' },
+    { code: 'EUR', symbol: '€', minorUnitExponent: 2, groupingStyle: 'WESTERN' },
+  ],
 };
 
 describe('EMPLOYEE_FORM_FIELDS', () => {

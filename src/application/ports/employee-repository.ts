@@ -1,5 +1,5 @@
 import type { Gender, ReferenceData } from '@/domain/import-row';
-import type { Money } from '@/domain/money';
+import type { CurrencyFormat, Money } from '@/domain/money';
 import type { PlainDate } from '@/domain/plain-date';
 
 /**
@@ -151,6 +151,19 @@ export type EmployeeFormOptions = {
     readonly name: string;
     readonly currencyCode: string;
   }[];
+  /**
+   * Every ACTIVE currency, as the one money formatter and its inverse need it (story 4-2).
+   *
+   * The country above carries only a CODE, and a code cannot be converted with: the CAP-3 form
+   * takes an amount in major units and turns it into minor units with the currency's own
+   * `minorUnitExponent`, which is 0 for JPY and never a hard-coded 100 (Law 4 / AD-4). This is the
+   * first time that number crosses the boundary, and it crosses it as `CurrencyFormat` — the exact
+   * shape `formatMoney` and `parseMajorAmount` take — rather than as a second money vocabulary.
+   *
+   * Keyed by nothing: it is a LIST, ordered totally by `code`, because a `Map` does not survive the
+   * Server-Component boundary as data and the caller resolves one row at a time anyway.
+   */
+  readonly currencies: readonly CurrencyFormat[];
 };
 
 /**

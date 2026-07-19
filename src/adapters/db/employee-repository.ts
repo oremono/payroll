@@ -12,7 +12,7 @@ import type {
   UpdateEmployeeOutcome,
 } from '@/application/ports/employee-repository';
 import type { ReferenceData } from '@/domain/import-row';
-import type { Money } from '@/domain/money';
+import { isSupportedExponent, type CurrencyFormat, type GroupingStyle, type Money } from '@/domain/money';
 import { comparePlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
 
 import { getDbClient } from './client';
@@ -235,6 +235,98 @@ export function normalizeSearchTerm(search: string | null): string | null {
  * error, not a claim about which UUID version the id port emits.
  */
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The grouping styles `src/domain/money.ts` knows how to format, as a runtime value.
+ *
+ * The domain's `GroupingStyle` is a TYPE and erases; Prisma generates its own separate enum for the
+ * column. They agree today and nothing keeps them agreeing — a member added to the database enum by
+ * a later migration would flow straight through a cast into the formatter, which switches on this
+ * union and would silently group an amount by whichever arm happened to be last.
+ *
+ * A `Record` KEYED BY THE UNION, so the list cannot drift from the union it exists to guard. Typed
+ * `readonly string[]` this was a drift guard with no link to the thing it guarded: adding a member
+ * to `GroupingStyle` produced no error here, and `toCurrencyFormats` would then silently DROP every
+ * currency using it — those employees losing the record-change trigger and being told their
+ * currency could not be determined. Under a `Record` a new member is a missing property and the
+ * build stops. A member REMOVED from the union is an excess property, which also stops it.
+ *
+ * The value side carries nothing: membership is the whole content, and `true` is the cheapest way
+ * to say so.
+ */
+const GROUPING_STYLE_MEMBERS: Readonly<Record<GroupingStyle, true>> = {
+  WESTERN: true,
+  INDIAN: true,
+};
+
+/** The same members as a runtime list — DERIVED, so there is exactly one declaration of them. */
+const GROUPING_STYLES: readonly string[] = Object.keys(GROUPING_STYLE_MEMBERS);
+
+/** One currency row, as Prisma hands it over: `groupingStyle` is a string until it is checked. */
+type CurrencyRow = {
+  readonly code: string;
+  readonly symbol: string;
+  readonly minorUnitExponent: number;
+  readonly groupingStyle: string;
+};
+
+/**
+ * Currency rows as the domain's `CurrencyFormat`, VALIDATED rather than cast.
+ *
+ * A row whose `groupingStyle` is not one the formatter knows is DROPPED, not coerced to a default:
+ * the currency then resolves to nothing at the form, and the form withholds itself with an
+ * explanatory statement — which is a truthful outcome, where a defaulted grouping style would be an
+ * amount rendered by a rule nobody wrote.
+ */
+export function toCurrencyFormats(rows: readonly CurrencyRow[]): readonly CurrencyFormat[] {
+  const dropped: { code: string; groupingStyle: string; reason: 'grouping-style' | 'exponent' }[] =
+    [];
+
+  const kept = rows
+    .filter((row) => {
+      if (!GROUPING_STYLES.includes(row.groupingStyle)) {
+        dropped.push({ code: row.code, groupingStyle: row.groupingStyle, reason: 'grouping-style' });
+        return false;
+      }
+      // The OTHER half of the same question. `CurrencyFormat` promises a format the domain formatter
+      // can USE, and the formatter needs both fields: `formatMoney` and `parseMajorAmount` each
+      // guard `isSupportedExponent` and answer nothing outside it. Validating only the grouping
+      // style let a row the domain calls unusable cross the port anyway, leaving every consumer to
+      // re-check independently — the trap `salaryChangeAvailability` had to add a boundary check to
+      // escape. Range-checked, never truthiness-checked: exponent 0 is JPY, not a missing value.
+      if (!isSupportedExponent(row.minorUnitExponent)) {
+        dropped.push({ code: row.code, groupingStyle: row.groupingStyle, reason: 'exponent' });
+        return false;
+      }
+      return true;
+    })
+    .map((row) => ({
+      code: row.code,
+      symbol: row.symbol,
+      minorUnitExponent: row.minorUnitExponent,
+      // Narrowed by the filter above, which is the whole point of this function existing.
+      groupingStyle: row.groupingStyle as GroupingStyle,
+    }));
+
+  // LOGGED, for the reason `revalidateCommitted` logs its swallowed failure: dropping the row is
+  // right for the READER — a defaulted grouping style would render an amount by a rule nobody wrote
+  // — but a silent drop makes the consequence undiagnosable. What the reader sees is an employee who
+  // cannot record a salary change and a statement that the currency could not be determined, with
+  // nothing anywhere naming the row that caused it.
+  //
+  // ONE line per call, listing every dropped row, rather than one per row. Unlike the transient
+  // failure `revalidateCommitted` reports, a bad grouping style is a PERSISTENT data condition: it
+  // is re-read on every employee page render and would otherwise emit the same lines forever, at a
+  // volume that trains an operator to filter out the very message that explains the outage.
+  if (dropped.length > 0) {
+    console.error('[employee-repository] dropped currency rows the domain formatter cannot use', {
+      dropped,
+      known: GROUPING_STYLES,
+    });
+  }
+
+  return kept;
+}
 
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
@@ -662,7 +754,7 @@ export function createEmployeeRepository(
       // stops the order reshuffling between page loads. Roles and countries have no rank, so `code`
       // is the tie-break behind `name`; without it two same-named rows would order by whatever the
       // query plan felt like.
-      const [roles, levels, countries] = await Promise.all([
+      const [roles, levels, countries, currencies] = await Promise.all([
         client.role.findMany({
           where: { isActive: true },
           orderBy: [{ name: 'asc' }, { code: 'asc' }],
@@ -680,9 +772,16 @@ export function createEmployeeRepository(
           // travels with it rather than being looked up again by the form.
           select: { code: true, name: true, currencyCode: true },
         }),
+        // The exponent, symbol and grouping style the ONE money formatter and its inverse take
+        // (story 4-2). `code` is UNIQUE, so ordering by it is total on its own.
+        client.currency.findMany({
+          where: { isActive: true },
+          orderBy: { code: 'asc' },
+          select: { code: true, symbol: true, minorUnitExponent: true, groupingStyle: true },
+        }),
       ]);
 
-      return { roles, levels, countries };
+      return { roles, levels, countries, currencies: toCurrencyFormats(currencies) };
     },
 
     // ── CAP-3 (story 4-1) ────────────────────────────────────────────────────────────────────

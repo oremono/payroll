@@ -59,11 +59,19 @@
   the only evidence is a one-line locator error — that gap is now closed by an `upload-artifact`
   step on the `browser-db` job, and the next red run will carry a trace showing the real DOM.
 
-  **Re-entry:** this belongs to story 4-2, which renders the salary timeline into the same detail
-  route and will add more read-after-write surfaces to the same race. Find the real signal to wait
-  on (the RSC payload landing, not a wall-clock ceiling), and make each test seed and assert its own
-  starting state so it passes alone. Note the related 3-2 entry above: the suite already mutates
-  state and needs a fresh seed per run.
+  **Re-entry:** still open after 4-2. Find the real signal to wait on (the RSC payload landing, not
+  a wall-clock ceiling), and make each test seed and assert its own starting state so it passes
+  alone. Note the related 3-2 entry above: the suite already mutates state and needs a fresh seed
+  per run.
+
+  **Correction (story 4-2, 2026-07-20):** the original wording said this "belongs to story 4-2,
+  which renders the salary timeline into the same detail route". Story 4-2 does NOT render the
+  timeline — that is CAP-4 / Epic 5 (`epics.md` DR9, `EXPERIENCE.md:181`, and the detail page's own
+  docstring all say so separately), and the aside was written by a review pass rather than taken as
+  a scope decision. 4-2 left this race untouched: its own tests assert nothing that has to be read
+  back after a write, because there is no surface that displays a salary yet. Re-measured on the
+  4-2 baseline (`6cc0914`) and on 4-2's head: the same two CAP-2 tests fail at the same rate on
+  both, so the exposure is unchanged.
 
 ## Deferred from: 3-2-employee-crud-ui (2026-07-19)
 
@@ -1047,3 +1055,177 @@ entries after them were added by the story's review passes.
     `tests/integration/salary-records.test.ts` proves both races reach the guard. Deferred because
     adding arms to `AppendSalaryRecordOutcome` widens a port story 4-2 already consumes, and this
     story's own residual risk notes that union moved once during review already.
+
+## Closed by: 4-2-record-salary-change-ui (2026-07-20)
+
+Four of 4-1's entries above are closed by this story, and one is narrowed. Recorded here rather
+than deleted, because each was deferred with a named re-entry point and this is that point.
+
+- **CLOSED — future `hire_date` dead end.** `salaryChangeAvailability` (`src/ui/salary-change-form.ts`)
+  withholds the trigger entirely when `hireDate > today` and states the date pay can be recorded
+  from, so the form that could not be satisfied is never offered. No backend arm was widened: the
+  two rules still cannot both be satisfied, and the surface simply stops pretending they can.
+
+- **CLOSED — CAP-3 rejection sentences quoting column tokens and CSV vocabulary.**
+  `salaryRejectionText` projects the shapes `composeRejectionSentence` produces into form
+  vocabulary and falls through VERBATIM for everything else. The shared composer is unchanged, so
+  the CSV rejection table still reads "the effective_from cell", which is correct there. The three
+  `amount_minor` sentences name the rule rather than quoting the value, because on this form the
+  value is in MINOR units and the person typed MAJOR ones — quoting it back would show them a
+  number 100x the one on their screen.
+
+- **CLOSED — the payload's two whitespace policies.** `toSalaryChangeInput` trims all three fields
+  before submitting. The boundary stays specified in canonical values (`'  12'` still rejects, per
+  4-1's I/O matrix); the FORM normalizes, because a stray space is a form artifact.
+
+- **CLOSED — `currency` required on a path where the server knows the answer.** There is no currency
+  control on the panel, editable or disabled, so the failure mode the entry predicted — a disabled
+  input omitted from the submission, yielding "The currency field was not submitted as text." on a
+  field the user cannot correct — cannot occur. The currency is derived from the employee's country
+  and travels in the payload as a derived string, which is the confirmation AD-6 asks for.
+  `SalaryChangeInput` is unchanged.
+
+- **NARROWED — double-submitted salary change.** The panel guards on `isPending`, so a second press
+  while the first is in flight is a no-op. That is the UI level only: the row remains undeletable,
+  the server still has no idempotency key, and a browser-level retry of a slow Server Action still
+  appends a second row. The entry stays open with that scope.
+
+Still open and untouched by 4-2: the `FOR SHARE` deadlock retry, historical
+`effective_from < hire_date` rows, the deactivated-vs-missing country sentence, the generic
+write-failure collapse, and the two e2e infrastructure entries.
+
+## Deferred from: 4-2-record-salary-change-ui review pass (2026-07-20)
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The record-change form's default effective date can silently be yesterday, because `today` is
+    resolved once when the detail page renders and the panel may be opened long afterwards.
+  evidence: `src/app/employees/[id]/page.tsx` reads the clock port at render (correctly — Law 6 forbids a
+    clock read in `src/ui`, `src/domain` or `src/application`) and passes `today` to the panel as a prop.
+    A page left open across UTC midnight therefore defaults the date to the previous day. The server
+    accepts it: a past effective date is legitimately allowed (backdating within history is an explicit
+    I/O-matrix row), so nothing rejects it and nothing tells the user. There is no cheap correct fix
+    inside this story's boundaries — re-reading the clock in the panel would violate Law 6, and forcing a
+    refresh on open is heavy — so the decision is where a long-lived page re-resolves "today", which is a
+    shell-level concern rather than a CAP-3 one.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The future-`hire_date` withheld arm — this story's closure of deferred #3 — has no browser
+    coverage, only unit coverage.
+  evidence: `salaryChangeAvailability` returns a `withheld` statement naming the hire date when
+    `hireDate > today`, and `tests/ui/salary-change-form.test.ts` asserts it. No fixture employee has a
+    future hire date (`e2e/fixtures/seed-employees.ts` caps at 2024), so the arm renders in no browser
+    test. Adding such a fixture shifts the directory count and pager assertions that several CAP-2 tests
+    pin, which is why it was not done here: the fixture change is the real work, and it belongs with the
+    e2e re-seeding entry (B) rather than being bolted onto this story.
+
+## Deferred from: 4-2-record-salary-change-ui follow-up review pass (2026-07-20)
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: `src/ui/salary-change-form.ts` is described in the spec and in code comments as "the gated
+    pure module", but it sits outside both the coverage floor and the mutation gate.
+  evidence: `vitest.config.ts` sets coverage `include` to `src/domain/**` and `src/application/**`;
+    `stryker.config.json` sets `mutate` to `src/domain/**`. Neither reaches `src/ui/**`. Moving a
+    decision out of `salary-change-panel.tsx` into `salary-change-form.ts` moves it from
+    untested-and-ungated to tested-and-ungated — a real improvement, but not the one the spec's
+    Residual Risks claim. Its 667-line test file is entirely voluntary: deleting half of it leaves
+    every gate green. The same argument the story used to place `parseMajorAmount` in `src/domain`
+    (correct, and honoured) applies to this module, so the fix is a decision about whether the
+    coverage/mutation `include` globs should extend to framework-free `src/ui` modules — a gate-policy
+    change affecting every future story, not a CAP-3 edit.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The effective-date control offers future dates the product will always reject, and the
+    obvious `max` fix has a WCAG interaction that needs deciding rather than assuming.
+  evidence: The panel's own copy states "a change cannot be dated later than today" (Law 5), yet the
+    `<input type="date">` at `src/ui/salary-change-panel.tsx` carries no `max`, so every date picker
+    offers 2027 and the only feedback is a full Server Action round trip. `plainDateToIso(today)` is
+    already in scope, so `max` is a one-line change — but a `max` violation makes the form fail native
+    constraint validation, which raises a browser-native bubble INSTEAD of the designed rejection
+    region and the app-level live region, bypassing the AD-20 "one voice" rule the panel is built
+    around. Choosing between a native bubble, a `max` paired with suppressed native validation, or
+    leaving server-side rejection as the only path is a form-contract decision, which is why it was
+    not patched blind.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The whole active-currency table is queried and serialized to the browser on every employee
+    list and detail render, to satisfy one row's worth of use.
+  evidence: `EmployeeFormOptions.currencies` is required, so `loadFormOptions` issues a fourth query on
+    both routes, and `EmployeeFormPanel` — which reads nothing from it — receives the whole `options`
+    object, putting the currency list in the CAP-2 RSC payload as well. The detail page resolves
+    exactly one `CurrencyFormat` and nothing else consumes the list. Narrowing the port to the
+    employee's own currency, or dropping the list from the panel's props, changes a boundary contract
+    story 4-1 finalized (Law 7), so it is a port decision rather than a patch.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: `employee-form-panel.tsx` strands focus on `body` when its dialog is dismissed by a backdrop
+    press — the CAP-2 original of the bug fixed in the CAP-3 panel this pass.
+  evidence: `src/ui/employee-form-panel.tsx:384` is `onPointerDown={() => setIsOpen(false)}`, which
+    skips the `returnFocusRef` that asks the effect cleanup to return focus to the trigger (WCAG 2.2 AA
+    SC 2.4.3). Confirmed as the same defect corrected in `salary-change-panel.tsx` this pass, and no
+    test at any level covers backdrop dismissal for the CAP-2 panel. The fix is NOT merely calling
+    `close()`: the rest of the press lands after the dialog is gone and its default action drops focus
+    on `body`, so `preventDefault()` on the pointerdown is required too — verified by watching the new
+    CAP-3 test fail with `close()` alone. Left to a CAP-2 story so the change lands with a red test
+    against the panel that owns it.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The major→minor conversion — the story's own named highest-consequence risk — has no
+    browser-level coverage, because no surface displays a recorded salary.
+  evidence: The keyboard happy-path e2e now pins the effective date to today, but still cannot assert
+    the amount: nothing renders a salary until Epic 5 draws the timeline, so a conversion producing
+    `2150000` instead of `215000000` is caught only by the `src/domain/money.ts` unit tests. Closing
+    this needs either a read surface (Epic 5) or an e2e that queries the database directly, which no
+    existing e2e does. It belongs with the Epic 5 timeline work.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: An employee whose country is later DEACTIVATED can never have a salary change recorded,
+    and no surface says so — the record-change form is withheld permanently with no remedy anywhere
+    in the product.
+  evidence: `salaryChangeAvailability` resolves the currency through `options.countries`, and
+    `loadFormOptions` filters that list to `isActive: true`. So deactivating a country silently
+    withdraws CAP-3 from every employee on it. `employee.country` is set at create and is IMMUTABLE by
+    AD-6 — the project context names a country-edit affordance as an explicit anti-pattern — so there
+    is no user-reachable path back: the person cannot be moved to an active country and cannot be
+    paid. `Edit employee` keeps working directly beside the withheld statement, which makes the
+    surface read as a transient failure rather than a permanent one. Deferred entry #6 covers only the
+    WORDING (telling "deactivated" apart from "missing"); the capability hole itself is unrecorded and
+    is a product decision, not a code fix — the options are re-activating the currency for read
+    purposes, allowing a recorded change on a deactivated country, or naming the dead end on screen.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The form-level refusal container is `role="group"`, which assistive technology does not
+    expose as a region — the project context and the spec both require refusals render "as a region
+    with a heading".
+  evidence: `src/ui/salary-change-panel.tsx` renders the form-level rejection list as
+    `<div role="group" aria-labelledby=…>`. `group` is not a landmark and is not surfaced in a screen
+    reader's region/landmark list, so the refusal is not reachable the way the stated floor implies;
+    `role="region"` with the same `aria-labelledby` is what that wording describes. Inherited
+    deliberately from the CAP-2 panel, which does the same, so the precedent — not this panel alone —
+    is what needs deciding, and changing one without the other would split the pattern. The axe pass
+    is green either way: `role="group"` is valid ARIA, so no automated gate contradicts it, which is
+    why this survived two review passes. Left for a decision that can change both panels together.
+
+- source_spec: `spec-4-2-record-salary-change-ui.md`
+  summary: The transport-failure statement tells the user "nothing was recorded" when the client
+    cannot know that, and the retry it then invites can append a second permanent salary row.
+  evidence: `SALARY_SUBMISSION_FAILED_STATEMENT` is rendered from the `catch` around the Server
+    Action call in `salary-change-panel.tsx`. A thrown transport error covers two cases the browser
+    cannot tell apart: the request never arrived, and the request arrived, COMMITTED, and the response
+    was lost coming back. The sentence asserts the first and closes with "Try again when the
+    connection is back". `salary_record` has no `UPDATE` and no `DELETE` path and the server has no
+    idempotency key (Law 5 / AD-18), so a user who believes it and retries after a lost response
+    appends a duplicate that is permanent and correctable only by appending a third record — the same
+    failure the story records as a residual risk for double-submit, reached by a different route, with
+    the copy pushing the user into it. NOT patched: the wording is pinned verbatim inside this story's
+    `<intent-contract>` (the I/O matrix's "Transport failed" row quotes "nothing was recorded"), which
+    a review pass may not amend, and rewording user-facing copy is a product decision rather than a
+    mechanical fix. A candidate replacement that claims only what is known: "The submission did not
+    get an answer, so it is not known whether the change was recorded. Reload this page before trying
+    again." Needs a product call on the wording plus an intent-contract amendment.
+
+### DW-1: Follow-up review still recommended for 4-2-record-salary-change-ui after the damping cap was spent
+origin: review-budget-followup
+source_spec: `spec-4-2-record-salary-change-ui.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260720-001305-9054; this entry preserves the lingering recommendation for a deliberate later review.
+status: open

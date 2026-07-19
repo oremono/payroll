@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   clampListLimit,
@@ -13,6 +13,7 @@ import {
   MAX_LIST_OFFSET,
   MIN_LIST_LIMIT,
   normalizeSearchTerm,
+  toCurrencyFormats,
   MAX_SEARCH_LENGTH,
 } from '@/adapters/db/employee-repository';
 
@@ -684,5 +685,143 @@ describe('fromDbDate — the calendar day, read back without a timezone shift', 
   it('returns a 1-based month, matching PlainDate rather than the JS getter', () => {
     expect(fromDbDate(new Date('2021-01-15T00:00:00.000Z')).month).toBe(1);
     expect(fromDbDate(new Date('2021-12-15T00:00:00.000Z')).month).toBe(12);
+  });
+});
+
+// ── the currency reference rows the form options carry (story 4-2) ─────────────────────────────
+//
+// Test-first (Law 1 / AD-23): red before `toCurrencyFormats` exists.
+//
+// `EmployeeFormOptions` grows a `currencies` list this story, because a form that takes an amount in
+// MAJOR units cannot convert it without the currency's own minor-unit exponent, and nothing crossed
+// the port with that number before.
+//
+// The subtlety is `groupingStyle`. Prisma generates its OWN enum type for the column; `GroupingStyle`
+// in `src/domain/money.ts` is a separate union that the domain owns and that the formatter switches
+// on. The two happen to have the same members today. Casting one to the other would compile forever
+// and would let a value that is neither `WESTERN` nor `INDIAN` — a member added to the database enum
+// by a later migration, a row read through a raw query — reach the formatter as a `GroupingStyle`
+// that is not one. So the boundary VALIDATES, and a row it cannot read is dropped rather than
+// mistranslated: the currency then resolves to nothing, and the form withholds itself instead of
+// rendering an amount grouped by a rule nobody wrote.
+describe('toCurrencyFormats — validating the grouping style rather than casting it', () => {
+  it('maps a row with every field the formatter needs', () => {
+    expect(
+      toCurrencyFormats([
+        { code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' },
+      ]),
+    ).toEqual([{ code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' }]);
+  });
+
+  it('keeps a zero-exponent currency — the exponent is data, never a hard-coded 100', () => {
+    expect(
+      toCurrencyFormats([
+        { code: 'JPY', symbol: '¥', minorUnitExponent: 0, groupingStyle: 'WESTERN' },
+      ]),
+    ).toEqual([{ code: 'JPY', symbol: '¥', minorUnitExponent: 0, groupingStyle: 'WESTERN' }]);
+  });
+
+  it('drops a row whose grouping style is not one the domain formatter knows', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(
+      toCurrencyFormats([
+        { code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' },
+        { code: 'XX', symbol: '¤', minorUnitExponent: 2, groupingStyle: 'ARABIC' },
+      ]).map((format) => format.code),
+    ).toEqual(['INR']);
+
+    // Dropping is right for the reader; SILENTLY dropping is not. The consequence — an employee who
+    // cannot record a salary change, told their currency could not be determined — is otherwise
+    // undiagnosable, so the offending row is identified. Same precedent as the swallowed
+    // `revalidatePath` failure in `handle-employee-write.ts`.
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[1]).toMatchObject({
+      dropped: [{ code: 'XX', groupingStyle: 'ARABIC' }],
+    });
+
+    logged.mockRestore();
+  });
+
+  // The OTHER half of the same validation. `CurrencyFormat` promises a format the domain formatter
+  // can actually use, and the formatter needs BOTH fields: `formatMoney` and `parseMajorAmount` each
+  // guard `isSupportedExponent` and answer nothing for a row outside it. Validating only the
+  // grouping style let a row the domain calls unusable cross the port anyway, leaving every consumer
+  // to re-check independently — which is precisely the trap `salaryChangeAvailability` had to add a
+  // boundary check to escape. A row is either usable by the domain or it is dropped; there is no
+  // third state at this boundary.
+  it('drops a row whose minor-unit exponent the domain formatter cannot use', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(
+      toCurrencyFormats([
+        { code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' },
+        { code: 'XX', symbol: '¤', minorUnitExponent: 9, groupingStyle: 'WESTERN' },
+        { code: 'YY', symbol: '¤', minorUnitExponent: -1, groupingStyle: 'WESTERN' },
+      ]).map((format) => format.code),
+    ).toEqual(['INR']);
+
+    // Named with the reason, so the two causes are told apart in the diagnostic even though the
+    // reader sees the same withheld statement for both.
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[1]).toMatchObject({
+      dropped: [
+        { code: 'XX', reason: 'exponent' },
+        { code: 'YY', reason: 'exponent' },
+      ],
+    });
+
+    logged.mockRestore();
+  });
+
+  // Exponent 0 is JPY and is entirely legitimate — the currency simply has no minor unit. A drop
+  // rule written as a truthiness check rather than a range check would silently take it out.
+  it('keeps a zero exponent, which is a real currency and not a missing value', () => {
+    expect(
+      toCurrencyFormats([
+        { code: 'JPY', symbol: '¥', minorUnitExponent: 0, groupingStyle: 'WESTERN' },
+      ]).map((format) => format.code),
+    ).toEqual(['JPY']);
+  });
+
+  // A bad grouping style is a PERSISTENT data condition, not a transient failure: it is re-read on
+  // every employee page render. One line per bad row per request would emit the same lines forever,
+  // at a volume that trains an operator to filter out the one message that explains the outage. So
+  // the rows are collected and reported together — the diagnostic names every offender, once.
+  it('reports every dropped row in a single line, however many rows are bad', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(
+      toCurrencyFormats([
+        { code: 'XX', symbol: '¤', minorUnitExponent: 2, groupingStyle: 'ARABIC' },
+        { code: 'YY', symbol: '¤', minorUnitExponent: 2, groupingStyle: 'THAI' },
+        { code: 'ZZ', symbol: '¤', minorUnitExponent: 2, groupingStyle: 'ARABIC' },
+      ]),
+    ).toEqual([]);
+
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[1]).toMatchObject({
+      dropped: [
+        { code: 'XX', groupingStyle: 'ARABIC' },
+        { code: 'YY', groupingStyle: 'THAI' },
+        { code: 'ZZ', groupingStyle: 'ARABIC' },
+      ],
+    });
+
+    logged.mockRestore();
+  });
+
+  it('logs nothing when every row is readable', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    toCurrencyFormats([{ code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' }]);
+
+    expect(logged).not.toHaveBeenCalled();
+
+    logged.mockRestore();
+  });
+
+  it('answers an empty list for no rows at all', () => {
+    expect(toCurrencyFormats([])).toEqual([]);
   });
 });

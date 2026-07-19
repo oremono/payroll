@@ -52,6 +52,10 @@ const FORM_OPTIONS: EmployeeFormOptions = {
   roles: [{ code: 'software_engineer', name: 'Software Engineer' }],
   levels: [{ code: 'L3', name: 'Level 3', rank: 30 }],
   countries: [{ code: 'IN', name: 'India', currencyCode: 'INR' }],
+  // Story 4-2: the form options carry the currency FORMATS too, because a major-unit amount cannot
+  // be converted with a code alone. No existing assertion reads this; it is here so the fake is a
+  // complete `EmployeeFormOptions`.
+  currencies: [{ code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' }],
 };
 
 const BOOM = new Error('the database is not answering');

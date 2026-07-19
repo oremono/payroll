@@ -59,6 +59,11 @@ const INACTIVE_LEVEL = `inactive-level-${suffix}`;
 const COUNTRY = `AA${suffix}`.toUpperCase().slice(0, 10);
 const INACTIVE_COUNTRY = `BB${suffix}`.toUpperCase().slice(0, 10);
 const CURRENCY = `XA${suffix}`.toUpperCase().slice(0, 10);
+// A SECOND currency whose minor-unit exponent is NOT 2, and a country on it. The form converts a
+// major-unit amount with the exponent this column carries, so a mapping that quietly answered 2 for
+// every currency would be a 100x error the unit fakes cannot see (Law 4 / AD-4).
+const CURRENCY_ZERO = `XB${suffix}`.toUpperCase().slice(0, 10);
+const COUNTRY_ZERO = `CC${suffix}`.toUpperCase().slice(0, 10);
 
 // `level.rank` is a PostgreSQL `int`, which caps at 2_147_483_647 — a band above that ceiling is
 // refused outright for every value in it, which is what happened to this file's originally assigned
@@ -120,9 +125,15 @@ beforeAll(async () => {
     [CURRENCY],
   );
   await owner.query(
+    `INSERT INTO currency (code, name, minor_unit_exponent, symbol, grouping_style)
+     VALUES ($1, 'CRUD Zero-Exponent Currency', 0, '¤0', 'INDIAN')`,
+    [CURRENCY_ZERO],
+  );
+  await owner.query(
     `INSERT INTO country (code, name, currency_code) VALUES ($1, 'Crudland', $2),
-                                                            ($3, 'Retired Crudland', $2)`,
-    [COUNTRY, CURRENCY, INACTIVE_COUNTRY],
+                                                            ($3, 'Retired Crudland', $2),
+                                                            ($4, 'Zeroland', $5)`,
+    [COUNTRY, CURRENCY, INACTIVE_COUNTRY, COUNTRY_ZERO, CURRENCY_ZERO],
   );
   await owner.query('UPDATE country SET is_active = false WHERE code = $1', [INACTIVE_COUNTRY]);
   await owner.query('INSERT INTO role (code, name) VALUES ($1, $2)', [ROLE, 'CRUD Role']);
@@ -792,6 +803,51 @@ describe('loadEmployeeFormOptions offers only pickable values', () => {
 
     if (result.kind !== 'options') throw new Error('expected options');
     expect(result.options.countries.find((c) => c.code === COUNTRY)?.currencyCode).toBe(CURRENCY);
+  });
+
+  // Story 4-2. The record-change form takes an amount in MAJOR units and converts it with the
+  // currency's own exponent, so these four columns have to survive the trip out of Postgres exactly.
+  // A fake repository can only prove the port's SHAPE; only the database proves the mapping.
+  it('carries each active currency its exponent, symbol and grouping style', async () => {
+    const result = await loadEmployeeFormOptions(deps());
+
+    if (result.kind !== 'options') throw new Error('expected options');
+    expect(result.options.currencies.find((c) => c.code === CURRENCY)).toEqual({
+      code: CURRENCY,
+      symbol: '¤',
+      minorUnitExponent: 2,
+      groupingStyle: 'WESTERN',
+    });
+  });
+
+  it('carries an exponent that is NOT 2 — never a hard-coded 100 (Law 4 / AD-4)', async () => {
+    const result = await loadEmployeeFormOptions(deps());
+
+    if (result.kind !== 'options') throw new Error('expected options');
+    expect(result.options.currencies.find((c) => c.code === CURRENCY_ZERO)).toEqual({
+      code: CURRENCY_ZERO,
+      symbol: '¤0',
+      minorUnitExponent: 0,
+      groupingStyle: 'INDIAN',
+    });
+  });
+
+  it('resolves every offered country to a currency the list carries', async () => {
+    const result = await loadEmployeeFormOptions(deps());
+
+    if (result.kind !== 'options') throw new Error('expected options');
+    const codes = new Set(result.options.currencies.map((c) => c.code));
+    for (const country of result.options.countries) {
+      expect(codes.has(country.currencyCode)).toBe(true);
+    }
+  });
+
+  it('orders currencies totally, so repeated reads agree', async () => {
+    const first = await loadEmployeeFormOptions(deps());
+    const second = await loadEmployeeFormOptions(deps());
+
+    if (first.kind !== 'options' || second.kind !== 'options') throw new Error('expected options');
+    expect(first.options.currencies).toEqual(second.options.currencies);
   });
 
   it('orders roles and countries totally, so repeated reads agree', async () => {
