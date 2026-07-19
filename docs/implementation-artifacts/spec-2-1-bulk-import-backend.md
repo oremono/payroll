@@ -2,7 +2,7 @@
 title: 'Bulk import backend (CAP-1)'
 type: 'feature'
 created: '2026-07-19'
-status: 'in-progress'
+status: 'done'
 baseline_revision: 'a04be66a367c8185e565bcb27974c3b5324704c0'
 review_loop_iteration: 1
 followup_review_recommended: false
@@ -102,21 +102,21 @@ To create — all new:
 
 **Execution** (in dependency order; each production task is preceded by its failing test):
 
-- [ ] `tests/domain/import-row.test.ts` -- red: cover every row-level matrix scenario -- the matrix is the contract, and domain needs 100% mutation score.
-- [ ] `src/domain/import-row.ts` -- define `ImportRowInput` (all cells as raw strings), `RejectionReason` as a discriminated union carrying its offending value, and `validateImportRow(raw, refs, today)` returning `{ ok: true, value: ValidatedRow } | { ok: false, reason: RejectionReason }` -- pure, total, takes `today` and the resolved reference codes as arguments so it never touches a clock or DB.
-- [ ] `tests/domain/import-rejection.test.ts` -- red: one expected sentence per `RejectionReason` variant, plus exhaustiveness.
-- [ ] `src/domain/import-rejection.ts` -- `composeRejectionSentence(reason): string` -- exactly one place composes rejection copy, so 2-2 renders it unmodified (mirrors the AD-20 verdict rule).
-- [ ] `tests/adapters/parse-import-csv.test.ts` -- red: header validation, quoted cells, CRLF, BOM, cell-count mismatch, `.xlsx`/binary detection, empty file, AND every case in the **CSV quoting contract** below -- the coverage and mutation gates do NOT reach `src/adapters/**`, so this file is the only thing standing between a parser bug and silent payroll data loss. Test it adversarially, not representatively.
-- [ ] `src/adapters/csv/parse-import-csv.ts` -- `parseImportCsv(text)` returning `{ kind: 'rows', rows } | { kind: 'refusal', reason }` -- hand-rolled RFC4180-subset parse implementing the **CSV quoting contract** and the **record-count reconciliation rule** below; the whole-file refusal cases live here, not in the use-case.
-- [ ] `src/application/ports/employee-repository.ts` -- declare `EmployeeRepository` with `loadReferenceData()` and `createEmployeesWithSalaries(batch)`; `src/application/ports/id.ts` -- `IdGenerator.next(): string` -- ports first, so the use-case is testable with fakes and the DB stays out of the fast suite.
-- [ ] `tests/application/import-employees.test.ts` -- red: use-case against in-memory fakes -- counts, ordering of rejections by row number, partial import, whole-file refusal passthrough, and that nothing is written when every row rejects.
-- [ ] `src/application/use-cases/import-employees.ts` -- orchestrate parse → validate → append; return the `ImportResult` payload -- the finalized boundary contract 2-2 and CAP-11 both consume.
-- [ ] `src/adapters/id.ts` -- UUIDv7 generator (AD-10) using node `crypto` -- adapters may use randomness; domain and application may not.
-- [ ] `src/adapters/db/employee-repository.ts` -- Prisma implementation; **the write funnel**: resolve currency from country, re-validate it, reject `effective_from > today`, and insert employee + salary record inside one transaction for the whole valid batch.
-- [ ] `tests/integration/import-employees.test.ts` -- against real Postgres 18: a mixed valid/invalid file lands exactly the valid rows, currency matches the country's, `seq` is assigned, and an attempted `UPDATE` on `salary_record` still fails under `payroll_app`.
-- [ ] `tests/app/handle-import-request.test.ts` -- red: no file part, multiple file parts, oversized upload, a `formData()` that throws, and a use-case that throws -- every one of these must produce an `ImportResult`, never a 500.
-- [ ] `src/app/api/import/route.ts` (+ an injectable handler body so it is testable without Next/DB/clock) -- multipart `POST` implementing the **handler error contract** below -- the one sanctioned Route Handler for this capability. Note: the finalized `ImportResult` carries no monetary value, so `toBoundaryMoney` has no call site here; if a future payload adds a total, it is the required encoder.
-- [ ] `docs/implementation-artifacts/deferred-work.md` -- record the F8 money-cell decision below and flag it for promotion to the spine's Consistency Conventions -- three export stories must inherit the same encoding.
+- [x] `tests/domain/import-row.test.ts` -- red: cover every row-level matrix scenario -- the matrix is the contract, and domain needs 100% mutation score.
+- [x] `src/domain/import-row.ts` -- define `ImportRowInput` (all cells as raw strings), `RejectionReason` as a discriminated union carrying its offending value, and `validateImportRow(raw, refs, today)` returning `{ ok: true, value: ValidatedRow } | { ok: false, reason: RejectionReason }` -- pure, total, takes `today` and the resolved reference codes as arguments so it never touches a clock or DB.
+- [x] `tests/domain/import-rejection.test.ts` -- red: one expected sentence per `RejectionReason` variant, plus exhaustiveness.
+- [x] `src/domain/import-rejection.ts` -- `composeRejectionSentence(reason): string` -- exactly one place composes rejection copy, so 2-2 renders it unmodified (mirrors the AD-20 verdict rule).
+- [x] `tests/adapters/parse-import-csv.test.ts` -- red: header validation, quoted cells, CRLF, BOM, cell-count mismatch, `.xlsx`/binary detection, empty file, AND every case in the **CSV quoting contract** below -- the coverage and mutation gates do NOT reach `src/adapters/**`, so this file is the only thing standing between a parser bug and silent payroll data loss. Test it adversarially, not representatively.
+- [x] `src/adapters/csv/parse-import-csv.ts` -- `parseImportCsv(text)` returning `{ kind: 'rows', rows } | { kind: 'refusal', reason }` -- hand-rolled RFC4180-subset parse implementing the **CSV quoting contract** and the **record-count reconciliation rule** below; the whole-file refusal cases live here, not in the use-case.
+- [x] `src/application/ports/employee-repository.ts` -- declare `EmployeeRepository` with `loadReferenceData()` and `createEmployeesWithSalaries(batch)`; `src/application/ports/id.ts` -- `IdGenerator.next(): string` -- ports first, so the use-case is testable with fakes and the DB stays out of the fast suite.
+- [x] `tests/application/import-employees.test.ts` -- red: use-case against in-memory fakes -- counts, ordering of rejections by row number, partial import, whole-file refusal passthrough, and that nothing is written when every row rejects.
+- [x] `src/application/use-cases/import-employees.ts` -- orchestrate parse → validate → append; return the `ImportResult` payload -- the finalized boundary contract 2-2 and CAP-11 both consume.
+- [x] `src/adapters/id.ts` -- UUIDv7 generator (AD-10) using node `crypto` -- adapters may use randomness; domain and application may not.
+- [x] `src/adapters/db/employee-repository.ts` -- Prisma implementation; **the write funnel**: resolve currency from country, re-validate it, reject `effective_from > today`, and insert employee + salary record inside one transaction for the whole valid batch.
+- [x] `tests/integration/import-employees.test.ts` -- against real Postgres 18: a mixed valid/invalid file lands exactly the valid rows, currency matches the country's, `seq` is assigned, and an attempted `UPDATE` on `salary_record` still fails under `payroll_app`.
+- [x] `tests/app/handle-import-request.test.ts` -- red: no file part, multiple file parts, oversized upload, a `formData()` that throws, and a use-case that throws -- every one of these must produce an `ImportResult`, never a 500.
+- [x] `src/app/api/import/route.ts` (+ an injectable handler body so it is testable without Next/DB/clock) -- multipart `POST` implementing the **handler error contract** below -- the one sanctioned Route Handler for this capability. Note: the finalized `ImportResult` carries no monetary value, so `toBoundaryMoney` has no call site here; if a future payload adds a total, it is the required encoder.
+- [x] `docs/implementation-artifacts/deferred-work.md` -- record the F8 money-cell decision below and flag it for promotion to the spine's Consistency Conventions -- three export stories must inherit the same encoding.
 
 **Acceptance Criteria:**
 - Given a CSV whose header is `name,role_code,level_code,country_code,gender,hire_date,amount_minor,currency,effective_from`, when it is posted with a mix of valid and invalid rows, then every valid row persists as one employee plus one salary record and every invalid row appears in `rejections` with its row number, name-as-it-appeared, offending value, and reason sentence.
@@ -174,6 +174,17 @@ To create — all new:
     elsewhere, and deliberately NOT placed on the `Clock` port.
   - Rejecting inactive reference rows, and excluding them in `loadReferenceData` — but apply the
     same `isActive` filter in the funnel's intra-transaction re-resolution, which previously diverged.
+
+- **2026-07-19 — re-derivation deviation, accepted.** The CSV quoting contract as I wrote it is
+  internally inconsistent in one case, and the implementer was right to say so. Item 2 allows
+  newlines inside quoted cells; item 3 requires an unterminated quote to be contained to its own
+  record. When a stray opening quote closes against a quote two lines later, the merged text is
+  character-for-character identical to a legitimate embedded newline, and it can land at exactly the
+  right cell count — so no heuristic separates them. Item 3 wins: **a record is one physical line.**
+  Containment becomes structural rather than best-effort, and the cost is embedded newlines, which
+  this format has no use for (a name, four reference codes, two ISO dates, an integer, a currency
+  code). Embedded *commas* in quoted cells still work. The limitation is documented at `splitRecords`
+  and pinned by a test, not silent. Revisit only if a real file ever needs a newline in a cell.
 
 ## Review Triage Log
 
