@@ -23,3 +23,40 @@
  */
 @import "tailwindcss";
 @import "./tokens.generated.css";
+
+/*
+ * The page CANVAS (story 1-6). Token REFERENCES only — no value is authored here.
+ *
+ * Until now nothing declared color-scheme and nothing painted the body, so with the OS in dark
+ * mode the app rendered a dark island inside a UA-white page: the generated file re-points every
+ * --color-* under prefers-color-scheme, but the surface BEHIND the app was never one of them.
+ * Recorded in deferred-work.md by 1-5's follow-up review; this is where it closes.
+ *
+ * Both halves are needed and they do different jobs:
+ *
+ *   color-scheme: light dark  tells the UA that this document has both, so it paints its OWN
+ *                             surfaces to match — scrollbars, focus rings, and (the one that
+ *                             matters most here) the native date picker inside the as-of control,
+ *                             which would otherwise render light-on-dark and be unreadable.
+ *
+ *   body background/color     paints the canvas itself, so the workspace surface extends past the
+ *                             last element to the edges of the viewport at any content height.
+ *
+ * There is no toggle, no .dark class, no data-theme attribute, and no persistence cookie: system
+ * preference is the only ratified hook, which is also why no rule in this file or anywhere in src/
+ * writes a dark: variant. eslint.config.mjs gates that for .ts/.tsx and no-hex.test.ts gates the
+ * color half of it here.
+ *
+ * @layer base so every Tailwind utility outranks it: a component that sets its own surface wins,
+ * as it must, and this is only ever the floor.
+ */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    background-color: var(--color-surface-base);
+    color: var(--color-ink);
+  }
+}

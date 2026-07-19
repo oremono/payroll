@@ -72,6 +72,17 @@ function asOfButton(page: Page) {
   return page.getByRole('button', { name: /change as-of date$/ });
 }
 
+/**
+ * The native date input inside the popover. Located by ROLE plus name rather than by label text:
+ * three elements in the open popover have an accessible name containing "as-of date" — the trigger
+ * button, the dialog, and the input — so a bare label lookup is ambiguous. Anchoring on the role is
+ * also the honest assertion: this control must expose itself as a form field, not merely carry
+ * matching text.
+ */
+function asOfInput(page: Page) {
+  return page.getByRole('textbox', { name: 'As-of date' });
+}
+
 test.describe('landmarks and bypass', () => {
   for (const route of ROUTES) {
     test(`${route.path} exposes exactly one nav and one main landmark`, async ({ page }) => {
@@ -192,7 +203,7 @@ test.describe('the as-of control', () => {
     await page.goto('/');
 
     await asOfButton(page).click();
-    await page.getByLabel('As-of date').fill(past.iso);
+    await asOfInput(page).fill(past.iso);
     await page.getByRole('button', { name: 'Apply' }).click();
 
     await expect(page).toHaveURL(new RegExp(`\\?asOf=${past.iso}$`));
@@ -210,7 +221,7 @@ test.describe('the as-of control', () => {
     await expect(region).toHaveText('');
 
     await asOfButton(page).click();
-    await page.getByLabel('As-of date').fill(past.iso);
+    await asOfInput(page).fill(past.iso);
     await page.getByRole('button', { name: 'Apply' }).click();
 
     await expect(region).toHaveText(`Findings updated as of ${past.label}`);
@@ -230,7 +241,7 @@ test.describe('the as-of control', () => {
     });
 
     await asOfButton(page).click();
-    await page.getByLabel('As-of date').fill(past.iso);
+    await asOfInput(page).fill(past.iso);
     await page.getByRole('button', { name: 'Apply' }).click();
 
     await expect(page.getByTestId('as-of-echo')).toHaveText(past.label);
@@ -260,7 +271,7 @@ test.describe('the as-of control', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    await page.getByLabel('As-of date').fill(past.iso);
+    await asOfInput(page).fill(past.iso);
     // Enter submits the topmost form (EXPERIENCE § Interaction Primitives).
     await page.keyboard.press('Enter');
 
