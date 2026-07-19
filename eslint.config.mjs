@@ -90,10 +90,16 @@ const layerBoundaryConfig = {
  * The order, widest to narrowest:
  *
  *   1. randomnessBanConfig  — no `files`: every linted file. Randomness only.
- *   2. colorLiteralBanConfig — `src/**`: randomness (re-declared) + color literals.
- *   3. prngExemptionConfig  — `src/adapters/prng.ts`: color literals ONLY. The AD-14 exemption.
+ *   2. colorLiteralBanConfig — `src/**`: randomness (re-declared) + the token-contract bans.
+ *   3. prngExemptionConfig  — `src/adapters/prng.ts`: the token-contract bans ONLY. The AD-14
+ *                             exemption.
  *   4. purityConfig         — `src/domain/**` + `src/application/**`: clock/env/randomness/import
- *                             bans + color literals (re-declared).
+ *                             bans + the token-contract bans (re-declared).
+ *
+ * The token-contract bans (color literals + the `dark:` variant) live in ONE shared array,
+ * `TOKEN_CONTRACT_BAN_SELECTORS`, which blocks 2-4 all spread. Adding a selector there reaches all
+ * three at once — the only arrangement that survives replace-don't-merge without a reviewer
+ * noticing that one block was missed.
  *
  * This is not hypothetical: the AD-14 PRNG exemption was lost exactly this way when block 2 was
  * introduced with no `ignores` and no re-declaration accounting. `tests/tokens/eslint-config.test.ts`
@@ -194,10 +200,66 @@ const COLOR_LITERAL_BAN_SELECTORS = [
   },
 ];
 
+/**
+ * The `dark:` variant ban (F-5) — the other half of the token contract, mechanized (story 1-6).
+ *
+ * "No component ever writes `dark:`" was stated in FIVE places — src/ui/README.md,
+ * src/app/globals.css, scripts/design-tokens/README.md, to-css.ts's header, and the 1-5 spec — and
+ * enforced in none. That is the same unenforced-prohibition shape the color ban above exists to
+ * fix, recorded as such in deferred-work.md.
+ *
+ * There is ONE token name and TWO values: `tokens.generated.css` re-declares every `--color-*`
+ * inside `@media (prefers-color-scheme: dark)`, so `bg-surface-card` already repaints itself. A
+ * `dark:` variant can therefore only reach for a `-dark` token that deliberately does not exist —
+ * it is not a style choice, it is a reference to nothing, and `tokens:check` and the hex ban would
+ * both stay green while it shipped.
+ *
+ * `\b` before `dark` keeps `is-dark` and `text-darkroom` out while still catching a STACKED variant
+ * (`md:dark:bg-…`), where the preceding `:` is a word boundary. The trailing colon is what makes it
+ * a Tailwind variant rather than the English word.
+ */
+const DARK_VARIANT_PATTERN = String.raw`\bdark:`;
+
+const DARK_VARIANT_BAN_MESSAGE =
+  'No `dark:` variant anywhere in src/ (F-5 / AD-15). Dark mode is one token name with two ' +
+  'values — src/app/tokens.generated.css re-points every --color-* under ' +
+  'prefers-color-scheme: dark, so `bg-surface-card` already repaints itself and there is no ' +
+  '`-dark` token to reach for. Write the single token utility. Dark mode is system preference ' +
+  'only: no toggle, no .dark class, no data-theme, no cookie.';
+
+const DARK_VARIANT_BAN_SELECTORS = [
+  {
+    selector: `Literal[value=/${DARK_VARIANT_PATTERN}/]`,
+    message: DARK_VARIANT_BAN_MESSAGE,
+  },
+  {
+    selector: `TemplateElement[value.raw=/${DARK_VARIANT_PATTERN}/]`,
+    message: DARK_VARIANT_BAN_MESSAGE,
+  },
+];
+
+/**
+ * The SHARED selector list every `src/**`-scoped block spreads.
+ *
+ * Both bans protect the same thing — the generated token contract — and both must hold in every
+ * corner of src/. Sharing one list is what stops the next block from inheriting one and losing the
+ * other: adding a selector here reaches `colorLiteralBanConfig`, `prngExemptionConfig`, and
+ * `purityConfig` at once, which is the only arrangement that survives flat config's
+ * replace-don't-merge semantics without a reviewer noticing.
+ *
+ * It is deliberately NOT spread into `randomnessBanConfig`: that block has no `files` and so
+ * applies repo-wide, and the generator, the contrast gate, and this repo's own config tests all
+ * handle color strings and `dark:` strings as DATA under scripts/ and tests/.
+ */
+const TOKEN_CONTRACT_BAN_SELECTORS = [
+  ...COLOR_LITERAL_BAN_SELECTORS,
+  ...DARK_VARIANT_BAN_SELECTORS,
+];
+
 const colorLiteralBanConfig = {
   files: [`src/**/*.${SRC_EXTENSIONS}`],
   rules: {
-    'no-restricted-syntax': ['error', RANDOMNESS_BAN_SELECTOR, ...COLOR_LITERAL_BAN_SELECTORS],
+    'no-restricted-syntax': ['error', RANDOMNESS_BAN_SELECTOR, ...TOKEN_CONTRACT_BAN_SELECTORS],
   },
 };
 
@@ -218,7 +280,7 @@ const colorLiteralBanConfig = {
 const prngExemptionConfig = {
   files: ['src/adapters/prng.ts'],
   rules: {
-    'no-restricted-syntax': ['error', ...COLOR_LITERAL_BAN_SELECTORS],
+    'no-restricted-syntax': ['error', ...TOKEN_CONTRACT_BAN_SELECTORS],
   },
 };
 
@@ -280,8 +342,8 @@ const purityConfig = {
       },
       // Re-declared, not inherited: this array REPLACES colorLiteralBanConfig's for domain and
       // application files. Dropping them here would make the pure core the one corner of src/
-      // where a color literal lints clean.
-      ...COLOR_LITERAL_BAN_SELECTORS,
+      // where a color literal or a `dark:` variant lints clean.
+      ...TOKEN_CONTRACT_BAN_SELECTORS,
     ],
     'no-restricted-imports': [
       'error',
