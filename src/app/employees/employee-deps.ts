@@ -7,6 +7,7 @@ import type {
   NewEmployee,
   NewEmployeeWithSalary,
   NewSalaryRecord,
+  PeerGroupKey,
 } from '@/application/ports/employee-repository';
 import type { EmployeeUseCaseDeps } from '@/application/use-cases/employees';
 import type { PlainDate } from '@/domain/plain-date';
@@ -57,6 +58,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
       createEmployeeRepository().appendSalaryRecord(salaryRecord, today),
     findSalaryHistory: async (employeeId: string) =>
       createEmployeeRepository().findSalaryHistory(employeeId),
+    findPeerPopulation: async (group: PeerGroupKey) =>
+      createEmployeeRepository().findPeerPopulation(group),
   };
 }
 

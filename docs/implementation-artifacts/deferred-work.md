@@ -1273,3 +1273,59 @@ source_spec: `spec-4-2-record-salary-change-ui.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260720-001305-9054; this entry preserves the lingering recommendation for a deliberate later review.
 status: open
+
+- source_spec: `spec-6-1-peer-comparison-backend.md`
+  summary: `getPeerComparison` reads the subject and then the peer population in two separate
+    non-transactional Prisma round-trips, so a concurrent role/level edit between the two reads can
+    produce a spurious `no-salary-as-of` refusal for an employee who actually has a salary.
+  evidence: `findEmployeeById` (peer-comparison use-case) captures the subject's `(role, level,
+    country)` triple, then `findPeerPopulation` queries by that triple on a second round-trip.
+    `updateEmployee` permits `roleCode`/`levelCode` edits, so if the subject's role/level changes in
+    the window between the two reads the subject can be absent from the freshly-read candidate set,
+    yielding a refusal that contradicts the file's "same data + same asOf ⇒ identical payload" claim.
+    Low consequence (transient, self-corrects on reload; no data corruption) but real. Fix is a single
+    transactional/combined read (e.g. `findPeerPopulation` taking the employeeId and resolving the
+    triple inside one transaction). Not patched: closing it is a port/adapter redesign, not mechanical.
+
+- source_spec: `spec-6-1-peer-comparison-backend.md`
+  summary: `comparePeers` medians/spreads the raw `amountMinor` of every in-population peer and labels
+    the result with only the subject's currency, with no defensive check that the group is actually
+    single-currency — the one error mode in the module with no guard.
+  evidence: The single-currency invariant holds today by construction (AD-6: currency is written from
+    the employee's immutable country and validated at write; each `salary_record` carries its own
+    currency). But `comparePeers` reads each candidate's `salary.currency` and never asserts they all
+    match before averaging minor units across them. If a backfill, migration, or future write path ever
+    stored a record whose `currency_code` diverged from the country's, the median would silently mix
+    currencies and `formatMoney` would not catch it (the median Money carries the subject's currency,
+    which still matches its format) — a mislabeled cross-currency mean in a module whose whole ethos is
+    "every figure carries its receipts." Both reviewers flagged it independently. Not patched: a guard
+    needs a new refusal/outcome to return on violation (domain functions are total, cannot throw),
+    which is design scope beyond a mechanical fix.
+
+- source_spec: `spec-6-1-peer-comparison-backend.md`
+  summary: The peer-comparison integration test retires shared `country`/`currency` reference rows
+    that it can never delete, and on a partial `beforeAll` failure can orphan ACTIVE run-scoped
+    reference rows, polluting global reference state that sibling integration suites assert over.
+  evidence: `tests/integration/peer-comparison.test.ts` `beforeAll` creates run-scoped role/level/
+    country/currency rows and later flips country+currency to `is_active = false` to exercise the
+    inactive-inclusive label path; `salary_record`/reference rows are never cleaned up by design. The
+    retire happens after six employee creations and several salary appends — if any of those throw or
+    the process is killed mid-`beforeAll`, the run leaves ACTIVE run-scoped country/currency rows
+    behind, transiently violating the "an active country resolves to an active currency" invariant that
+    the form-options integration suite asserts globally, and every completed run permanently
+    accumulates inactive rows in the shared DB. Low probability (mid-setup crash) but affects shared
+    state across suites. Not patched: robustly isolating this needs a per-run schema/namespace or a
+    teardown strategy the suite family does not currently have.
+
+- source_spec: `spec-6-1-peer-comparison-backend.md`
+  summary: The finalized `no-salary-as-of` refusal payload omits the `peerGroup` receipt that both the
+    answer and the `thin-peer-group` refusal carry, so story 6-2 cannot show which group the subject
+    would have been compared against on that outcome.
+  evidence: `PeerRefusal`'s `thin-peer-group` arm carries `peerGroup: {roleCode, levelCode,
+    countryCode}` and the answer carries it too, but the `no-salary-as-of` arm carries only `asOf` and
+    `verdict` — even though the use-case has already computed the subject's triple and discards it for
+    this arm. It weakens the "a refusal is a full citizen carrying its receipts" claim exactly where a
+    little context (the group the subject sits in but has no as-of salary for) would help a 6-2 reader.
+    Spec-conformant (the Design Notes contract omits it deliberately), so revisit when building 6-2 if
+    the UI wants the group label on this state; enriching the finalized contract now is cheap but is a
+    design call, not a defect fix.

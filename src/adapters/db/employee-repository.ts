@@ -9,6 +9,8 @@ import type {
   NewEmployee,
   NewEmployeeWithSalary,
   NewSalaryRecord,
+  PeerGroupKey,
+  PeerPopulation,
   UpdateEmployeeOutcome,
 } from '@/application/ports/employee-repository';
 import type { ReferenceData } from '@/domain/import-row';
@@ -928,6 +930,94 @@ export function createEmployeeRepository(
         effectiveFrom: fromDbDate(record.effectiveFrom),
         salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
       }));
+    },
+
+    // ── CAP-5 (story 6-1) ────────────────────────────────────────────────────────────────────
+    // A READ-ONLY sibling of `findSalaryHistory` on this same repository — same client, same
+    // read-null idiom, and the SAME `is_active`-inclusive resolution the schema comments demand.
+    // It SELECTS the candidate set; the median, spread, distance, and `n` are the domain's (Law 2).
+
+    findPeerPopulation: async (group: PeerGroupKey): Promise<PeerPopulation | null> => {
+      // The employees sharing the exact triple (served by the `@@index([roleCode, levelCode,
+      // countryCode])`), each with their WHOLE history — UNORDERED and as-of-UNFILTERED, because the
+      // domain owns the ordering (AD-8) and the as-of population (AD-16). The reference labels and
+      // the currency are read alongside, each by its natural `code`. Parallel selects rather than
+      // one join: `loadFormOptions` reads the small reference tables the same way, and a join would
+      // fan the (small) label rows across every employee row.
+      const [employees, role, level, country] = await Promise.all([
+        client.employee.findMany({
+          where: {
+            roleCode: group.roleCode,
+            levelCode: group.levelCode,
+            countryCode: group.countryCode,
+          },
+          select: {
+            id: true,
+            // NO `orderBy` (AD-8) and NO `where` on `effectiveFrom` (AD-16): the domain resolves
+            // current salary and in-population membership from the whole append-only series.
+            salaryRecords: {
+              select: {
+                id: true,
+                seq: true,
+                amountMinor: true,
+                currencyCode: true,
+                effectiveFrom: true,
+              },
+            },
+          },
+        }),
+        // NO `is_active` filter on any of these (AD-16): a subject holding a retired role, level,
+        // country, or currency still has statistics and a nameable group. `findUnique` on the
+        // UNIQUE `code` checks existence, never activity — the exact opposite of `loadFormOptions`,
+        // which filters for pickability. The two must NOT converge.
+        client.role.findUnique({ where: { code: group.roleCode }, select: { name: true } }),
+        client.level.findUnique({ where: { code: group.levelCode }, select: { name: true } }),
+        client.country.findUnique({
+          where: { code: group.countryCode },
+          // The currency travels with the country (AD-6), read through the relation rather than
+          // re-resolved separately, and WITHOUT an `is_active` filter for the reason above.
+          select: {
+            name: true,
+            currency: {
+              select: { code: true, symbol: true, minorUnitExponent: true, groupingStyle: true },
+            },
+          },
+        }),
+      ]);
+
+      // A missing reference label is a data condition surfaced as a value, never an exception — the
+      // FKs make it unreachable for an existing employee, but the read stays total (AD-20).
+      if (role === null || level === null || country === null) {
+        return null;
+      }
+
+      // The group currency, VALIDATED into a `CurrencyFormat` the ONE money formatter can use —
+      // through the SAME `toCurrencyFormats` `loadFormOptions` uses, so a grouping style or exponent
+      // the domain cannot format is DROPPED (→ `null` here → the use-case answers `unavailable`)
+      // rather than coerced into an amount rendered by a rule nobody wrote.
+      const [currencyFormat] = toCurrencyFormats([country.currency]);
+      if (currencyFormat === undefined) {
+        return null;
+      }
+
+      return {
+        candidates: employees.map((employee) => ({
+          employeeId: employee.id,
+          // `amountMinor`/`seq` come back as native `bigint`; the currency is each record's OWN,
+          // read straight off the column and never re-resolved from the country (AD-6). `seq` rides
+          // along for the resolver's ordering and is dropped at the application boundary.
+          salaryHistory: employee.salaryRecords.map((record) => ({
+            id: record.id,
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+            salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+          })),
+        })),
+        roleName: role.name,
+        levelLabel: level.name,
+        countryName: country.name,
+        currencyFormat,
+      };
     },
   };
 }

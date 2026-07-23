@@ -92,6 +92,9 @@ function fakeDeps(
     // CAP-4's salary read (story 5-1). Present so this fake still satisfies the widened port; no
     // CAP-2 handler reaches it.
     findSalaryHistory: () => Promise.resolve(null),
+    // CAP-5's peer-population read (story 6-1). Present so this fake still satisfies the widened
+    // port; no CAP-2 handler reaches it.
+    findPeerPopulation: () => Promise.resolve(null),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };
