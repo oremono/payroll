@@ -3,18 +3,21 @@ import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { getEmployee, loadEmployeeFormOptions } from '@/application/use-cases/employees';
+import { getSalaryTimeline } from '@/application/use-cases/salary-timeline';
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { currencyLineFor, EMPLOYEE_FORM_FIELDS } from '@/ui/employee-form';
 import { EmployeeFormPanel } from '@/ui/employee-form-panel';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
 import { salaryChangeAvailability } from '@/ui/salary-change-form';
 import { SalaryChangePanel } from '@/ui/salary-change-panel';
+import { SalaryTimeline } from '@/ui/salary-timeline';
+import { buildSalaryTimeline } from '@/ui/salary-timeline-vm';
 
 import { recordSalaryChangeAction, updateEmployeeAction } from '../actions';
 import { employeeReadDeps } from '../employee-deps';
 
 /**
- * One employee — IDENTITY FIELDS ONLY, and the edit form's invoking control.
+ * One employee — identity fields, the edit/record-change controls, and the DR9 salary timeline.
  *
  * ## Why this route exists at all, and how far it goes
  *
@@ -23,10 +26,12 @@ import { employeeReadDeps } from '../employee-deps';
  * Epic 3 assigns "row-to-detail navigation" here, and `reconcile-stitch.md` puts the `Edit employee`
  * control on the detail screen.
  *
- * So it is a thin identity page plus CAP-3's entry point, and nothing more. NO current salary — the
- * AD-8 resolver belongs to CAP-4. No salary timeline (DR9 → Epic 5), no percent-change chip, no
- * `(Hire)` label, no peer comparison (Epic 6). Story 4-2 adds the record-a-change TRIGGER named in
- * the docstring's original hole and nothing else; Epic 5 adds the surface that displays a salary.
+ * Story 5-2 adds the CAP-4 surface: it calls `getSalaryTimeline(deps, id, today)` and renders its
+ * three arms as a sibling section after the identity one — the DR9 timeline (newest-first, with the
+ * derived percent chip and `(Hire)` marker), a dignified empty line, or the shared "unreadable"
+ * region. It CONSUMES story 5-1's finalized payload unmodified and adds nothing to the contract
+ * (Law 7); the current record is the payload's head, never re-resolved here (AD-8). No peer
+ * comparison yet (Epic 6).
  *
  * ## `today`, read once, here
  *
@@ -46,6 +51,17 @@ import { employeeReadDeps } from '../employee-deps';
  */
 
 const UNAVAILABLE_HEADING = 'This employee could not be read';
+
+/**
+ * The heading for the timeline's own "unreadable" region.
+ *
+ * Distinct copy AND a distinct DOM id from the whole-employee `unavailable` arm above: the identity
+ * read can succeed while the salary read fails, so both regions may be on the page at once, and this
+ * one names the salary history specifically rather than the employee.
+ */
+const TIMELINE_UNAVAILABLE_HEADING = 'This salary timeline could not be read';
+const TIMELINE_UNAVAILABLE_STATEMENT =
+  "This employee's salary history is not readable right now. Nothing has changed.";
 
 export default async function EmployeeDetailPage({
   params,
@@ -93,7 +109,15 @@ export default async function EmployeeDetailPage({
     today,
   );
 
+  // The CAP-4 read, at the SAME `today` the sibling reads above use (Law 6 / AD-11). `deps` already
+  // satisfies `SalaryTimelineDeps`; the payload is consumed unmodified (Law 7). `unavailable` and,
+  // defensively, `not-found` (a race after `getEmployee` resolved) are the "unreadable" region;
+  // `timeline` builds the view-model — currencies come from the reference options when they were
+  // readable, and an empty list withholds the amounts through the builder rather than here.
+  const timeline = await getSalaryTimeline(deps, id, today);
+
   return (
+    <>
     <section
       aria-labelledby="employee-detail-heading"
       className="rounded border border-border-hairline bg-surface-card p-4"
@@ -170,6 +194,29 @@ export default async function EmployeeDetailPage({
         <p className="mt-3 text-body-sm text-ink-muted">{currencyLine}</p>
       )}
     </section>
+
+      {/* The DR9 salary timeline — a sibling section, flat under the page `<h1>`. `unavailable` and,
+          defensively, `not-found` are the shared "unreadable" region (a region with a heading, never
+          `role="alert"`), kept visibly distinct from a present employee with an empty history. */}
+      {timeline.kind === 'unavailable' || timeline.kind === 'not-found' ? (
+        <div className="mt-4">
+          <EmployeeUnavailable
+            id="salary-timeline-unavailable-heading"
+            heading={TIMELINE_UNAVAILABLE_HEADING}
+            statement={TIMELINE_UNAVAILABLE_STATEMENT}
+          />
+        </div>
+      ) : (
+        <SalaryTimeline
+          vm={buildSalaryTimeline(
+            timeline.timeline,
+            // The reference currencies, when the tables were readable; an empty list otherwise, which
+            // the builder answers by withholding the amounts rather than showing a bare figure.
+            options.kind === 'options' ? options.options.currencies : [],
+          )}
+        />
+      )}
+    </>
   );
 }
 

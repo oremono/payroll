@@ -100,7 +100,7 @@ development_status:
   # Epic 5 — CAP-4 Salary Timeline
   epic-5: backlog
   5-1-salary-timeline-backend: done
-  5-2-salary-timeline-ui: backlog
+  5-2-salary-timeline-ui: done
   epic-5-retrospective: optional
 
   # Epic 6 — CAP-5 Peer Comparison or Refusal
