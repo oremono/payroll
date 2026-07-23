@@ -122,6 +122,10 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
     // port; no CAP-2 use-case reaches it, and `tests/application/outliers.test.ts` is where it is
     // actually exercised.
     findAllPeerGroups: async () => guard('findAllPeerGroups', []),
+    // CAP-7's gender-gap population read (story 8-1). Present so this fake still satisfies the
+    // widened port; no CAP-2 use-case reaches it, and `tests/application/gender-gap.test.ts` is
+    // where it is actually exercised.
+    findGenderGapPopulation: async () => guard('findGenderGapPopulation', null),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).

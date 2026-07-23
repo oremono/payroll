@@ -56,6 +56,10 @@ const NOT_USED_BY_IMPORT = {
   // CAP-6's whole-population read (story 7-1). Import never sweeps outliers — a rejecting stub keeps
   // that true rather than asserting it in prose.
   findAllPeerGroups: () => Promise.reject(new Error('import never reads the whole peer population')),
+  // CAP-7's gender-gap population read (story 8-1). Import never computes a gender gap — a rejecting
+  // stub keeps that true rather than asserting it in prose.
+  findGenderGapPopulation: () =>
+    Promise.reject(new Error('import never reads a gender-gap population')),
 } satisfies Pick<
   EmployeeRepository,
   | 'createEmployee'
@@ -67,6 +71,7 @@ const NOT_USED_BY_IMPORT = {
   | 'findSalaryHistory'
   | 'findPeerPopulation'
   | 'findAllPeerGroups'
+  | 'findGenderGapPopulation'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */

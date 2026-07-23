@@ -1365,3 +1365,22 @@ status: open
     state does not differentiate no-data from all-clear), surfaced incidentally by review, not a
     defect in the 7-2 diff. Revisit as a product decision: whether the zero-population case should
     show an onboarding/import affordance distinct from the all-clear.
+
+- source_spec: `docs/implementation-artifacts/spec-8-1-gender-gap-backend.md`
+  summary: `computeGenderGap` pools each gender's in-population `amountMinor` into the reused
+    `median` and reads the group currency from the first in-population member, with no defensive
+    single-currency guard — so `(M − F) / M` would divide across two currencies (silently wrong, no
+    throw) if a peer group ever mixed currencies.
+  evidence: `src/domain/gender-gap.ts` medians the male/female minor units and labels the answer
+    with the first member's currency; `src/adapters/db/employee-repository.ts`
+    `findGenderGapPopulation` reads each salary record's own `currencyCode`. Safe today only because
+    the app binds salary currency to country at write (`checkSalaryCurrency` / import), country is
+    immutable per employee (no country-edit path), and salary history is append-only — but
+    `country.currency_code` has no `onUpdate: Restrict` in `prisma/schema.prisma` (contrast
+    `salary_record.currencyCode`), so an org-wide currency change on a country would break the
+    invariant with no guard. This is the SAME construction-safe assumption CAP-5's `comparePeers`
+    and CAP-6's `sweepOutliers` were deferred on (identical single-currency-guard item), re-committed
+    here; masked downstream only accidentally by `formatMoney` returning `null` on a
+    currency/format mismatch → `unavailable`. Not a live defect. Revisit by pinning country-currency
+    immutability at the schema/role level, or adding one shared domain guard that refuses a group
+    whose in-population members disagree on currency (would close it for CAP-5/6/7 at once).

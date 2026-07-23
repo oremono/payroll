@@ -6,6 +6,7 @@ import type {
   EmployeeListQuery,
   EmployeeRepository,
   EmployeeUpdate,
+  GenderGapPopulation,
   NewEmployee,
   NewEmployeeWithSalary,
   NewSalaryRecord,
@@ -1138,6 +1139,97 @@ export function createEmployeeRepository(
       }
 
       return populations;
+    },
+
+    // ── CAP-7 (story 8-1) ────────────────────────────────────────────────────────────────────
+    // A READ-ONLY, gender-carrying sibling of `findPeerPopulation` — the SAME single-triple read the
+    // gender gap needs, with `gender` on every candidate so the domain can split the as-of population
+    // WITHIN the group (AD-16 / AD-17). Same triple `where`, same `is_active`-inclusive labels and
+    // currency, same `null` arms. It SELECTs the candidate set; the per-gender medians, the gap, and
+    // the counts are the domain's (Law 2 / AD-2). No update, no delete, ever (Law 5 / AD-18).
+
+    findGenderGapPopulation: async (
+      group: PeerGroupKey,
+    ): Promise<GenderGapPopulation | null> => {
+      // Mirrors `findPeerPopulation` exactly, adding `gender` to the employee select: the employees
+      // sharing the exact triple (served by the `@@index([roleCode, levelCode, countryCode])`), each
+      // with their WHOLE history — UNORDERED and as-of-UNFILTERED (AD-8 / AD-16) — plus the reference
+      // labels and currency read by their natural `code`.
+      const [employees, role, level, country] = await Promise.all([
+        client.employee.findMany({
+          where: {
+            roleCode: group.roleCode,
+            levelCode: group.levelCode,
+            countryCode: group.countryCode,
+          },
+          select: {
+            id: true,
+            // The one addition over `findPeerPopulation`: gender rides onto every candidate so the
+            // domain can split the group (AD-17). It is never part of peer identity (the `where` is
+            // still the triple alone) — it only slices WITHIN the group.
+            gender: true,
+            // NO `orderBy` (AD-8) and NO `where` on `effectiveFrom` (AD-16): the domain resolves
+            // current salary and in-population membership from the whole append-only series.
+            salaryRecords: {
+              select: {
+                id: true,
+                seq: true,
+                amountMinor: true,
+                currencyCode: true,
+                effectiveFrom: true,
+              },
+            },
+          },
+        }),
+        // NO `is_active` filter on any of these (AD-16): a subject holding a retired role, level,
+        // country, or currency still has statistics and a nameable group — the same
+        // `is_active`-inclusive resolution `findPeerPopulation` uses, never `loadFormOptions`'.
+        client.role.findUnique({ where: { code: group.roleCode }, select: { name: true } }),
+        client.level.findUnique({ where: { code: group.levelCode }, select: { name: true } }),
+        client.country.findUnique({
+          where: { code: group.countryCode },
+          select: {
+            name: true,
+            currency: {
+              select: { code: true, symbol: true, minorUnitExponent: true, groupingStyle: true },
+            },
+          },
+        }),
+      ]);
+
+      // A missing reference label is a data condition surfaced as a value, never an exception — the
+      // FKs make it unreachable for an existing employee, but the read stays total (AD-20).
+      if (role === null || level === null || country === null) {
+        return null;
+      }
+
+      // The group currency, VALIDATED into a `CurrencyFormat` the ONE money formatter can use, through
+      // the SAME `toCurrencyFormats` — a grouping style or exponent the domain cannot format is
+      // DROPPED (→ `null` here → the use-case answers `unavailable`) rather than coerced.
+      const [currencyFormat] = toCurrencyFormats([country.currency]);
+      if (currencyFormat === undefined) {
+        return null;
+      }
+
+      return {
+        candidates: employees.map((employee) => ({
+          employeeId: employee.id,
+          gender: employee.gender,
+          // `amountMinor`/`seq` come back as native `bigint`; the currency is each record's OWN, read
+          // straight off the column and never re-resolved from the country (AD-6). `seq` rides along
+          // for the resolver's ordering and is dropped at the application boundary.
+          salaryHistory: employee.salaryRecords.map((record) => ({
+            id: record.id,
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+            salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+          })),
+        })),
+        roleName: role.name,
+        levelLabel: level.name,
+        countryName: country.name,
+        currencyFormat,
+      };
     },
   };
 }
