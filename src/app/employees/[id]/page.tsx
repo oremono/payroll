@@ -3,12 +3,19 @@ import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { getEmployee, loadEmployeeFormOptions } from '@/application/use-cases/employees';
+import { getGenderGap } from '@/application/use-cases/gender-gap';
 import { getPeerComparison } from '@/application/use-cases/peer-comparison';
 import { getSalaryTimeline } from '@/application/use-cases/salary-timeline';
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { currencyLineFor, EMPLOYEE_FORM_FIELDS } from '@/ui/employee-form';
 import { EmployeeFormPanel } from '@/ui/employee-form-panel';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { GenderGapCard } from '@/ui/gender-gap';
+import {
+  buildGenderGap,
+  GENDER_GAP_UNREADABLE_HEADING,
+  GENDER_GAP_UNREADABLE_STATEMENT,
+} from '@/ui/gender-gap-vm';
 import { PeerComparison } from '@/ui/peer-comparison';
 import {
   buildPeerComparison,
@@ -131,6 +138,14 @@ export default async function EmployeeDetailPage({
   // rather than here.
   const peer = await getPeerComparison(deps, id, today);
 
+  // The CAP-7 read, at the SAME `today` the sibling reads use (Law 6 / AD-11). `deps` already
+  // satisfies `GenderGapDeps`; the payload is consumed unmodified (Law 7). `unavailable` and,
+  // defensively, `not-found` (a race after `getEmployee` resolved) are the shared "unreadable"
+  // region; `answer`/`refusal` build the view-model — currencies come from the reference options
+  // when they were readable, and an empty list fails the answer's figures closed through the builder
+  // rather than here.
+  const genderGap = await getGenderGap(deps, id, today);
+
   return (
     <>
     <section
@@ -250,6 +265,31 @@ export default async function EmployeeDetailPage({
         <PeerComparison
           vm={buildPeerComparison(
             peer,
+            options.kind === 'options' ? options.options.currencies : [],
+          )}
+        />
+      )}
+
+      {/* The CAP-7 gender-gap surface — a fourth sibling section, flat under the page `<h1>`.
+          `unavailable` and, defensively, `not-found` are the shared "unreadable" region (a region
+          with a heading, never `role="alert"`), kept visibly distinct from a refusal. `answer` and
+          `refusal` build the view-model: an answer's median figures resolve from the reference
+          currencies (an empty list fails them closed to verdict + provenance + copy), and both a
+          refusal and an answer carry the ONE verdict for the card and copy-answer alike. The
+          gender-gap card adds only the gender split — the whole-group median/spread stays with the
+          peer-comparison card above (AD-9). */}
+      {genderGap.kind === 'unavailable' || genderGap.kind === 'not-found' ? (
+        <div className="mt-4">
+          <EmployeeUnavailable
+            id="gender-gap-unavailable-heading"
+            heading={GENDER_GAP_UNREADABLE_HEADING}
+            statement={GENDER_GAP_UNREADABLE_STATEMENT}
+          />
+        </div>
+      ) : (
+        <GenderGapCard
+          vm={buildGenderGap(
+            genderGap,
             options.kind === 'options' ? options.options.currencies : [],
           )}
         />
