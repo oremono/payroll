@@ -55,6 +55,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
     loadFormOptions: async () => createEmployeeRepository().loadFormOptions(),
     appendSalaryRecord: async (salaryRecord: NewSalaryRecord, today: PlainDate) =>
       createEmployeeRepository().appendSalaryRecord(salaryRecord, today),
+    findSalaryHistory: async (employeeId: string) =>
+      createEmployeeRepository().findSalaryHistory(employeeId),
   };
 }
 

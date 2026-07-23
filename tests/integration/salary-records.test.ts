@@ -558,11 +558,13 @@ describe('salary_record is append-only at the DATABASE, not merely in the types 
 
     const methods = Object.keys(repository);
     expect(methods.filter((method) => /delete|remove|destroy/i.test(method))).toEqual([]);
-    // Two salary-touching methods, and both of them APPEND: the batch funnel CAP-1 writes through
-    // and CAP-3's single-record sibling. No update, no delete, no second write path.
+    // The salary-touching methods, and NONE of them updates or deletes: the two APPENDs (the batch
+    // funnel CAP-1 writes through and CAP-3's single-record sibling) plus CAP-4's read-only
+    // `findSalaryHistory` (story 5-1). No update, no delete, no second write path.
     expect(methods.filter((method) => /salar/i.test(method)).sort()).toEqual([
       'appendSalaryRecord',
       'createEmployeesWithSalaries',
+      'findSalaryHistory',
     ]);
   });
 });

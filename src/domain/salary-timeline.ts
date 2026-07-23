@@ -55,29 +55,43 @@ export type SalaryRecordView = SalaryRecordOrder & {
 };
 
 /**
- * Is `candidate` later in the `(effectiveFrom, seq)` order than `incumbent`?
+ * THE `(effectiveFrom, seq)` comparison, and the only one. Negative when `a` orders BEFORE `b`,
+ * positive when after, zero when neither (same date AND same seq).
  *
- * STRICTLY later. "Greatest" admits no ties, and `salary_record.seq` is UNIQUE so a real tie cannot
- * arise — but this function is total over any list it is handed, and a non-strict comparison would
- * make the answer depend on the position of an equal pair in the input, which is exactly what AD-8
- * says it must never depend on.
+ * There is exactly one of these because there is exactly one ordering (AD-8): the resolver reads it
+ * to find "greatest", and the timeline reads it to sort newest-first. A second comparator anywhere
+ * is how the tie-break forks and two surfaces begin disagreeing about which record is current — so
+ * both route through here, and the agreement between them is a mechanical consequence rather than a
+ * thing each maintains independently. `SalaryRecordOrder` is the whole of what it reads; a richer
+ * row rides along untouched.
  *
- * The date is tested for BOTH signs explicitly, rather than as "nonzero, then positive". The two
- * are equivalent, and that is precisely the problem: written the second way, the sign test sits on a
- * value already known to be nonzero, so relaxing it to `>= 0` changes nothing and no test can
- * distinguish the two. A rule this much later code reads through does not get to have a comparison
- * no test constrains. Three explicit arms, each independently reachable and each pinned.
+ * A THREE-WAY sign: `1` when `a` orders after `b`, `-1` when before, `0` when neither — the last
+ * only for a record measured against one sharing BOTH its date and its `seq`. `salary_record.seq` is
+ * UNIQUE so that never happens for two distinct rows, but the function is TOTAL over any list it is
+ * handed and the `0` is what a comparator must return for a genuine tie: the resolver reads it as
+ * "not strictly later" (`> 0` is false, so the incumbent is kept), and `Array.prototype.sort` reads
+ * it as "equal", leaving the pair in input order. Both are pinned by a test, so the `0` is live, not
+ * decoration.
+ *
+ * STRICT on `seq`, and the two `seq` arms are written for BOTH signs explicitly rather than as
+ * "nonzero, then positive": the second form would sit a sign test on a value already known to be
+ * nonzero, so relaxing it changes nothing and no test could distinguish the two — a comparison this
+ * much later code reads through does not get one no test constrains. The date is returned as the raw
+ * `comparePlainDate` result; both callers read only its SIGN, never its magnitude.
  */
-function isLaterThan(candidate: SalaryRecordOrder, incumbent: SalaryRecordOrder): boolean {
-  const byDate = comparePlainDate(candidate.effectiveFrom, incumbent.effectiveFrom);
-  if (byDate > 0) {
-    return true;
-  }
-  if (byDate < 0) {
-    return false;
+function compareSalaryOrder(a: SalaryRecordOrder, b: SalaryRecordOrder): number {
+  const byDate = comparePlainDate(a.effectiveFrom, b.effectiveFrom);
+  if (byDate !== 0) {
+    return byDate;
   }
   // Same day — the DESIGNED path, not an edge case. `seq` decides, and `createdAt` never does.
-  return candidate.seq > incumbent.seq;
+  if (a.seq > b.seq) {
+    return 1;
+  }
+  if (a.seq < b.seq) {
+    return -1;
+  }
+  return 0;
 }
 
 /**
@@ -101,10 +115,37 @@ export function resolveCurrentSalary<T extends SalaryRecordOrder>(
     if (comparePlainDate(record.effectiveFrom, asOf) > 0) {
       continue;
     }
-    if (current === null || isLaterThan(record, current)) {
+    // STRICTLY later — `compareSalaryOrder(record, current) > 0`. The one comparison the timeline
+    // also sorts by, so the resolver's pick and the timeline's head cannot fork (AD-8).
+    if (current === null || compareSalaryOrder(record, current) > 0) {
       current = record;
     }
   }
 
   return current;
+}
+
+/**
+ * The salary timeline as of `asOf`: every eligible record, NEWEST FIRST — a DISPLAY ordering, not a
+ * second answer to "what is current" (that is still and only `resolveCurrentSalary`, AD-8).
+ *
+ * As-of filtered the same way the resolver is: a record with `effectiveFrom <= asOf` is in, one
+ * after `asOf` is out. The bound is INCLUSIVE, so a record dated exactly on `asOf` shows — the same
+ * inclusiveness that makes "append a record dated today" a working correction. Because future-dating
+ * is rejected on write, at the default `asOf` = today every record is visible, and rewinding the
+ * control only hides not-yet-effective records.
+ *
+ * Sorted through the ONE `compareSalaryOrder` (descending), so `orderSalaryTimeline(records, asOf)[0]`
+ * is exactly `resolveCurrentSalary(records, asOf)` — the agreement is a consequence of sharing the
+ * comparison, not a coincidence a test hopes for. Pure and TOTAL: an empty or all-future list is
+ * `[]`, never an exception. Computes on a COPY (`filter` already allocates one) so the caller's list
+ * is never disturbed.
+ */
+export function orderSalaryTimeline<T extends SalaryRecordOrder>(
+  records: readonly T[],
+  asOf: PlainDate,
+): readonly T[] {
+  return records
+    .filter((record) => comparePlainDate(record.effectiveFrom, asOf) <= 0)
+    .sort((a, b) => compareSalaryOrder(b, a));
 }

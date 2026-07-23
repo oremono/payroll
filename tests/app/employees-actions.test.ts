@@ -89,6 +89,9 @@ function fakeDeps(
     // CAP-3's sibling append (story 4-1). Present so this fake still satisfies the port; no CAP-2
     // handler reaches it, and `tests/app/handle-salary-change.test.ts` is where it is exercised.
     appendSalaryRecord: () => Promise.resolve({ kind: 'appended' as const }),
+    // CAP-4's salary read (story 5-1). Present so this fake still satisfies the widened port; no
+    // CAP-2 handler reaches it.
+    findSalaryHistory: () => Promise.resolve(null),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };

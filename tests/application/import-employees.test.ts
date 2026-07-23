@@ -47,6 +47,9 @@ const NOT_USED_BY_IMPORT = {
   // BATCH funnel and never through this one — a rejecting stub is how that stays true rather than
   // being merely asserted in prose.
   appendSalaryRecord: () => Promise.reject(new Error('import never appends one salary record')),
+  // CAP-4's salary read (story 5-1). Import never reads a timeline — a rejecting stub keeps that
+  // true rather than asserting it in prose.
+  findSalaryHistory: () => Promise.reject(new Error('import never reads a salary history')),
 } satisfies Pick<
   EmployeeRepository,
   | 'createEmployee'
@@ -55,6 +58,7 @@ const NOT_USED_BY_IMPORT = {
   | 'listEmployees'
   | 'loadFormOptions'
   | 'appendSalaryRecord'
+  | 'findSalaryHistory'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */
