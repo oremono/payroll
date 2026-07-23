@@ -1351,3 +1351,17 @@ status: open
     widened to the whole population here; construction-safe, not a live defect. Revisit by either
     pinning country-currency immutability at the schema/role level or adding a domain guard that
     refuses/drops a group whose in-population members disagree on currency.
+
+- source_spec: `docs/implementation-artifacts/spec-7-2-outliers-threshold-ui.md`
+  summary: On a fresh install with no employees imported, Home renders the calm CAP-6 zero-state
+    "No outliers beyond {threshold}% as of {date}. Nothing is drifting." instead of an
+    import/onboarding prompt, which can read as a false all-clear (the pre-7-2 placeholder said
+    "No employees yet. Import a spreadsheet to begin.").
+  evidence: `src/app/page.tsx` now always renders the findings surface; an empty population yields
+    `getOutlierFindings` → `findings` with `groups: []`, which `buildOutlierFindings`
+    (`src/ui/outlier-findings-vm.ts`) maps to the zero-state statement. The mechanism faithfully
+    follows the spec — the I/O & Edge-Case Matrix maps `groups: []` to exactly that copy and never
+    distinguishes "zero outliers" from "no employees at all". This is a product-scope gap (the empty
+    state does not differentiate no-data from all-clear), surfaced incidentally by review, not a
+    defect in the 7-2 diff. Revisit as a product decision: whether the zero-population case should
+    show an onboarding/import affordance distinct from the all-clear.

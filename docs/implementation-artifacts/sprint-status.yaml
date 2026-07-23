@@ -112,7 +112,7 @@ development_status:
   # Epic 7 — CAP-6 Outliers & Threshold
   epic-7: in-progress
   7-1-outliers-threshold-backend: done
-  7-2-outliers-threshold-ui: backlog
+  7-2-outliers-threshold-ui: done
   epic-7-retrospective: optional
 
   # Epic 8 — CAP-7 Gender Gap or Refusal
