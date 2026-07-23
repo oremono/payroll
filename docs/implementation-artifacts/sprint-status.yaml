@@ -118,7 +118,7 @@ development_status:
   # Epic 8 — CAP-7 Gender Gap or Refusal
   epic-8: backlog
   8-1-gender-gap-backend: done
-  8-2-gender-gap-ui: backlog
+  8-2-gender-gap-ui: done
   epic-8-retrospective: optional
 
   # Epic 9 — CAP-8 Gender Distribution by Level
