@@ -54,10 +54,45 @@
   client Router Cache and the `/employees` Suspense boundary (`loading.tsx`), which is where a
   streamed RSC payload could be resolved from a stale entry.
 
-  **What is still unexplained:** the failure reproduces in CI on three consecutive runs and has
-  never reproduced locally once the database was actually up. CI uploads no Playwright trace, so
-  the only evidence is a one-line locator error — that gap is now closed by an `upload-artifact`
-  step on the `browser-db` job, and the next red run will carry a trace showing the real DOM.
+  **Deep-dived 2026-07-20 with the CI trace + a local repro. Well-characterised, NOT yet fixed.**
+
+  A reliable local repro finally exists: `CI=1` (cold server, no `reuseExistingServer`) + a fresh
+  `npm run e2e:seed` + the isolated create test. Measured baseline flake **~30% (3/10, and 4/12 on
+  repeats)**. The earlier "never reproduces locally" was the Docker Postgres dying yet again — now
+  fixed at the source with `docker update --restart=unless-stopped payroll-pg18`, which should end
+  the phantom failures that misled this investigation twice.
+
+  Layer-by-layer, what it is NOT (each ruled out by direct evidence, not reasoning):
+  - **Not the database or pool.** A standalone probe committed a write via the owner and read it
+    back via the `payroll_app` pool 30 times: **0/30 stale**. A committed row is always immediately
+    visible.
+  - **Not static prerendering.** `next build` marks `/employees` as `ƒ` (Dynamic, server-rendered
+    on demand). Every request re-renders from the DB.
+  - **Not the client Router Cache stale-time.** `experimental.staleTimes: { dynamic: 0, static: 0 }`
+    changed nothing (4/12).
+  - **Not `router.refresh()` ordering.** Wrapping it in `useTransition` and calling it before vs
+    after `close()` both measured unchanged (~4/12).
+  - **Not the redundant double-refetch.** Removing the explicit `router.refresh()` entirely (relying
+    on the Server Action's own `revalidatePath` auto-refetch) also measured unchanged (4/12).
+
+  What the network capture SHOWS (the strongest lead): after the create, the browser issues a POST
+  to `/employees` (the Server Action) followed by **two racing RSC GETs** of `/employees`. Their
+  bodies disagree on whether the new row is present *within the same run*, and the **last** RSC
+  response is consistently the STALE one (30 rows, new employee absent) — which is what the client
+  commits and renders. A dynamic GET returning pre-write rows after the commit contradicts the
+  0/30 pool result, so the stale GET must have executed its DB read before the commit — i.e. a
+  refetch dispatched while the write was still in flight, landing last and overwriting the fresh
+  payload in the client Router Cache. The sidebar `<Link>` prefetch was checked and is NOT it (its
+  href carries `?asOf=`, a different cache key than the bare `/employees` the refetches hit).
+
+  **Assessment:** a genuine, subtle Next 16 App Router concurrency bug in how an imperative Server
+  Action's revalidation refetch races another current-route refetch. None of the standard levers
+  fix it. This needs either a targeted Next-internals fix (likely an upstream issue to file, with
+  this repro) or a pragmatic product decision — NOT more guessing under time pressure.
+
+  **What is still unexplained:** precisely which fetch is the stale one and what dispatches it
+  before the commit. The `browser-db` job now uploads the Playwright trace on failure, so every
+  future red run carries the real DOM + network timeline.
 
   **Re-entry:** still open after 4-2. Find the real signal to wait on (the RSC payload landing, not
   a wall-clock ceiling), and make each test seed and assert its own starting state so it passes
