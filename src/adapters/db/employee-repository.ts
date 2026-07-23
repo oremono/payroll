@@ -9,7 +9,9 @@ import type {
   NewEmployee,
   NewEmployeeWithSalary,
   NewSalaryRecord,
+  OutlierCandidate,
   PeerGroupKey,
+  PeerGroupPopulation,
   PeerPopulation,
   UpdateEmployeeOutcome,
 } from '@/application/ports/employee-repository';
@@ -1018,6 +1020,124 @@ export function createEmployeeRepository(
         countryName: country.name,
         currencyFormat,
       };
+    },
+
+    // ── CAP-6 (story 7-1) ────────────────────────────────────────────────────────────────────
+    // A READ-ONLY sibling of `findPeerPopulation` — the WHOLE-POPULATION read the outlier sweep
+    // needs. Home surfaces outliers unprompted, so there is no subject to key off: this loads every
+    // employee at once and groups by the exact triple IN-PROCESS (AD-2 / AD-16). The SQL SELECTs
+    // rows only — no as-of `where`, no `ORDER BY`, no `COUNT`, no `is_active` filter, no grouping —
+    // the domain owns the ordering (AD-8), the as-of population and every `n` (AD-16), and the
+    // median/distance/flag (Law 2). Nothing is materialized or cached (AD-12).
+
+    findAllPeerGroups: async (): Promise<readonly PeerGroupPopulation[]> => {
+      // Every employee with their id, name, triple, and WHOLE UNORDERED history. No `where` (the
+      // whole population), no `orderBy` on salary records (the domain resolves current salary,
+      // AD-8), no as-of filter (the domain owns the as-of population, AD-16).
+      const employees = await client.employee.findMany({
+        select: {
+          id: true,
+          name: true,
+          roleCode: true,
+          levelCode: true,
+          countryCode: true,
+          salaryRecords: {
+            select: {
+              id: true,
+              seq: true,
+              amountMinor: true,
+              currencyCode: true,
+              effectiveFrom: true,
+            },
+          },
+        },
+      });
+
+      // Group by the EXACT triple in TypeScript — the database groups nothing a user sees (AD-2).
+      // A `Map` keyed by the joined codes preserves first-seen order and de-duplicates the triple.
+      const grouped = new Map<string, { key: PeerGroupKey; candidates: OutlierCandidate[] }>();
+      for (const employee of employees) {
+        // JSON-encoded (not `|`-joined) so a reference code containing the delimiter can never
+        // collapse two distinct triples into one group. Must match the use-case's `keyOf`.
+        const key = JSON.stringify([employee.roleCode, employee.levelCode, employee.countryCode]);
+        let group = grouped.get(key);
+        if (group === undefined) {
+          group = {
+            key: {
+              roleCode: employee.roleCode,
+              levelCode: employee.levelCode,
+              countryCode: employee.countryCode,
+            },
+            candidates: [],
+          };
+          grouped.set(key, group);
+        }
+        group.candidates.push({
+          employeeId: employee.id,
+          name: employee.name,
+          // `amountMinor`/`seq` are native `bigint`; the currency is each record's OWN (AD-6). `seq`
+          // rides along for the resolver's ordering and is dropped at the application boundary.
+          salaryHistory: employee.salaryRecords.map((record) => ({
+            id: record.id,
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+            salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+          })),
+        });
+      }
+
+      // Reference labels + currency formats, read ONCE for the whole population and WITHOUT an
+      // `is_active` filter (AD-16): a group holding a retired role/level/currency still has a
+      // nameable group and a computable statistic — the exact opposite of `loadFormOptions`.
+      const [roles, levels, countries] = await Promise.all([
+        client.role.findMany({ select: { code: true, name: true } }),
+        client.level.findMany({ select: { code: true, name: true } }),
+        client.country.findMany({
+          select: {
+            code: true,
+            name: true,
+            // The currency travels with the country (AD-6), read through the relation and WITHOUT
+            // an `is_active` filter for the reason above.
+            currency: {
+              select: { code: true, symbol: true, minorUnitExponent: true, groupingStyle: true },
+            },
+          },
+        }),
+      ]);
+      const roleNames = new Map(roles.map((role) => [role.code, role.name]));
+      const levelNames = new Map(levels.map((level) => [level.code, level.name]));
+      const countriesByCode = new Map(countries.map((country) => [country.code, country]));
+
+      const populations: PeerGroupPopulation[] = [];
+      for (const group of grouped.values()) {
+        const roleName = roleNames.get(group.key.roleCode);
+        const levelLabel = levelNames.get(group.key.levelCode);
+        const country = countriesByCode.get(group.key.countryCode);
+        // A missing reference label is a data condition surfaced as a value: the group is DROPPED,
+        // leaving the rest computable (the FKs make it unreachable for an existing employee).
+        if (roleName === undefined || levelLabel === undefined || country === undefined) {
+          continue;
+        }
+
+        // The group currency, VALIDATED into a `CurrencyFormat` the ONE money formatter can use,
+        // through the SAME `toCurrencyFormats` — a grouping style or exponent the domain cannot
+        // format DROPS the group rather than rendering an amount by a rule nobody wrote.
+        const [currencyFormat] = toCurrencyFormats([country.currency]);
+        if (currencyFormat === undefined) {
+          continue;
+        }
+
+        populations.push({
+          key: group.key,
+          roleName,
+          levelLabel,
+          countryName: country.name,
+          currencyFormat,
+          candidates: group.candidates,
+        });
+      }
+
+      return populations;
     },
   };
 }

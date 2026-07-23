@@ -110,8 +110,8 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7 — CAP-6 Outliers & Threshold
-  epic-7: backlog
-  7-1-outliers-threshold-backend: backlog
+  epic-7: in-progress
+  7-1-outliers-threshold-backend: done
   7-2-outliers-threshold-ui: backlog
   epic-7-retrospective: optional
 

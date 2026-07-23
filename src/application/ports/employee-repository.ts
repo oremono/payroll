@@ -263,6 +263,39 @@ export type PeerPopulation = {
   readonly currencyFormat: CurrencyFormat;
 };
 
+/**
+ * One candidate as the WHOLE-POPULATION read (CAP-6) hands them over: a `PeerCandidate` — the id and
+ * their whole UNORDERED append-only salary history — PLUS the employee's display `name`.
+ *
+ * The name rides along because CAP-6's findings row names the person, and the sweep that flags them
+ * is pure (it computes over `salaryHistory` and knows nothing of names). Carrying the name on the
+ * candidate lets the use-case join it back onto a flagged member without a second read. The domain
+ * sweep takes only the `PeerCandidate` half; the name is application/boundary data.
+ */
+export type OutlierCandidate = PeerCandidate & { readonly name: string };
+
+/**
+ * The as-of peer population for ONE `(role, level, country)` triple, as CAP-6's whole-population
+ * read returns it — the CAP-5 `PeerPopulation` shape, but KEYED by its triple and carrying employee
+ * names (see `OutlierCandidate`), because the sweep processes every group at once and each finding
+ * must name both its group and its person.
+ *
+ * The read returns EVERY group in one call and does the grouping in-process (AD-2 / AD-16): it loads
+ * all employees with their whole UNORDERED history and partitions them by the exact triple in
+ * TypeScript. There is no as-of filter, no `ORDER BY`, no `COUNT`, and no `is_active` filter in the
+ * SQL — the domain owns the ordering (AD-8), the as-of population and `n` (AD-16), and the labels
+ * resolve for retired roles/levels/currencies the same way CAP-5's single-group read does.
+ * Single-currency by construction, so ONE `currencyFormat` describes every candidate's money.
+ */
+export type PeerGroupPopulation = {
+  readonly key: PeerGroupKey;
+  readonly roleName: string;
+  readonly levelLabel: string;
+  readonly countryName: string;
+  readonly currencyFormat: CurrencyFormat;
+  readonly candidates: readonly OutlierCandidate[];
+};
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -439,4 +472,32 @@ export type EmployeeRepository = {
    * "present but empty" distinction `findSalaryHistory` draws.
    */
   readonly findPeerPopulation: (group: PeerGroupKey) => Promise<PeerPopulation | null>;
+
+  // ── CAP-6 (story 7-1) ──────────────────────────────────────────────────────────────────────
+  // A READ-ONLY sibling of `findPeerPopulation` on this same port — the whole-population read the
+  // outlier sweep needs. Where `findPeerPopulation` serves ONE triple (reached through a subject),
+  // this serves EVERY group: Home surfaces outliers unprompted, so there is no subject to key off,
+  // and the sweep must see the entire as-of population at once (AD-16). It belongs here because it
+  // reads the same `employee` + `salary_record` tables through the same client; there is no
+  // peer-group index to hang a separate port off, and a peer group is not a table (AD-2).
+
+  /**
+   * Every `(role, level, country)` peer group in the product, each with every employee sharing its
+   * triple — id, display `name`, and whole UNORDERED salary history — plus the group's labels and
+   * `CurrencyFormat`. The GROUPING is done in-process (AD-2): the adapter loads all employees and
+   * partitions by the exact triple in TypeScript, so the database never groups, counts, or filters
+   * a user-facing set.
+   *
+   * Returns the populations WITHOUT any as-of filtering, `ORDER BY`, `COUNT`, or `is_active` filter
+   * — the domain sweep owns the ordering (AD-8), the as-of population and every `n` (AD-16), the
+   * median/distance/flag (Law 2), and the labels resolve for retired roles/levels/currencies the
+   * same way `findPeerPopulation` resolves them.
+   *
+   * A group whose currency format cannot be resolved into a form the ONE money formatter can use, or
+   * a group missing a reference label, is a data condition — it is DROPPED from the returned list (a
+   * value, never an exception), leaving the rest computable, exactly as CAP-5's read maps such a
+   * condition to a value rather than throwing. Findings are computed fresh per request; nothing here
+   * is materialized or cached (AD-12).
+   */
+  readonly findAllPeerGroups: () => Promise<readonly PeerGroupPopulation[]>;
 };

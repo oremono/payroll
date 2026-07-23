@@ -93,6 +93,7 @@ function fakeDeps(
     loadFormOptions: () => Promise.reject(new Error('not reachable')),
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),
+    findAllPeerGroups: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).
