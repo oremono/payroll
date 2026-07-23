@@ -7,12 +7,14 @@ import { getDbClient } from './client';
 import type { PrismaClient } from './generated/client';
 
 /**
- * The Prisma implementation of the settings port (AD-19) — the ONE reader of the persisted
- * single-row org configuration.
+ * The Prisma implementation of the settings port (AD-19) — the reader AND, from story 7-2, the ONE
+ * writer of the persisted single-row org configuration.
  *
- * READ-ONLY: it selects the single `settings` row and hands its threshold and reporting currency
- * inward. There is no write here; a settings edit surface, if ever built, would be a separate
- * mutation with its own single-row guard.
+ * `readSettings` selects the single `settings` row and hands its threshold and reporting currency
+ * inward. `updateOutlierThresholdPct` is CAP-6's one mutation: it updates the SAME single row
+ * (`id = 1`), never inserting and never touching a second row, so the `settings_single_row` guard
+ * holds. `settings` already carries table-level `UPDATE` for `payroll_app` and a range CHECK, so
+ * this needs no migration.
  */
 
 /**
@@ -47,6 +49,19 @@ export function createSettingsRepository(
         outlierThresholdPct: row.outlierThresholdPct,
         reportingCurrency: row.reportingCurrency,
       };
+    },
+
+    updateOutlierThresholdPct: async (pct: number): Promise<void> => {
+      // Updates the SINGLE guarded row (`id = 1`) only — never an insert, never a second row — so
+      // the `settings_single_row` CHECK is honoured. `pct` has already been validated by the
+      // use-case to be an integer in `[1, 100]`; the `settings_outlier_threshold_pct_range` CHECK
+      // (`> 0 AND <= 100`) is the DB-side belt. A value that ever bypassed validation trips that
+      // CHECK, and Prisma surfaces it as a rejected promise — the use-case's `try/catch` turns it
+      // into `unavailable` (adapters may throw; the pure layers may not).
+      await client.settings.update({
+        where: { id: SETTINGS_ROW_ID },
+        data: { outlierThresholdPct: pct },
+      });
     },
   };
 }

@@ -6,9 +6,13 @@
  * and hands it inward as a parameter; no `src/domain/**` code ever touches settings, and no
  * use-case reads a clock or environment to get it.
  *
- * READ-ONLY. This story surfaces the persisted defaults; there is no write path here. A settings
- * EDIT surface, if one is ever built, would be a separate mutation with its own single-row guard —
- * this port would not grow an `update`.
+ * READ + WRITE. The read (`readSettings`) surfaces the persisted defaults; the write
+ * (`updateOutlierThresholdPct`, added by story 7-2) is the ONE mutation CAP-6 introduces — the
+ * Settings threshold Apply. It updates the single guarded row (`id = 1`); `settings` already holds
+ * table-level `UPDATE` for `payroll_app` and a `settings_outlier_threshold_pct_range` CHECK
+ * (`> 0 AND <= 100`), so no migration is needed. The application-layer use-case
+ * (`updateOutlierThreshold`) validates the integer percent in `[1, 100]` BEFORE the write; the DB
+ * CHECK is the belt to that suspenders.
  */
 
 /**
@@ -32,4 +36,17 @@ export type SettingsRepository = {
    * throw; the pure layers may not.
    */
   readonly readSettings: () => Promise<SettingsView>;
+
+  /**
+   * Persist a new outlier threshold onto the SINGLE settings row (`id = 1`) — the one mutation CAP-6
+   * introduces (story 7-2). `pct` is an integer percent the use-case has ALREADY validated to be in
+   * `[1, 100]`; the adapter updates `id = 1` only (never inserts, never touches a second row), so
+   * the `settings_single_row` guard is honoured.
+   *
+   * Adapters MAY throw: a value that somehow bypassed validation trips the DB
+   * `settings_outlier_threshold_pct_range` CHECK, which surfaces here as a rejected promise the
+   * use-case catches and turns into `{ kind: 'unavailable' }` (Law 8 / AD-20). The pure layers may
+   * not throw; this port method may.
+   */
+  readonly updateOutlierThresholdPct: (pct: number) => Promise<void>;
 };

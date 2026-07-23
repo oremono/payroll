@@ -2,62 +2,107 @@ import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
-import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
+import { getOutlierFindings } from '@/application/use-cases/outliers';
+import { getSettings } from '@/application/use-cases/settings';
+import { formatPlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
+import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { OutlierFindings } from '@/ui/outlier-findings';
+import { buildOutlierFindings } from '@/ui/outlier-findings-vm';
+
+import { outlierFindingsDeps } from './employees/employee-deps';
+import { settingsReadDeps } from './settings/settings-deps';
 
 /**
- * Home — placeholder route, plus the one thing on it that is not a placeholder: the SERVER-RENDERED
- * echo of the resolved as-of date.
+ * Home — the CAP-6 outlier sweep (story 7-2). Until now this route was story 1-6's placeholder
+ * ("No employees yet…").
  *
- * That echo is what makes recompute observable end to end. The header's control is a client
- * component reading the URL, so on its own it could show a new date while nothing had actually been
- * recomputed. This paragraph is rendered on the server from `searchParams`, at the delivery
- * boundary, through the same `resolveAsOf` policy — so when it changes, a real server render
- * happened. `e2e/shell.spec.ts` asserts on THIS element for exactly that reason.
+ * A React Server Component reading IN-PROCESS (AD-21) — no `fetch` to our own origin, no Route
+ * Handler (the CSV export's handler is the export link's target, reached by the browser, not by this
+ * page). This file is the delivery boundary and the composition root: the clock is read ONCE here
+ * and the resolved `asOf` and the persisted threshold travel inward as arguments (Law 6 / AD-19).
  *
- * No database read, no use-case, no Server Action (story constraint). The as-of date is resolved
- * here and would, from the first capability onward, be passed inward as an argument — never read
- * inside the math (Law 6 / AD-11).
+ * ## The threshold is read ONCE at the boundary and passed inward (Law 6 / AD-19)
  *
- * The first paragraph keeps `bg-surface-card rounded p-3 text-body-md` because `e2e/tokens.spec.ts`
- * reads COMPUTED styles off `main p` — that is what makes the token contract an end-to-end claim
- * about a rendered utility rather than a claim about a string.
+ * `getSettings` reads the persisted `outlierThresholdPct`; that integer is handed to
+ * `getOutlierFindings` as its `thresholdPct` argument. No `src/ui`/`src/domain` code reads settings
+ * inside the sweep, and the threshold judged is the threshold echoed on the report and in the
+ * zero-state copy. When settings cannot be read, the page renders the calm "unreadable" region
+ * rather than the sweep — the sweep has no threshold to judge against.
+ *
+ * ## The as-of echo keeps recompute observable
+ *
+ * The first card echoes the SERVER-resolved as-of date (`data-testid="as-of-echo"`), rendered from
+ * `searchParams` through the same `resolveAsOf` policy — so when it changes, a real server render
+ * happened. `e2e/shell.spec.ts` asserts on THIS element, and `e2e/tokens.spec.ts` reads computed
+ * styles off `main p`, so that card keeps `rounded bg-surface-card p-3 text-body-md`. An as-of change
+ * swaps the findings in place (the `<Announcer>` region, mounted in the layout, is never remounted).
  */
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+const UNAVAILABLE_HEADING = 'The outlier findings could not be read';
+
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
-  // Same reason as the layout: the clock read must happen per REQUEST, never at build time.
+  // Per REQUEST, never at build time — the clock read must not be hoisted into the build (AD-11).
   await connection();
 
   const params = await searchParams;
   const today = systemClock.todayUtc();
 
   // Hostile by default — anything a person or a stale bookmark can type arrives here. `resolveAsOf`
-  // is total: a malformed, impossible, future, or repeated param resolves to today and renders
-  // normally. There is deliberately no error surface for a bad as-of date.
+  // is total: a malformed, impossible, future, or repeated param resolves to today.
   const asOf = resolveAsOf(params['asOf'], today);
+
+  const settings = await getSettings(settingsReadDeps());
 
   return (
     <>
       <p className="rounded bg-surface-card p-3 text-body-md">
-        No employees yet. Import a spreadsheet to begin.
-      </p>
-      <p className="mt-3 text-body-sm text-ink-muted">
         Showing findings as of{' '}
-        {/* All numerals are JetBrains Mono, dates in data positions included (DESIGN
-            § Typography). */}
+        {/* All numerals are JetBrains Mono, dates in data positions included (DESIGN § Typography). */}
         <time
           data-testid="as-of-echo"
           dateTime={plainDateToIso(asOf)}
           className="font-mono text-number-sm"
         >
-          {/* `formatPlainDate` returns `null` for an out-of-range month (the `money.ts` guard
-              pattern). Unreachable through `resolveAsOf`, but JSX renders `null` as NOTHING — an
-              empty `<time>` on a provenance line — so the canonical machine form is the fallback. */}
+          {/* `formatPlainDate` returns `null` for an out-of-range month; unreachable through
+              `resolveAsOf`, but the canonical machine form is the fallback (never an empty `<time>`). */}
           {formatPlainDate(asOf) ?? plainDateToIso(asOf)}
         </time>
         .
       </p>
+
+      {settings.kind !== 'settings' ? (
+        // Settings could not be read, so the sweep has no threshold to judge against — the calm
+        // "unreadable" region, distinct from a refusal (project-context § Conventions). HTTP 200.
+        <div className="mt-3">
+          <EmployeeUnavailable
+            id="home-settings-unavailable-heading"
+            heading={UNAVAILABLE_HEADING}
+            statement="The outlier findings are not readable right now. Nothing has changed."
+          />
+        </div>
+      ) : (
+        <div className="mt-3">
+          <Findings asOf={asOf} thresholdPct={settings.outlierThresholdPct} />
+        </div>
+      )}
     </>
+  );
+}
+
+/**
+ * The findings surface, given a resolved as-of and the persisted threshold. Kept a small async
+ * component so the page body stays a single boundary read; the threshold arrives as an argument
+ * (never read inside the sweep). The export link carries the current as-of so the CSV matches the
+ * screen.
+ */
+async function Findings({ asOf, thresholdPct }: { asOf: PlainDate; thresholdPct: number }) {
+  const findings = await getOutlierFindings(outlierFindingsDeps(), asOf, thresholdPct);
+  return (
+    <OutlierFindings
+      vm={buildOutlierFindings(findings, asOf)}
+      exportHref={`/api/outliers/export?asOf=${plainDateToIso(asOf)}`}
+    />
   );
 }

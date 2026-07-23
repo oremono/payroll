@@ -4,7 +4,12 @@ import type {
   SettingsRepository,
   SettingsView,
 } from '@/application/ports/settings-repository';
-import { getSettings, type SettingsDeps } from '@/application/use-cases/settings';
+import {
+  getSettings,
+  updateOutlierThreshold,
+  type SettingsDeps,
+  type SettingsWriteDeps,
+} from '@/application/use-cases/settings';
 
 // Test-first (Law 1 / AD-23): red before `src/application/use-cases/settings.ts` exists.
 //
@@ -25,6 +30,9 @@ function fakeDeps(
       }
       return config.settings ?? { outlierThresholdPct: 20, reportingCurrency: 'USD' };
     },
+    // The write half exists on the port from story 7-2; `getSettings` never calls it, so a read fake
+    // supplies an unused no-op to satisfy the full port shape.
+    updateOutlierThresholdPct: async () => undefined,
   } satisfies SettingsRepository;
 
   return {
@@ -72,5 +80,99 @@ describe('getSettings — totality (AD-20)', () => {
     await expect(getSettings(fakeDeps({ throws: true }))).resolves.toEqual({
       kind: 'unavailable',
     });
+  });
+});
+
+// The ONE mutation CAP-6 introduces (story 7-2): the Settings threshold Apply. It validates the
+// integer percent in [1, 100] BEFORE any write (Law 8 / AD-20) — a rejected value never reaches the
+// database — wraps the write in try/catch → unavailable, and never lets an exception cross the
+// boundary. Tested test-first against an in-memory FAKE port that records every write it receives.
+
+function fakeWriteDeps(
+  config: { readonly throws?: boolean } = {},
+): SettingsWriteDeps & { readonly writes: readonly number[] } {
+  const writes: number[] = [];
+  const repository = {
+    updateOutlierThresholdPct: async (pct: number) => {
+      writes.push(pct);
+      if (config.throws === true) {
+        throw new Error('the database is not answering');
+      }
+    },
+  };
+
+  return {
+    repository,
+    get writes() {
+      return writes;
+    },
+  };
+}
+
+describe('updateOutlierThreshold — the one CAP-6 mutation, validated before the write (AD-20)', () => {
+  it('applies an in-range integer, writing it to the port exactly once', async () => {
+    const deps = fakeWriteDeps();
+
+    const result = await updateOutlierThreshold(deps, 25);
+
+    expect(result).toEqual({ kind: 'applied', value: 25 });
+    expect(deps.writes).toEqual([25]);
+  });
+
+  it('applies the lower bound 1 and the upper bound 100 (the [1, 100] edges)', async () => {
+    const low = fakeWriteDeps();
+    const high = fakeWriteDeps();
+
+    await expect(updateOutlierThreshold(low, 1)).resolves.toEqual({ kind: 'applied', value: 1 });
+    await expect(updateOutlierThreshold(high, 100)).resolves.toEqual({
+      kind: 'applied',
+      value: 100,
+    });
+    expect(low.writes).toEqual([1]);
+    expect(high.writes).toEqual([100]);
+  });
+
+  it('rejects 0 as out-of-range WITHOUT touching the database', async () => {
+    const deps = fakeWriteDeps();
+
+    const result = await updateOutlierThreshold(deps, 0);
+
+    expect(result).toEqual({ kind: 'rejected', reason: 'out-of-range' });
+    expect(deps.writes).toEqual([]);
+  });
+
+  it('rejects 101 as out-of-range WITHOUT touching the database', async () => {
+    const deps = fakeWriteDeps();
+
+    const result = await updateOutlierThreshold(deps, 101);
+
+    expect(result).toEqual({ kind: 'rejected', reason: 'out-of-range' });
+    expect(deps.writes).toEqual([]);
+  });
+
+  it('rejects a fractional 20.5 as not-an-integer WITHOUT touching the database', async () => {
+    const deps = fakeWriteDeps();
+
+    const result = await updateOutlierThreshold(deps, 20.5);
+
+    expect(result).toEqual({ kind: 'rejected', reason: 'not-an-integer' });
+    expect(deps.writes).toEqual([]);
+  });
+
+  it('rejects NaN as not-an-integer WITHOUT touching the database', async () => {
+    const deps = fakeWriteDeps();
+
+    const result = await updateOutlierThreshold(deps, Number.NaN);
+
+    expect(result).toEqual({ kind: 'rejected', reason: 'not-an-integer' });
+    expect(deps.writes).toEqual([]);
+  });
+
+  it('answers unavailable when the write throws — the throw does NOT propagate', async () => {
+    const deps = fakeWriteDeps({ throws: true });
+
+    await expect(updateOutlierThreshold(deps, 25)).resolves.toEqual({ kind: 'unavailable' });
+    // The write was ATTEMPTED (validation passed) before the port threw.
+    expect(deps.writes).toEqual([25]);
   });
 });

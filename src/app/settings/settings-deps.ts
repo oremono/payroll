@@ -1,6 +1,6 @@
 import { createSettingsRepository } from '@/adapters/db/settings-repository';
 import type { SettingsRepository } from '@/application/ports/settings-repository';
-import type { SettingsDeps } from '@/application/use-cases/settings';
+import type { SettingsDeps, SettingsWriteDeps } from '@/application/use-cases/settings';
 
 /**
  * The settings read's composition root: the adapter constructed here and injected inward.
@@ -23,10 +23,22 @@ import type { SettingsDeps } from '@/application/use-cases/settings';
 function lazySettingsRepository(): SettingsRepository {
   return {
     readSettings: async () => createSettingsRepository().readSettings(),
+    updateOutlierThresholdPct: async (pct: number) =>
+      createSettingsRepository().updateOutlierThresholdPct(pct),
   };
 }
 
 /** The dependencies the settings read use-case takes — just the settings port. */
 export function settingsReadDeps(): SettingsDeps {
+  return { repository: lazySettingsRepository() };
+}
+
+/**
+ * The dependencies the settings WRITE use-case takes — the same lazy repository, so the Server
+ * Action's composition root defers `createSettingsRepository()` for the same reason the read does:
+ * a DB-free surface yields a rejected promise the use-case turns into `unavailable`, never a build
+ * throw. The threshold Apply is CAP-6's one mutation (story 7-2).
+ */
+export function settingsWriteDeps(): SettingsWriteDeps {
   return { repository: lazySettingsRepository() };
 }
