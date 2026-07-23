@@ -10,6 +10,7 @@ import type {
   PeerGroupKey,
 } from '@/application/ports/employee-repository';
 import type { EmployeeUseCaseDeps } from '@/application/use-cases/employees';
+import type { GenderGapDeps } from '@/application/use-cases/gender-gap';
 import type { OutlierFindingsDeps } from '@/application/use-cases/outliers';
 import type { PlainDate } from '@/domain/plain-date';
 
@@ -62,6 +63,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
     findPeerPopulation: async (group: PeerGroupKey) =>
       createEmployeeRepository().findPeerPopulation(group),
     findAllPeerGroups: async () => createEmployeeRepository().findAllPeerGroups(),
+    findGenderGapPopulation: async (group: PeerGroupKey) =>
+      createEmployeeRepository().findGenderGapPopulation(group),
   };
 }
 
@@ -83,5 +86,15 @@ export function employeeReadDeps(): EmployeeUseCaseDeps {
  * call as arguments (Law 6 / AD-19); no clock and no id generator are needed for this read.
  */
 export function outlierFindingsDeps(): OutlierFindingsDeps {
+  return { repository: lazyEmployeeRepository() };
+}
+
+/**
+ * The dependencies the CAP-7 gender-gap read takes — just the repository, reached through the SAME
+ * lazy composition root so a database-free surface (the `check`/`a11y` CI jobs) yields `unavailable`
+ * rather than throwing during render. `asOf` arrives per call as an argument (Law 6 / AD-11); no
+ * clock and no id generator are needed for this read.
+ */
+export function genderGapDeps(): GenderGapDeps {
   return { repository: lazyEmployeeRepository() };
 }

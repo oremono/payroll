@@ -1,3 +1,4 @@
+import type { GenderGapCandidate } from '@/domain/gender-gap';
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
 import type { PeerCandidate } from '@/domain/peer-comparison';
@@ -296,6 +297,25 @@ export type PeerGroupPopulation = {
   readonly candidates: readonly OutlierCandidate[];
 };
 
+/**
+ * The as-of peer population for ONE `(role, level, country)` triple, gender-carrying — the CAP-7
+ * gender gap's read (AD-17). The exact `PeerPopulation` shape (same labels, same single
+ * `currencyFormat`), but each candidate is a `GenderGapCandidate` carrying the employee's `gender`,
+ * because the split by gender happens WITHIN this one group and the domain needs the gender on every
+ * member. Gender is never part of peer identity — it only slices within the group (Law 3 / AD-17).
+ *
+ * Like `PeerPopulation` it is returned WITHOUT any as-of filtering, `ORDER BY`, `COUNT`, or grouping
+ * — the domain owns the ordering (AD-8), the as-of population, and every per-gender `n` (AD-16 / Law
+ * 2). Labels and currency resolve WITHOUT an `is_active` filter (AD-16).
+ */
+export type GenderGapPopulation = {
+  readonly candidates: readonly GenderGapCandidate[];
+  readonly roleName: string;
+  readonly levelLabel: string;
+  readonly countryName: string;
+  readonly currencyFormat: CurrencyFormat;
+};
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -500,4 +520,26 @@ export type EmployeeRepository = {
    * is materialized or cached (AD-12).
    */
   readonly findAllPeerGroups: () => Promise<readonly PeerGroupPopulation[]>;
+
+  // ── CAP-7 (story 8-1) ────────────────────────────────────────────────────────────────────────
+  // A READ-ONLY, gender-carrying SIBLING of `findPeerPopulation` on this same port — not a second
+  // one, and emphatically not a write (Law 5 / AD-18). Where `findPeerPopulation` serves the peer
+  // comparison, this serves the gender gap: the SAME single-triple read (reached through a subject),
+  // the SAME `is_active`-inclusive labels and currency, but each candidate carries `gender` so the
+  // domain can split the as-of population WITHIN the group (AD-16 / AD-17). Grouping, counts, and
+  // every median stay OUT of SQL — the database SELECTs the candidate set, the domain computes the
+  // per-gender medians, the gap, and the counts (Law 2 / AD-2).
+
+  /**
+   * The as-of gender-gap population for a `(role, level, country)` triple: every employee sharing it,
+   * each with their whole UNORDERED salary history AND their `gender`, plus the group's display
+   * labels and single `CurrencyFormat`.
+   *
+   * Returned WITHOUT any as-of filtering, `ORDER BY`, or `COUNT` — the domain owns all three (AD-8 /
+   * AD-16 / Law 2) and splits by gender itself. Labels and currency resolve WITHOUT an `is_active`
+   * filter (AD-16), exactly as `findPeerPopulation` resolves them. `null` on an unresolvable currency
+   * format or a missing reference label — a data condition the use-case maps to `unavailable`, never
+   * an exception; a triple no employee matches is a present-but-EMPTY `candidates` list instead.
+   */
+  readonly findGenderGapPopulation: (group: PeerGroupKey) => Promise<GenderGapPopulation | null>;
 };

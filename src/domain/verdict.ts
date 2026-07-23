@@ -52,6 +52,25 @@ export type VerdictInput =
       readonly kind: 'no-salary-as-of';
       readonly subjectName: string;
       readonly asOf: PlainDate;
+    }
+  | {
+      readonly kind: 'gender-gap-answer';
+      readonly maleMedian: Money;
+      readonly femaleMedian: Money;
+      readonly currencyFormat: CurrencyFormat;
+      readonly gapPctTenths: bigint;
+      readonly maleN: number;
+      readonly femaleN: number;
+      readonly group: PeerGroupLabels;
+      readonly asOf: PlainDate;
+    }
+  | {
+      readonly kind: 'gender-gap-refusal';
+      readonly maleN: number;
+      readonly femaleN: number;
+      readonly shortGender: 'MALE' | 'FEMALE' | 'BOTH';
+      readonly group: PeerGroupLabels;
+      readonly asOf: PlainDate;
     };
 
 /** `"Software Engineer · L4 · India"` — the group's identity in one phrase (DESIGN middle dots). */
@@ -79,6 +98,63 @@ function positionPhrase(distancePctTenths: bigint): string {
     return `${formatDistancePct(distancePctTenths)}% over the peer median`;
   }
   return 'at the peer median';
+}
+
+/**
+ * Which gender is paid more, in words, for a gender gap (AD-17): `"Men are paid 8.0% more than women
+ * at the median"`, the women-higher mirror, or `"Men and women are paid the same at the median"` at
+ * exact parity. The magnitude is the SIGN-LESS one-decimal form (`formatDistancePct` of the absolute
+ * tenths), the direction carried by the word.
+ *
+ * DIRECTION is driven by the EXACT median comparison (`maleMedianMinor` vs `femaleMedianMinor`), NOT
+ * by the rounded `gapPctTenths`. Parity ("paid the same") therefore means the medians are actually
+ * equal — never "the gap rounded to 0.0%". Were the sign of the ROUNDED gap the discriminator, a
+ * ₹20,000-vs-₹19,999.99 group (gap `0.0005%` → `0n` tenths) would assert "paid the same" beside two
+ * DIFFERENT median figures the very same sentence prints — a self-contradiction. Instead that group
+ * reads "Men are paid 0.0% more than women" (honest: barely higher, rounds to 0.0%). The magnitude
+ * still comes from `gapPctTenths` so the number shown is the AD-17 number judged.
+ *
+ * A THREE-WAY return on the median comparison — `>` and `<` each guarding their own return, exact
+ * parity the fall-through — mirroring `positionPhrase`'s discipline: a `<=`/`>=` slip would send an
+ * equal-median group into a "0.0% more" arm, which the parity test (no percent at all) pins. The
+ * magnitude is formatted INSIDE each direction arm from the tenths whose sign that arm already knows
+ * (`M > F ⇒ gap ≥ 0`, `M < F ⇒ gap ≤ 0`), so no standalone `abs` is taken — a `< 0n` abs guard would
+ * be an equivalent mutant at `0n` (`-0n === 0n` for `bigint`), unkillable by construction.
+ */
+function gapDirectionPhrase(
+  maleMedianMinor: bigint,
+  femaleMedianMinor: bigint,
+  gapPctTenths: bigint,
+): string {
+  if (maleMedianMinor > femaleMedianMinor) {
+    return `Men are paid ${formatDistancePct(gapPctTenths)}% more than women at the median`;
+  }
+  if (maleMedianMinor < femaleMedianMinor) {
+    return `Women are paid ${formatDistancePct(-gapPctTenths)}% more than men at the median`;
+  }
+  return 'Men and women are paid the same at the median';
+}
+
+/** `"5 men"` / `"1 man"` — the noun agrees with the count, as the thin-peer-group arm agrees its own. */
+function menCount(n: number): string {
+  return n === 1 ? '1 man' : `${n} men`;
+}
+
+/** `"5 women"` / `"1 woman"` — the female mirror of `menCount`. */
+function womenCount(n: number): string {
+  return n === 1 ? '1 woman' : `${n} women`;
+}
+
+/** Which side is too thin, as a closing sentence. Exhaustive over `shortGender` — no default arm. */
+function shortnessPhrase(shortGender: 'MALE' | 'FEMALE' | 'BOTH'): string {
+  switch (shortGender) {
+    case 'MALE':
+      return 'Too few men.';
+    case 'FEMALE':
+      return 'Too few women.';
+    case 'BOTH':
+      return 'Too few of both.';
+  }
 }
 
 /**
@@ -111,5 +187,19 @@ export function composeVerdict(input: VerdictInput): string | null {
     }
     case 'no-salary-as-of':
       return `No comparison — ${input.subjectName} has no salary on record as of ${asOfText}.`;
+    case 'gender-gap-answer': {
+      // BOTH medians must render; either failing is `formatMoney`'s `null`, propagated rather than
+      // a sentence with a hole. Male-first ordering is fixed — the direction is in the lead phrase.
+      const maleMedianText = formatMoney(input.maleMedian, input.currencyFormat);
+      const femaleMedianText = formatMoney(input.femaleMedian, input.currencyFormat);
+      if (maleMedianText === null || femaleMedianText === null) {
+        return null;
+      }
+      return `${gapDirectionPhrase(input.maleMedian.amountMinor, input.femaleMedian.amountMinor, input.gapPctTenths)} — ${maleMedianText} across ${menCount(input.maleN)} vs ${femaleMedianText} across ${womenCount(input.femaleN)} — ${groupLabel(input.group)}, as of ${asOfText}.`;
+    }
+    case 'gender-gap-refusal':
+      // Both counts named, the "5 of each" standard stated as a confident fact (not an apology), and
+      // the short side made explicit. Nouns agree with the counts, which may be 0 or 1 here.
+      return `No gender gap — ${groupLabel(input.group)} has ${menCount(input.maleN)} and ${womenCount(input.femaleN)} as of ${asOfText}, and a gap needs at least ${MIN_PEER_GROUP_SIZE} of each. ${shortnessPhrase(input.shortGender)}`;
   }
 }
