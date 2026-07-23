@@ -3,11 +3,18 @@ import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { getEmployee, loadEmployeeFormOptions } from '@/application/use-cases/employees';
+import { getPeerComparison } from '@/application/use-cases/peer-comparison';
 import { getSalaryTimeline } from '@/application/use-cases/salary-timeline';
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { currencyLineFor, EMPLOYEE_FORM_FIELDS } from '@/ui/employee-form';
 import { EmployeeFormPanel } from '@/ui/employee-form-panel';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { PeerComparison } from '@/ui/peer-comparison';
+import {
+  buildPeerComparison,
+  PEER_COMPARISON_UNREADABLE_HEADING,
+  PEER_COMPARISON_UNREADABLE_STATEMENT,
+} from '@/ui/peer-comparison-vm';
 import { salaryChangeAvailability } from '@/ui/salary-change-form';
 import { SalaryChangePanel } from '@/ui/salary-change-panel';
 import { SalaryTimeline } from '@/ui/salary-timeline';
@@ -116,6 +123,14 @@ export default async function EmployeeDetailPage({
   // readable, and an empty list withholds the amounts through the builder rather than here.
   const timeline = await getSalaryTimeline(deps, id, today);
 
+  // The CAP-5 read, at the SAME `today` the sibling reads use (Law 6 / AD-11). `deps` already
+  // satisfies `PeerComparisonDeps`; the payload is consumed unmodified (Law 7). `unavailable` and,
+  // defensively, `not-found` (a race after `getEmployee` resolved) are the shared "unreadable"
+  // region; `answer`/`refusal` build the view-model — currencies come from the reference options
+  // when they were readable, and an empty list fails the answer's figures closed through the builder
+  // rather than here.
+  const peer = await getPeerComparison(deps, id, today);
+
   return (
     <>
     <section
@@ -212,6 +227,29 @@ export default async function EmployeeDetailPage({
             timeline.timeline,
             // The reference currencies, when the tables were readable; an empty list otherwise, which
             // the builder answers by withholding the amounts rather than showing a bare figure.
+            options.kind === 'options' ? options.options.currencies : [],
+          )}
+        />
+      )}
+
+      {/* The CAP-5 peer-comparison surface — a third sibling section, flat under the page `<h1>`.
+          `unavailable` and, defensively, `not-found` are the shared "unreadable" region (a region
+          with a heading, never `role="alert"`), kept visibly distinct from a refusal. `answer` and
+          `refusal` build the view-model: an answer's money figures resolve from the reference
+          currencies (an empty list fails them closed to verdict + provenance + copy), and both a
+          refusal and an answer carry the ONE verdict for the card and copy-answer alike. */}
+      {peer.kind === 'unavailable' || peer.kind === 'not-found' ? (
+        <div className="mt-4">
+          <EmployeeUnavailable
+            id="peer-comparison-unavailable-heading"
+            heading={PEER_COMPARISON_UNREADABLE_HEADING}
+            statement={PEER_COMPARISON_UNREADABLE_STATEMENT}
+          />
+        </div>
+      ) : (
+        <PeerComparison
+          vm={buildPeerComparison(
+            peer,
             options.kind === 'options' ? options.options.currencies : [],
           )}
         />

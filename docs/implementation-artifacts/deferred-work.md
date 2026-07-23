@@ -1329,3 +1329,7 @@ status: open
     Spec-conformant (the Design Notes contract omits it deliberately), so revisit when building 6-2 if
     the UI wants the group label on this state; enriching the finalized contract now is cheap but is a
     design call, not a defect fix.
+
+- source_spec: `docs/implementation-artifacts/spec-6-2-peer-comparison-ui.md`
+  summary: The employee detail page awaits its independent repository reads (getEmployee → loadEmployeeFormOptions → getSalaryTimeline → getPeerComparison) strictly sequentially; the two after-identity reads (timeline + peer comparison) share deps/id/today with no data dependency and could run under a single Promise.all to drop a serial round-trip.
+  evidence: Confirmed by adversarial review of `src/app/employees/[id]/page.tsx` — `await getSalaryTimeline(...)` (line ~124) and `await getPeerComparison(...)` (line ~132) are independent in-process/DB reads run one-after-another. This is a pre-existing page-wide serial-read pattern that story 6-2 extends by one hop, not a defect it introduced; parallelizing is a page-wide optimization better done as a focused pass across all reads.
