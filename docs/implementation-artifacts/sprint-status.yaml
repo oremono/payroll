@@ -92,19 +92,19 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4 — CAP-3 Record a Salary Change
-  epic-4: in-progress
+  epic-4: done
   4-1-record-salary-change-backend: done
   4-2-record-salary-change-ui: done
   epic-4-retrospective: optional
 
   # Epic 5 — CAP-4 Salary Timeline
-  epic-5: backlog
+  epic-5: done
   5-1-salary-timeline-backend: done
   5-2-salary-timeline-ui: done
   epic-5-retrospective: optional
 
   # Epic 6 — CAP-5 Peer Comparison or Refusal
-  epic-6: backlog
+  epic-6: done
   6-1-peer-comparison-backend: done
   6-2-peer-comparison-ui: done
   epic-6-retrospective: optional
