@@ -50,6 +50,9 @@ const NOT_USED_BY_IMPORT = {
   // CAP-4's salary read (story 5-1). Import never reads a timeline — a rejecting stub keeps that
   // true rather than asserting it in prose.
   findSalaryHistory: () => Promise.reject(new Error('import never reads a salary history')),
+  // CAP-5's peer-population read (story 6-1). Import never compares peers — a rejecting stub keeps
+  // that true rather than asserting it in prose.
+  findPeerPopulation: () => Promise.reject(new Error('import never reads a peer population')),
 } satisfies Pick<
   EmployeeRepository,
   | 'createEmployee'
@@ -59,6 +62,7 @@ const NOT_USED_BY_IMPORT = {
   | 'loadFormOptions'
   | 'appendSalaryRecord'
   | 'findSalaryHistory'
+  | 'findPeerPopulation'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */

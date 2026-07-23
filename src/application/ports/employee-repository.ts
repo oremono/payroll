@@ -1,5 +1,6 @@
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
+import type { PeerCandidate } from '@/domain/peer-comparison';
 import type { PlainDate } from '@/domain/plain-date';
 import type { SalaryRecordView } from '@/domain/salary-timeline';
 
@@ -229,6 +230,39 @@ export type AppendSalaryRecordOutcome =
       readonly hireDate: PlainDate;
     };
 
+/**
+ * The `(role, level, country)` triple that DEFINES a peer group (AD-16). Read off the subject's own
+ * employee row — never chosen, never widened. A peer group is not a table; this key is resolved at
+ * read time and the population read below derives the group from it fresh, per request (AD-2 / AD-12).
+ */
+export type PeerGroupKey = {
+  readonly roleCode: string;
+  readonly levelCode: string;
+  readonly countryCode: string;
+};
+
+/**
+ * The as-of peer population for one triple, plus everything the verdict needs to NAME the group.
+ *
+ * `candidates` is EVERY employee sharing the triple, each carrying their WHOLE append-only salary
+ * history UNORDERED — the read does no as-of filtering and imposes no `ORDER BY` (AD-8). The domain
+ * decides in-population membership through the ONE resolver and computes `n` as the cardinality of
+ * that exact set (Law 2 / AD-16); the read never runs a `COUNT`.
+ *
+ * The labels and `currencyFormat` are resolved WITHOUT an `is_active` filter (AD-16): `is_active`
+ * gates pickability for NEW writes, never the visibility of an existing employee's statistics or the
+ * labels of a retired role/level/currency they still hold. The group is single-currency by
+ * construction (country immutable, currency follows country), so ONE `currencyFormat` describes
+ * every candidate's money.
+ */
+export type PeerPopulation = {
+  readonly candidates: readonly PeerCandidate[];
+  readonly roleName: string;
+  readonly levelLabel: string;
+  readonly countryName: string;
+  readonly currencyFormat: CurrencyFormat;
+};
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -374,4 +408,35 @@ export type EmployeeRepository = {
   readonly findSalaryHistory: (
     employeeId: string,
   ) => Promise<readonly SalaryRecordView[] | null>;
+
+  // ── CAP-5 (story 6-1) ──────────────────────────────────────────────────────────────────────
+  // A READ-ONLY sibling on this same port — not a second one, and emphatically not a write. Peer
+  // comparison is a pure consumer of the append-only series: it SELECTS the candidate set and the
+  // domain computes the median, spread, distance, and `n` in process (Law 2 / AD-2). There is no
+  // update or delete here and never will be (Law 5 / AD-18); it belongs on this port because it
+  // reads the same `employee` + `salary_record` tables `findSalaryHistory` does, through the same
+  // client, and a peer comparison is reached only THROUGH an employee — there is no peer-group
+  // index to hang a separate port off.
+
+  /**
+   * The as-of peer population for a `(role, level, country)` triple: every employee sharing it, each
+   * with their whole UNORDERED salary history, plus the group's display labels and `CurrencyFormat`.
+   *
+   * Returns the population WITHOUT any as-of filtering, `ORDER BY`, or `COUNT` — the domain owns all
+   * three (AD-8 / AD-16 / Law 2). The subject is among the returned candidates by construction (it
+   * shares its own triple), so the caller hands the whole set to `comparePeers`, which decides
+   * in-population membership through the ONE resolver and derives `n` from the exact in-memory set.
+   *
+   * The labels and currency are resolved WITHOUT an `is_active` filter — a subject holding a retired
+   * role, level, or currency still has statistics and a nameable group (AD-16). Filtering inactive
+   * rows out here would reintroduce the population divergence the schema exists to avoid.
+   *
+   * `null` when the group's currency format cannot be resolved into a form the ONE money formatter
+   * can use (an unknown currency, or a grouping style / exponent the domain does not support), or
+   * when a reference label is missing — a data condition, surfaced as a value the use-case maps to
+   * `unavailable`, never an exception across the boundary. A triple no employee matches is NOT this
+   * case: it answers a population with an EMPTY `candidates` list (the domain then refuses), the same
+   * "present but empty" distinction `findSalaryHistory` draws.
+   */
+  readonly findPeerPopulation: (group: PeerGroupKey) => Promise<PeerPopulation | null>;
 };

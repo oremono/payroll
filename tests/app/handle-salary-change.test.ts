@@ -93,6 +93,7 @@ function fakeDeps(
     listEmployees: () => Promise.reject(new Error('not reachable')),
     loadFormOptions: () => Promise.reject(new Error('not reachable')),
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
+    findPeerPopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   const idGenerator: IdGenerator = { next: () => 'salary-id-1' };
