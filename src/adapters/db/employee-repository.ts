@@ -14,6 +14,7 @@ import type {
 import type { ReferenceData } from '@/domain/import-row';
 import { isSupportedExponent, type CurrencyFormat, type GroupingStyle, type Money } from '@/domain/money';
 import { comparePlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
+import type { SalaryRecordView } from '@/domain/salary-timeline';
 
 import { getDbClient } from './client';
 import type { PrismaClient } from './generated/client';
@@ -879,6 +880,54 @@ export function createEmployeeRepository(
         // answers with a payload rather than a 500.
         throw error;
       }
+    },
+
+    // ── CAP-4 (story 5-1) ────────────────────────────────────────────────────────────────────
+    // The first salary READ on this repository, and it is READ-ONLY — no update, no delete, ever
+    // (Law 5 / AD-18). It hands the whole append-only series to the domain UNORDERED; the ordering
+    // is AD-8's ONE comparison in `salary-timeline.ts`, never a second `ORDER BY` here.
+
+    findSalaryHistory: async (
+      employeeId: string,
+    ): Promise<readonly SalaryRecordView[] | null> => {
+      // A hand-editable URL segment is ordinary input: answer null rather than letting Prisma raise
+      // a cast error against the `@db.Uuid` column, exactly as `findEmployeeById` does.
+      if (!isUuid(employeeId)) {
+        return null;
+      }
+
+      // ONE nested read distinguishes "no such employee" from "employee with an empty history": a
+      // `null` row is the former, a present row with an empty `salaryRecords` is the latter. No
+      // second query, and — deliberately — NO `orderBy`: the domain owns the ordering (AD-8).
+      const row = await client.employee.findUnique({
+        where: { id: employeeId },
+        select: {
+          salaryRecords: {
+            select: {
+              id: true,
+              seq: true,
+              amountMinor: true,
+              currencyCode: true,
+              effectiveFrom: true,
+            },
+          },
+        },
+      });
+
+      if (row === null) {
+        return null;
+      }
+
+      // `amountMinor` and `seq` come back as native `bigint` (Prisma maps `@db.BigInt` to it); the
+      // currency is the RECORD's own, read straight off the column and never re-resolved from the
+      // employee's country (AD-6). `seq` rides along for the resolver's ordering and is dropped at
+      // the application boundary, never here.
+      return row.salaryRecords.map((record) => ({
+        id: record.id,
+        seq: record.seq,
+        effectiveFrom: fromDbDate(record.effectiveFrom),
+        salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+      }));
     },
   };
 }

@@ -1,6 +1,7 @@
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
 import type { PlainDate } from '@/domain/plain-date';
+import type { SalaryRecordView } from '@/domain/salary-timeline';
 
 /**
  * The first repository port, and with it THE WRITE FUNNEL (AD-6 / AD-18).
@@ -348,4 +349,29 @@ export type EmployeeRepository = {
     record: NewSalaryRecord,
     today: PlainDate,
   ) => Promise<AppendSalaryRecordOutcome>;
+
+  // ── CAP-4 (story 5-1) ──────────────────────────────────────────────────────────────────────
+  // The FIRST salary READ on this port, and it is READ-ONLY: there is no update and no delete over
+  // `salary_record` anywhere here, and there never will be (Law 5 / AD-18). It reads the whole
+  // append-only series and hands it to the domain UNORDERED — the ordering is AD-8's one comparison
+  // in `salary-timeline.ts`, never a second `ORDER BY` in the adapter.
+
+  /**
+   * Every salary record for one employee, in NO GUARANTEED ORDER, or `null` when no such employee
+   * exists — the same read-null idiom `findEmployeeById` uses, and for the same reasons.
+   *
+   * `null` distinguishes "there is no such employee" from "the employee exists with an empty
+   * history": a present employee with zero salary records answers `[]`, not `null`. That distinction
+   * is what lets the use-case answer `not-found` versus a `timeline` with no rows, and a single
+   * nested read makes it without a second query. A malformed / non-UUID id answers `null` rather
+   * than throwing, because it arrives from a URL segment a user can hand-edit (AD-8 / AD-18).
+   *
+   * Returns `SalaryRecordView`s — money as domain `Money` and `seq` as the native `bigint` the ONE
+   * resolver orders by. The currency is each record's OWN, read straight off the row and never
+   * re-resolved from the employee's country at read time (AD-6). The use-case is what encodes money
+   * to `BoundaryMoney` and drops `seq` before anything crosses to a surface.
+   */
+  readonly findSalaryHistory: (
+    employeeId: string,
+  ) => Promise<readonly SalaryRecordView[] | null>;
 };

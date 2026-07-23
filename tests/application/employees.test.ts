@@ -110,6 +110,10 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
     // use-case reaches it, and `tests/application/record-salary-change.test.ts` is where it is
     // actually exercised.
     appendSalaryRecord: async () => guard('appendSalaryRecord', { kind: 'appended' as const }),
+    // CAP-4's salary read (story 5-1). Present so this fake still satisfies the widened port; no
+    // CAP-2 use-case reaches it, and `tests/application/salary-timeline.test.ts` is where it is
+    // actually exercised.
+    findSalaryHistory: async () => guard('findSalaryHistory', null),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).
