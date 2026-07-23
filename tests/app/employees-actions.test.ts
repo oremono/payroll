@@ -95,6 +95,9 @@ function fakeDeps(
     // CAP-5's peer-population read (story 6-1). Present so this fake still satisfies the widened
     // port; no CAP-2 handler reaches it.
     findPeerPopulation: () => Promise.resolve(null),
+    // CAP-6's whole-population read (story 7-1). Present so this fake still satisfies the widened
+    // port; no CAP-2 handler reaches it.
+    findAllPeerGroups: () => Promise.resolve([]),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };

@@ -77,6 +77,7 @@ function fakeDeps(config: FakeConfig = {}): SalaryTimelineDeps & { readonly aske
     loadFormOptions: () => Promise.reject(new Error('not reachable')),
     appendSalaryRecord: () => Promise.reject(new Error('not reachable')),
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),
+    findAllPeerGroups: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return { repository, asked };

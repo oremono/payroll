@@ -118,6 +118,10 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
     // port; no CAP-2 use-case reaches it, and `tests/application/peer-comparison.test.ts` is where
     // it is actually exercised.
     findPeerPopulation: async () => guard('findPeerPopulation', null),
+    // CAP-6's whole-population read (story 7-1). Present so this fake still satisfies the widened
+    // port; no CAP-2 use-case reaches it, and `tests/application/outliers.test.ts` is where it is
+    // actually exercised.
+    findAllPeerGroups: async () => guard('findAllPeerGroups', []),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).
