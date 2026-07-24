@@ -97,6 +97,7 @@ function fakeDeps(
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
     findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
     findPayrollTotalsPopulation: () => Promise.reject(new Error('not reachable')),
+    findOverduePopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).

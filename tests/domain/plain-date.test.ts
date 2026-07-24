@@ -5,6 +5,7 @@ import {
   formatPlainDate,
   parsePlainDate,
   plainDateToIso,
+  subtractMonths,
   type PlainDate,
 } from '@/domain/plain-date';
 
@@ -263,5 +264,141 @@ describe('comparePlainDate', () => {
 
   it('ignores a lower month when the year is already later — year dominates', () => {
     expect(comparePlainDate({ year: 2027, month: 1, day: 1 }, JUL_16_2026)).toBeGreaterThan(0);
+  });
+});
+
+// CAP-10 (AD-22, M-5): the overdue cutoff is `asOf − period`, computed by CALENDAR month subtraction
+// with a day that clamps into a shorter target month (29 Feb − 1y = 28 Feb). Pure, TOTAL, and
+// deterministic — no JS `Date` anywhere (Law 6 / AD-11), which is the whole reason the arithmetic is
+// written out here rather than delegated. Test-first: this block lands red before `subtractMonths`
+// exists, and it walks the story's leap-day and preset rows plus the boundary cases the 100% mutation
+// floor needs (the year rollover, the month wrap, and the clamp in BOTH leap directions).
+describe('subtractMonths', () => {
+  it('subtracts within the same year without touching the day', () => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 3)).toEqual({
+      year: 2026,
+      month: 4,
+      day: 16,
+    });
+  });
+
+  it('the golden domain example: 16 Jul 2026 minus 18 months is 16 Jan 2025', () => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 18)).toEqual({
+      year: 2025,
+      month: 1,
+      day: 16,
+    });
+  });
+
+  // The four period presets the surface offers (story 11-2), measured back from the golden as-of.
+  it.each([
+    [12, { year: 2025, month: 7, day: 16 }],
+    [18, { year: 2025, month: 1, day: 16 }],
+    [24, { year: 2024, month: 7, day: 16 }],
+    [36, { year: 2023, month: 7, day: 16 }],
+  ])('subtracts the %i-month preset from 16 Jul 2026', (months, expected) => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, months)).toEqual(expected);
+  });
+
+  it('crosses a year boundary when the month underflows', () => {
+    // January minus one month is the previous December, previous year.
+    expect(subtractMonths({ year: 2026, month: 1, day: 10 }, 1)).toEqual({
+      year: 2025,
+      month: 12,
+      day: 10,
+    });
+  });
+
+  it('lands exactly on January (month index 0) without rolling the year an extra step', () => {
+    // month 7 (Jul) minus 6 -> month 1 (Jan) of the SAME year: the modulo/rollover boundary.
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 6)).toEqual({
+      year: 2026,
+      month: 1,
+      day: 16,
+    });
+  });
+
+  it('lands exactly on December of the previous year when the whole year is consumed', () => {
+    // month 7 minus 7 -> month 12 (Dec) of the prior year: the other side of the wrap.
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 7)).toEqual({
+      year: 2025,
+      month: 12,
+      day: 16,
+    });
+  });
+
+  it('is the identity for zero months', () => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 0)).toEqual({
+      year: 2026,
+      month: 7,
+      day: 16,
+    });
+  });
+
+  it('subtracts a whole multiple of twelve as exactly that many years', () => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 16 }, 120)).toEqual({
+      year: 2016,
+      month: 7,
+      day: 16,
+    });
+  });
+
+  // The AD-22 / M-5 clamp, both leap directions. A day absent in the TARGET month drops to that
+  // month's last day — 29 Feb has no counterpart in a common February.
+  it('clamps 29 Feb of a leap year back onto 28 Feb of a common year (24 months)', () => {
+    expect(subtractMonths({ year: 2028, month: 2, day: 29 }, 24)).toEqual({
+      year: 2026,
+      month: 2,
+      day: 28,
+    });
+  });
+
+  it('clamps 29 Feb of a leap year back onto 28 Feb of the prior common year (12 months)', () => {
+    expect(subtractMonths({ year: 2024, month: 2, day: 29 }, 12)).toEqual({
+      year: 2023,
+      month: 2,
+      day: 28,
+    });
+  });
+
+  it('keeps 29 Feb when the target February is itself a leap February (48 months)', () => {
+    // 2028 and 2024 are both leap years: no clamp, the 29th survives — the branch that proves the
+    // clamp is CONDITIONAL, not applied to every February.
+    expect(subtractMonths({ year: 2028, month: 2, day: 29 }, 48)).toEqual({
+      year: 2024,
+      month: 2,
+      day: 29,
+    });
+  });
+
+  it('clamps the 31st onto a 30-day target month', () => {
+    // 31 Jul minus one month -> June has 30 days, so the day clamps to 30.
+    expect(subtractMonths({ year: 2026, month: 7, day: 31 }, 1)).toEqual({
+      year: 2026,
+      month: 6,
+      day: 30,
+    });
+  });
+
+  it('does not clamp when the day already fits the target month', () => {
+    expect(subtractMonths({ year: 2026, month: 7, day: 28 }, 1)).toEqual({
+      year: 2026,
+      month: 6,
+      day: 28,
+    });
+  });
+
+  // FIRST_YEAR invariant: the proleptic calendar has no year below 1, and `<input type="date">`
+  // cannot show one. A period that would underflow past year 1 clamps to the earliest date rather
+  // than emit a `{year: 0}` cutoff — the one invariant a *valid* positive period can still breach.
+  it('clamps to 0001-01-01 rather than underflow below year 1', () => {
+    expect(subtractMonths({ year: 1, month: 6, day: 1 }, 12)).toEqual({ year: 1, month: 1, day: 1 });
+    expect(subtractMonths({ year: 1, month: 1, day: 1 }, 1)).toEqual({ year: 1, month: 1, day: 1 });
+  });
+
+  it('does NOT clamp when the result lands exactly on year 1 (the boundary is exclusive)', () => {
+    // 20 Jun 0002 minus 12 months is 20 Jun 0001 — year 1 is representable, so month/day survive
+    // untouched. Pins the clamp's `< FIRST_YEAR` boundary as strict, not `<=`.
+    expect(subtractMonths({ year: 2, month: 6, day: 20 }, 12)).toEqual({ year: 1, month: 6, day: 20 });
   });
 });

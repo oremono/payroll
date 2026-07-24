@@ -136,6 +136,10 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
     // where it is actually exercised.
     findPayrollTotalsPopulation: async () =>
       guard('findPayrollTotalsPopulation', { candidates: [], countries: [], currencies: [] }),
+    // CAP-10's org-wide overdue read (story 11-1). Present so this fake still satisfies the widened
+    // port; no CAP-2 use-case reaches it, and `tests/application/overdue.test.ts` is where it is
+    // actually exercised.
+    findOverduePopulation: async () => guard('findOverduePopulation', { candidates: [] }),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).

@@ -108,6 +108,9 @@ function fakeDeps(
     // widened port; no CAP-2 handler reaches it.
     findPayrollTotalsPopulation: () =>
       Promise.resolve({ candidates: [], countries: [], currencies: [] }),
+    // CAP-10's org-wide overdue read (story 11-1). Present so this fake still satisfies the widened
+    // port; no CAP-2 handler reaches it.
+    findOverduePopulation: () => Promise.resolve({ candidates: [] }),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };
