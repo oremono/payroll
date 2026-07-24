@@ -315,7 +315,7 @@ export function EmployeeFormPanel({
 
     setIsPending(false);
     // One voice (AD-20): the app-level polite region, never a second live region mounted here.
-    announce(composeFormAnnouncement(result));
+    announce(composeFormAnnouncement(result), { visible: true });
 
     if (result.kind === 'created' || result.kind === 'updated') {
       close();

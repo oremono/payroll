@@ -94,7 +94,7 @@ export function ThresholdControl({
       if (result.kind === 'applied') {
         setDraft(String(result.value));
         setStatus({ kind: 'idle' });
-        announce(`Threshold updated to ${result.value}%`);
+        announce(`Threshold updated to ${result.value}%`, { visible: true });
         return;
       }
       // The outcome the reader most needs read aloud is a failure, and after Apply focus is on the
@@ -103,7 +103,7 @@ export function ThresholdControl({
       // addition to the inline message, so it is announced regardless of where focus sits.
       const text = result.kind === 'rejected' ? REJECTED_MESSAGE : UNAVAILABLE_MESSAGE;
       setStatus({ kind: 'message', text });
-      announce(text);
+      announce(text, { visible: true });
     });
   }
 

@@ -66,11 +66,11 @@ export function CopyAnswer({ verdict }: { readonly verdict: string }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(verdict);
-      announce(COPY_ANNOUNCEMENT);
+      announce(COPY_ANNOUNCEMENT, { visible: true });
     } catch {
       // Total: a rejected clipboard write is swallowed. The muted announce keeps a screen-reader
       // user from waiting on a confirmation that will never arrive; it never throws or opens a dialog.
-      announce(COPY_FAILED_ANNOUNCEMENT);
+      announce(COPY_FAILED_ANNOUNCEMENT, { visible: true });
     }
   }
 

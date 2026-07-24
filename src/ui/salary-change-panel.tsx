@@ -305,6 +305,7 @@ export function SalaryChangePanel({
           { kind: 'rejected', reasons: built.reasons },
           values.effectiveFrom,
         ),
+        { visible: true },
       );
       return;
     }
@@ -329,7 +330,7 @@ export function SalaryChangePanel({
     pendingRef.current = false;
     setIsPending(false);
     // One voice (AD-20): the app-level polite region, never a second live region mounted here.
-    announce(composeSalaryAnnouncement(result, built.input.effectiveFrom));
+    announce(composeSalaryAnnouncement(result, built.input.effectiveFrom), { visible: true });
 
     if (result.kind === 'recorded') {
       close();

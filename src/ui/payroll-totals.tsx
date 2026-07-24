@@ -326,10 +326,22 @@ export function PayrollByCountryChart({
         <p className="mt-3 text-body-md text-ink">{NO_COUNTRIES_STATEMENT}</p>
       ) : (
         <>
-          {/* The decorative bar strip — `aria-hidden`, static, sized by headcount only. */}
+          {/* The decorative bar strip — `aria-hidden`, static, sized by headcount only. On the Home
+              PULSE the counts table beside it is `sr-only`, so each bar carries a visible country
+              name and its headcount above it there (still `aria-hidden` — the table is the accessible
+              carrier); on Payroll Totals the visible table already names every country, so the labels
+              are withheld to avoid saying each country twice. */}
           <ol aria-hidden className="mt-4 flex flex-col gap-cell-padding-v">
             {vm.pulse.map((row) => (
               <li key={row.countryCode}>
+                {visuallyHiddenTable ? (
+                  <div className="mb-1 flex items-baseline justify-between gap-gutter">
+                    <span className="text-label-caps uppercase text-ink-muted">
+                      {row.countryName}
+                    </span>
+                    <span className="font-mono text-number-sm text-ink-muted">{row.n}</span>
+                  </div>
+                ) : null}
                 <CountryBar row={row} />
               </li>
             ))}

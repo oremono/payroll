@@ -103,7 +103,7 @@ export function ImportPanel() {
     setReport(settled);
     setIsPending(false);
     // One voice (AD-20): the app-level polite region, never a second live region mounted here.
-    announce(composeImportAnnouncement(settled));
+    announce(composeImportAnnouncement(settled), { visible: true });
   }
 
   return (

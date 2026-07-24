@@ -38,7 +38,17 @@ import {
  * (they render as a region with a heading, never an alert).
  */
 
-type Announce = (message: string) => void;
+type AnnounceOptions = {
+  /**
+   * Also show the message as a brief VISIBLE confirmation, not only speak it into the sr-only
+   * region. Reserved for settled USER ACTIONS a sighted person expects a receipt from — a form
+   * submit, a copy — never ambient recompute (an as-of or period change), which would then flash a
+   * toast on every keystroke of the date picker.
+   */
+  readonly visible?: boolean;
+};
+
+type Announce = (message: string, options?: AnnounceOptions) => void;
 
 const AnnounceContext = createContext<Announce>(() => undefined);
 
@@ -63,9 +73,10 @@ type Announcement = {
   readonly text: string;
   readonly nonce: number;
   readonly pathname: string;
+  readonly visible: boolean;
 };
 
-const SILENCE: Announcement = { text: '', nonce: 0, pathname: '' };
+const SILENCE: Announcement = { text: '', nonce: 0, pathname: '', visible: false };
 
 export function Announcer({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -73,11 +84,42 @@ export function Announcer({ children }: { children: ReactNode }) {
   const regionRef = useRef<HTMLDivElement>(null);
 
   const announce = useCallback<Announce>(
-    (next) => {
-      setRequest((previous) => ({ text: next, nonce: previous.nonce + 1, pathname }));
+    (next, options) => {
+      setRequest((previous) => ({
+        text: next,
+        nonce: previous.nonce + 1,
+        pathname,
+        visible: options?.visible ?? false,
+      }));
     },
     [pathname],
   );
+
+  /**
+   * The VISIBLE confirmation (issue: form submits gave a sighted person no receipt — the polite
+   * region above spoke "Employee created." but nothing showed). A brief calm card, driven by the
+   * SAME `announce` requests but only when `visible` was asked for, auto-dismissing after a few
+   * seconds. It is `aria-hidden`: the sr-only region is the accessible carrier, so the toast must
+   * not re-announce. Held in React state (not the imperative node above) — a normal render is fine
+   * here because, unlike a live region, a visible element has no "announce only on mutation" rule.
+   */
+  // DERIVED from the latest request, not mirrored into its own state: a visible request shows until
+  // the timer below retires its nonce, or a pathname change expires it. Deriving keeps the effect
+  // free of a synchronous `setState` (the retire happens inside the timer callback, which is fine).
+  const [dismissedNonce, setDismissedNonce] = useState(0);
+  const showToast =
+    request.visible &&
+    request.nonce !== 0 &&
+    request.pathname === pathname &&
+    request.nonce !== dismissedNonce;
+
+  useEffect(() => {
+    if (!showToast) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setDismissedNonce(request.nonce), 6000);
+    return () => clearTimeout(timer);
+  }, [showToast, request.nonce]);
 
   /**
    * Turn a REQUEST into the region's contents. Two defects live here, and they are the same defect
@@ -135,6 +177,20 @@ export function Announcer({ children }: { children: ReactNode }) {
         aria-atomic="true"
         className="sr-only"
       />
+      {/* The VISIBLE confirmation for a settled action — `aria-hidden` because the region above is
+          the accessible carrier. Fixed to the bottom-right, calm register: a hairline card on
+          `surface-card`, no error/success color (none exists in this token system — the WORDS carry
+          "created" / "not saved"), no `role="alert"`. Auto-dismisses; the detailed rejection reasons
+          persist under their own fields regardless. */}
+      {showToast ? (
+        <div
+          key={request.nonce}
+          aria-hidden
+          className="fixed bottom-4 right-4 z-50 max-w-sm rounded border border-border-hairline bg-surface-card px-4 py-3 text-body-sm text-ink"
+        >
+          {request.text}
+        </div>
+      ) : null}
       {children}
     </AnnounceContext.Provider>
   );

@@ -86,10 +86,25 @@ export function GenderDistributionChart({
             <Legend />
           </div>
 
-          {/* The decorative bar stack — `aria-hidden`, static, no hover/tooltip/click target. */}
+          {/* The decorative bar stack — `aria-hidden`, static, no hover/tooltip/click target. On the
+              Home PULSE the counts table beside it is `sr-only`, so the bars would otherwise be
+              unlabeled to a sighted reader; a caps level label and the M/F split are shown above each
+              bar THERE (still `aria-hidden` — the table remains the accessible carrier). On Gender
+              Insights the visible table already labels every row, so the bar labels are withheld to
+              avoid stating each level twice. */}
           <ol aria-hidden className="mt-4 flex flex-col gap-cell-padding-v">
             {vm.rows.map((row) => (
               <li key={row.levelCode}>
+                {visuallyHiddenTable ? (
+                  <div className="mb-1 flex items-baseline justify-between gap-gutter">
+                    <span className="text-label-caps uppercase text-ink-muted">
+                      {row.levelLabel}
+                    </span>
+                    <span className="font-mono text-number-sm text-ink-muted">
+                      {row.maleN} / {row.femaleN}
+                    </span>
+                  </div>
+                ) : null}
                 <LevelBar row={row} />
               </li>
             ))}
