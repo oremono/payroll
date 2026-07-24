@@ -16,8 +16,16 @@ export type NavItem = {
   readonly label: string;
 };
 
-/** Shown on every route when no nav item claims the path (e.g. a future `/employees/[id]`). */
+/** Shown on a route no nav item claims and that is not otherwise named below. */
 const PRODUCT_NAME = 'Salary Management for ACME HR';
+
+/**
+ * The employee DETAIL route (`/employees/<id>`) has no nav item of its own. Naming the SURFACE —
+ * "Employee" — is truer than the bare product-name fallback: the header `<h1>` then says what kind
+ * of page this is, consistent with every other route, while the person's name stays the card's own
+ * heading in the page body (the document keeps its one `<h1>` in the header).
+ */
+const EMPLOYEE_DETAIL_LABEL = 'Employee';
 
 /** The six working destinations, in the order they appear in the sidebar. */
 export const PRIMARY_NAV_ITEMS: readonly NavItem[] = [
@@ -85,5 +93,19 @@ export function navHrefWithAsOf(itemHref: string, asOfParam: string | undefined)
  */
 export function pageTitleFor(pathname: string): string {
   const active = NAV_ITEMS.find((item) => isActiveNavItem(item.href, pathname));
-  return active === undefined ? PRODUCT_NAME : active.label;
+  if (active !== undefined) {
+    return active.label;
+  }
+  // `/employees/<id>` — a claimed SURFACE without its own nav item. Any path one segment below the
+  // directory is a detail page; `/employees` itself is the nav item handled above.
+  if (isEmployeeDetailPath(pathname)) {
+    return EMPLOYEE_DETAIL_LABEL;
+  }
+  return PRODUCT_NAME;
+}
+
+/** Whether `pathname` is an employee DETAIL route — `/employees/<non-empty>`, not `/employees`. */
+function isEmployeeDetailPath(pathname: string): boolean {
+  const prefix = '/employees/';
+  return pathname.startsWith(prefix) && pathname.length > prefix.length;
 }

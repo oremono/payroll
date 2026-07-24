@@ -554,12 +554,14 @@ describe('listEmployees paginates and searches', () => {
     for (const name of NAMES) {
       await createFixtureEmployee(name);
     }
-    // Two people who genuinely share a name — the tie the (name, id) order exists to break.
+    // Two people who genuinely share a name — a tie the id order breaks. These fixtures also share
+    // one hire date (the ordering key), so `id` is the sole discriminant, and — since it is a
+    // monotonic UUIDv7 — the returned order is creation order, which is alphabetical for this cohort.
     await createFixtureEmployee(TWIN);
     await createFixtureEmployee(TWIN);
   });
 
-  it('returns a page in (name, id) order with the total, and echoes the effective window', async () => {
+  it('returns a page in (hire-date desc, id) order with the total, and echoes the effective window', async () => {
     const result = await listEmployees(deps(), { search: cohort, limit: 3, offset: 0 });
 
     expect(result.kind).toBe('page');

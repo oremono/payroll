@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 
@@ -63,6 +64,11 @@ import { employeeReadDeps } from '../employee-deps';
  * `notFound()` is Next's own control flow, not an exception reaching a user: it renders
  * `[id]/not-found.tsx` under HTTP 404.
  */
+
+// The browser-tab title for the detail surface. Deliberately the SURFACE name ("Employee"), not the
+// person's — the same choice the header `<h1>` makes (`pageTitleFor`), and it needs no extra read.
+// Next composes it through the layout template as `Employee · Salary Management for ACME HR`.
+export const metadata: Metadata = { title: 'Employee' };
 
 const UNAVAILABLE_HEADING = 'This employee could not be read';
 
@@ -153,8 +159,8 @@ export default async function EmployeeDetailPage({
       className="rounded border border-border-hairline bg-surface-card p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        {/* `<h2>` — the header owns the document's one `<h1>`, and no nav item claims this path, so
-            its title is the product name. */}
+        {/* `<h2>` — the header owns the document's one `<h1>`, which names the SURFACE ("Employee",
+            via `pageTitleFor`). The person's name is this card's own heading, one level down. */}
         <h2 id="employee-detail-heading" className="text-headline-md text-ink">
           {employee.name}
         </h2>

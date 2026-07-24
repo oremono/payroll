@@ -106,8 +106,17 @@ describe('pageTitleFor', () => {
     expect(pageTitleFor('/')).toBe('Home');
   });
 
+  it('names the employee-detail surface "Employee", not the product name', () => {
+    expect(pageTitleFor('/employees/42')).toBe('Employee');
+    expect(pageTitleFor('/employees/01941f29-7c00-7f64-86bd-3853da7a2c2f')).toBe('Employee');
+  });
+
+  it('still uses the directory nav label for `/employees` itself', () => {
+    expect(pageTitleFor('/employees')).toBe('Employees');
+  });
+
   it('falls back to the product name on a path no nav item claims', () => {
-    expect(pageTitleFor('/employees/42')).toBe('Salary Management for ACME HR');
+    expect(pageTitleFor('/no-such-page')).toBe('Salary Management for ACME HR');
   });
 });
 

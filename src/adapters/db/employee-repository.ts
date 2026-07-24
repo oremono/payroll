@@ -725,15 +725,17 @@ export function createEmployeeRepository(
       // here; the integration suite asserts the database really reports `repeatable read`), because
       // this comment has no way to be true on its own.
       //
-      // `(name, id)` — name alone TIES on duplicates (two people may legitimately share one), and
-      // offset pagination over a non-total order silently drops and repeats rows between pages.
+      // `(hire_date desc, id)` — most-recently-hired first, the order the directory promises. Hire
+      // date alone TIES (many share a day), and offset pagination over a non-total order silently
+      // drops and repeats rows between pages, so `id` (unique) is the tie-break that makes the order
+      // TOTAL. `id` is a UUIDv7, monotonic with insert time, so ties resolve to insertion order.
       const [rows, totalCount] = await client.$transaction(
         async (tx) => {
           // Sequential rather than concurrent: both statements ride ONE connection inside an
           // interactive transaction, and that is the point — they share its snapshot.
           const page = await tx.employee.findMany({
             where,
-            orderBy: [{ name: 'asc' }, { id: 'asc' }],
+            orderBy: [{ hireDate: 'desc' }, { id: 'asc' }],
             skip: offset,
             take: limit,
             select: EMPLOYEE_IDENTITY_SELECT,

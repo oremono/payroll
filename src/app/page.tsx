@@ -143,6 +143,7 @@ async function Findings({ asOf, thresholdPct }: { asOf: PlainDate; thresholdPct:
     <OutlierFindings
       vm={buildOutlierFindings(findings, asOf)}
       exportHref={`/api/outliers/export?asOf=${plainDateToIso(asOf)}`}
+      asOfParam={plainDateToIso(asOf)}
     />
   );
 }

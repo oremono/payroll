@@ -46,8 +46,8 @@ export function EmployeeTable({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <caption className="sr-only">
-          Employees, ordered by name: name, role code, level code, country code, gender, and hire
-          date. Choose a name to open that employee.
+          Employees, ordered by most recent hire date: name, role code, level code, country code,
+          gender, and hire date. Choose a name to open that employee.
         </caption>
         <thead>
           {/* Real `<th scope="col">` headers, not styled divs — the row/column relationship is what

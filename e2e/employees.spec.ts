@@ -91,7 +91,7 @@ async function openCreateDialog(page: Page): Promise<void> {
 }
 
 test.describe('the directory', () => {
-  test('names its six columns and pages the thirty employees by name', async ({ page }) => {
+  test('names its six columns and pages the thirty employees by hire date', async ({ page }) => {
     await page.goto('/employees');
 
     for (const header of ['Name', 'Role', 'Level', 'Country', 'Gender', 'Hire date']) {
@@ -101,8 +101,9 @@ test.describe('the directory', () => {
     // Header row plus one page of data rows — the page size, not the whole table.
     await expect(page.getByRole('row')).toHaveCount(PAGE_SIZE + 1);
 
-    // Ordered by `(name, id)`. The first row is the alphabetically first fixture name.
-    await expect(page.getByRole('row').nth(1)).toContainText('Aaron Fields');
+    // Ordered by `(hire_date desc, id)`. The first row is the most recently hired fixture employee
+    // (Hana Watanabe, 2024-10-10); Aaron Fields, hired 2015-01-01, is now on the last page.
+    await expect(page.getByRole('row').nth(1)).toContainText('Hana Watanabe');
 
     // Every number comes from the payload's ECHOED effective limit and offset.
     await expect(
@@ -115,14 +116,16 @@ test.describe('the directory', () => {
     // code must still render here, which is exactly why the table shows codes rather than names —
     // display names live only on `EmployeeFormOptions`, which excludes inactive rows, so a join
     // would leave this cell blank at the moment something is already wrong.
-    await page.goto('/employees?page=2');
+    // Zoltan Kovacs (hired 2024-06-02) sits on page 1 under the hire-date-desc order.
+    await page.goto('/employees');
 
     const row = page.getByRole('row').filter({ hasText: 'Zoltan Kovacs' });
     await expect(row).toContainText('retired_role');
   });
 
   test('spells gender as MALE / FEMALE, never abbreviated or title-cased', async ({ page }) => {
-    await page.goto('/employees');
+    // Aaron Fields (hired 2015-01-01) is the last row overall, on page 2 under hire-date-desc order.
+    await page.goto('/employees?page=2');
 
     const row = page.getByRole('row').filter({ hasText: 'Aaron Fields' });
     await expect(row).toContainText('FEMALE');
@@ -174,7 +177,8 @@ test.describe('the pager', () => {
     // the last page's offset rather than showing a pager beside an empty table.
     await expect(page.getByText('Page 2 of 2')).toBeVisible();
     await expect(page.getByRole('row')).toHaveCount(TOTAL - PAGE_SIZE + 1);
-    await expect(page.getByRole('row').nth(1)).toContainText('Wanda Kaminski');
+    // Page 2's first data row under hire-date-desc order (Sofia Alvarez, hired 2016-10-22).
+    await expect(page.getByRole('row').nth(1)).toContainText('Sofia Alvarez');
   });
 
   test('survives hostile page numbers without a 500', async ({ page }) => {
@@ -296,8 +300,10 @@ test.describe('the `/` shortcut', () => {
 });
 
 test.describe('the detail route', () => {
-  test('is reached from a row and states the identity fields only', async ({ page }) => {
-    await page.goto('/employees?asOf=2026-01-01');
+  test('is reached from a row and states the identity fields', async ({ page }) => {
+    // Ana Silva (hired 2016-02-02) is on page 2 under the hire-date-desc order; the as-of param
+    // rides across the page change and must then survive the hop into the detail route.
+    await page.goto('/employees?asOf=2026-01-01&page=2');
     await page.getByRole('link', { name: 'Ana Silva' }).click();
     await expect(page.getByRole('heading', { name: 'Ana Silva' })).toBeVisible();
 
@@ -321,25 +327,10 @@ test.describe('the detail route', () => {
     // replaces it is the same claim minus the part story 4-2 delivers.
     await expect(page.getByRole('button', { name: 'Record a salary change' })).toBeVisible();
 
-    // NOTHING CAP-4/CAP-5 owns, and no salary AMOUNT anywhere. The timeline is Epic 5 and the
-    // percent change and `(Hire)` label are rendered there, not stored and not here. Scoped to
-    // `main` because the shell's `<h1>` falls back to the product name — "Salary Management for
-    // ACME HR" — on a route no nav item claims, which this one is.
-    await expect(page.locator('main').getByText(/current salary/i)).toHaveCount(0);
-    await expect(page.locator('main').getByText(/salary timeline/i)).toHaveCount(0);
-    await expect(page.locator('main').getByText('(Hire)')).toHaveCount(0);
-    await expect(page.locator('main').getByText(/%/)).toHaveCount(0);
-    await expect(page.locator('main').getByText(/peer/i)).toHaveCount(0);
-    // A rendered MONEY AMOUNT, whatever currency it is in. The six probes that replaced the old
-    // blanket `getByText(/salary/i)).toHaveCount(0)` are all vocabulary probes, and a formatted
-    // amount matches none of them: `formatMoney` renders `symbol + grouped digits + ISO code` and
-    // says the word "salary" nowhere. This is the shape-level backstop for the claim that no salary
-    // is displayed on the detail page until Epic 5 renders the timeline.
-    // `\p{Sc}` — the Unicode CURRENCY SYMBOL category, not a hand-listed five. A salary rendered in
-    // any currency outside `$₹¥€£` evaded the enumerated set entirely, which made the backstop
-    // narrowest exactly where a missed case is most likely.
-    await expect(page.locator('main').getByText(/\p{Sc}\s*\d/u)).toHaveCount(0);
-    await expect(page.locator('main').getByText(/\d\s*(?:INR|USD|JPY|EUR|GBP)\b/)).toHaveCount(0);
+    // The salary timeline, peer comparison, and gender-gap sections that Epics 5–7 later added to
+    // this route each have their OWN dedicated tests below and elsewhere; this test's job is only
+    // that a row leads here and the identity fields render, so it asserts nothing about them. (The
+    // block that once claimed "identity fields ONLY" predated those epics and is gone with them.)
   });
 
   test('says no employee has an id nobody holds', async ({ page }) => {

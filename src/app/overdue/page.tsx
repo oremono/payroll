@@ -120,6 +120,7 @@ export default async function OverduePage({ searchParams }: { searchParams: Sear
           vm={buildOverdue(result, currencies, page)}
           exportHref={exportHref}
           hrefForPage={(targetPage) => overdueHref(asOfIso, periodParam, targetPage)}
+          asOfParam={asOfIso}
         />
       </div>
     </>

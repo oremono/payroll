@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { navHrefWithAsOf } from '@/ui/nav-items';
 import type { OverdueListRow, OverdueVM } from '@/ui/overdue-vm';
 
 /**
@@ -42,11 +43,14 @@ export function OverdueList({
   vm,
   exportHref,
   hrefForPage,
+  asOfParam,
 }: {
   readonly vm: OverdueVM;
   readonly exportHref: string;
   /** Build the URL for a page number, preserving `asOf` + `period` — supplied by the composition root. */
   readonly hrefForPage: (page: number) => string;
+  /** The resolved as-of, carried onto each name's link so the detail page opens on the same date. */
+  readonly asOfParam: string | undefined;
 }) {
   if (vm.kind === 'unavailable') {
     return (
@@ -117,7 +121,7 @@ export function OverdueList({
           </thead>
           <tbody>
             {vm.rows.map((row) => (
-              <OverdueRowView key={row.employeeId} row={row} />
+              <OverdueRowView key={row.employeeId} row={row} asOfParam={asOfParam} />
             ))}
           </tbody>
         </table>
@@ -138,10 +142,25 @@ export function OverdueList({
  * One overdue row: the employee name, the current record's effective date (mono, with a
  * machine-readable `<time>`), and the salary (mono, right-aligned; an em dash when withheld).
  */
-function OverdueRowView({ row }: { readonly row: OverdueListRow }) {
+function OverdueRowView({
+  row,
+  asOfParam,
+}: {
+  readonly row: OverdueListRow;
+  readonly asOfParam: string | undefined;
+}) {
   return (
     <tr className="h-10 border-b border-border-hairline hover:bg-surface-tint">
-      <td className="py-2 pr-3 text-body-md font-medium text-primary">{row.name}</td>
+      {/* The name opens that employee's detail page, carrying the ambient as-of (`navHrefWithAsOf`) —
+          the same affordance the directory and the outlier findings give. */}
+      <td className="py-2 pr-3 text-body-md font-medium">
+        <Link
+          href={navHrefWithAsOf(`/employees/${row.employeeId}`, asOfParam)}
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {row.name}
+        </Link>
+      </td>
       <td className="py-2 pr-3 font-mono text-number-sm text-ink">
         <time dateTime={row.effectiveFromIso}>{row.effectiveFrom}</time>
       </td>

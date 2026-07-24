@@ -49,11 +49,12 @@ import { Pool } from 'pg';
  *
  * ## Why the ids are fixed
  *
- * Determinism (Law 6 / AD-19) and the ORDER the directory promises. `listEmployees` orders by
- * `(name, id)` — the tie-break is not decoration, because offset pagination over a non-total order
- * silently drops and repeats rows between pages. Two employees below deliberately SHARE a name, so
- * the id is what settles their order, and a random id would make the assertion about which comes
- * first flap.
+ * Determinism (Law 6 / AD-19). Tests navigate by `fixtureId(NAMES.indexOf(...))`, so each row needs
+ * a stable, known id. `listEmployees` orders by `(hire_date desc, id)`; the id tie-break is not
+ * decoration in general — offset pagination over a non-total order silently drops and repeats rows —
+ * though the thirty rows below all carry DISTINCT hire dates, so their page order is fully settled by
+ * the date alone. Two employees still deliberately SHARE a name (a name is never an identity), which
+ * the detail-route tests rely on; the id keeps even that pair's order fixed.
  */
 
 const OWNER_URL = process.env.DATABASE_URL;

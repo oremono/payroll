@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
+import { navHrefWithAsOf } from '@/ui/nav-items';
 import type { OutlierRow, OutlierSection } from '@/ui/outlier-findings-vm';
 
 /**
@@ -25,8 +27,11 @@ const SECTIONS_PER_PAGE = 8;
 
 export function OutlierFindingsTable({
   sections,
+  asOfParam,
 }: {
   readonly sections: readonly OutlierSection[];
+  /** The current as-of, carried onto each name's link so the detail page opens on the same date. */
+  readonly asOfParam: string | undefined;
 }) {
   const pageCount = Math.max(1, Math.ceil(sections.length / SECTIONS_PER_PAGE));
   // Clamp defensively — state can only reach [0, pageCount) through the controls below, but a
@@ -60,7 +65,11 @@ export function OutlierFindingsTable({
             </tr>
           </thead>
           {visible.map((section, index) => (
-            <SectionBody key={sectionKey(section, start + index)} section={section} />
+            <SectionBody
+              key={sectionKey(section, start + index)}
+              section={section}
+              asOfParam={asOfParam}
+            />
           ))}
         </table>
       </div>
@@ -116,7 +125,13 @@ function sectionKey(section: OutlierSection, index: number): string {
  * for between peer-group sections. An outlier section is one row per flagged member; a thin group is
  * a single full-width inline refusal row.
  */
-function SectionBody({ section }: { readonly section: OutlierSection }) {
+function SectionBody({
+  section,
+  asOfParam,
+}: {
+  readonly section: OutlierSection;
+  readonly asOfParam: string | undefined;
+}) {
   if (section.kind === 'refusal') {
     return (
       <tbody className="border-t-2 border-border-strong">
@@ -137,7 +152,13 @@ function SectionBody({ section }: { readonly section: OutlierSection }) {
   return (
     <tbody className="border-t-2 border-border-strong">
       {section.rows.map((row) => (
-        <FindingRow key={row.employeeId} row={row} label={section.label} n={section.n} />
+        <FindingRow
+          key={row.employeeId}
+          row={row}
+          label={section.label}
+          n={section.n}
+          asOfParam={asOfParam}
+        />
       ))}
     </tbody>
   );
@@ -151,14 +172,25 @@ function FindingRow({
   row,
   label,
   n,
+  asOfParam,
 }: {
   readonly row: OutlierRow;
   readonly label: string;
   readonly n: number;
+  readonly asOfParam: string | undefined;
 }) {
   return (
     <tr className="h-10 hover:bg-surface-tint">
-      <td className="py-2 pr-3 text-body-md font-medium text-primary">{row.name}</td>
+      {/* The name opens that employee's detail page, carrying the ambient as-of so the page opens on
+          the same date (`navHrefWithAsOf`) — the same affordance the directory row gives. */}
+      <td className="py-2 pr-3 text-body-md font-medium">
+        <Link
+          href={navHrefWithAsOf(`/employees/${row.employeeId}`, asOfParam)}
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {row.name}
+        </Link>
+      </td>
       <td className="py-2 pr-3 text-body-sm text-ink-muted">{label}</td>
       <td className="py-2 pl-3 text-right font-mono text-number-sm text-ink">{n} peers</td>
       <td className="py-2 pl-3 text-right">

@@ -37,9 +37,12 @@ const HEADING = 'Outlier findings';
 export function OutlierFindings({
   vm,
   exportHref,
+  asOfParam,
 }: {
   readonly vm: OutlierFindingsVM;
   readonly exportHref: string;
+  /** The current as-of, carried onto each finding name's link to the employee's detail page. */
+  readonly asOfParam: string | undefined;
 }) {
   if (vm.kind === 'unreadable') {
     return (
@@ -88,7 +91,7 @@ export function OutlierFindings({
 
       {/* The table itself is a client island so its peer-group SECTIONS paginate (DR-scale: the
           sweep can flag hundreds of groups). It renders data already in this payload — no fetch. */}
-      <OutlierFindingsTable sections={vm.sections} />
+      <OutlierFindingsTable sections={vm.sections} asOfParam={asOfParam} />
     </section>
   );
 }
