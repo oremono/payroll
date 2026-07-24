@@ -141,5 +141,5 @@ development_status:
 
   # Epic 12 — CAP-11 Seed 10,000 (backend-only, no frontend surface)
   epic-12: backlog
-  12-1-seed-population-backend: backlog
+  12-1-seed-population-backend: done
   epic-12-retrospective: optional
