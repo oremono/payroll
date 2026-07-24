@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
+
 import { ImportPanel } from '@/ui/import-panel';
+import { pageTitleFor } from '@/ui/nav-items';
+
+// The browser-tab title, drawn from the same IA declaration the shell reads (`nav-items`).
+export const metadata: Metadata = { title: pageTitleFor('/import') };
 
 /**
  * Import — the CAP-1 surface (story 2-2). Until now this route was story 1-6's placeholder

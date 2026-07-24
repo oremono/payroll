@@ -119,14 +119,17 @@ export function GenderDistributionChart({
 
 /** The ONE caps MALE/FEMALE legend — a swatch + its verbatim label (Law 3), never color alone. */
 function Legend() {
+  // Each swatch carries a hairline outline (`ring-border-strong`) so it stays delineated from the
+  // card behind it — the MALE swatch (`bg-primary`) is near-white in dark mode and would otherwise
+  // bleed into the surface. The outline uses an existing semantic token; no color is invented.
   return (
     <ul className="flex items-center gap-gutter">
       <li className="flex items-center gap-cell-padding-v">
-        <span aria-hidden className="inline-block h-3 w-3 bg-primary" />
+        <span aria-hidden className="inline-block h-3 w-3 bg-primary ring-1 ring-inset ring-border-strong" />
         <span className="text-label-caps uppercase text-ink-muted">MALE</span>
       </li>
       <li className="flex items-center gap-cell-padding-v">
-        <span aria-hidden className="inline-block h-3 w-3 bg-secondary" />
+        <span aria-hidden className="inline-block h-3 w-3 bg-secondary ring-1 ring-inset ring-border-strong" />
         <span className="text-label-caps uppercase text-ink-muted">FEMALE</span>
       </li>
     </ul>
@@ -142,16 +145,30 @@ function Legend() {
  */
 function LevelBar({ row }: { readonly row: GenderDistributionRow }) {
   if (!row.hasPeople) {
-    return <div className="h-3 w-full bg-surface-tint" />;
+    return <div className="h-3 w-full bg-surface-tint ring-1 ring-inset ring-border-strong" />;
   }
 
+  // A hairline outline around the whole strip (`ring-border-strong`) delineates it from the card,
+  // and — when BOTH segments are present — the FEMALE segment carries a 2px separator in the card's
+  // own color (`border-surface-card`) so the two series read apart regardless of how close their
+  // fills are (the MALE `bg-primary` and FEMALE `bg-secondary` are both light in dark mode). The
+  // separator is withheld when there is only one segment, where it would be a stray edge. Every
+  // color here is an existing semantic token; none is invented, and the data still lives in the
+  // table below (color is never the sole carrier).
   return (
-    <div className="flex h-3 w-full">
+    <div className="flex h-3 w-full ring-1 ring-inset ring-border-strong">
       {row.maleN > 0 ? (
         <div className="h-full bg-primary" style={{ flexGrow: row.maleN, flexBasis: 0 }} />
       ) : null}
       {row.femaleN > 0 ? (
-        <div className="h-full bg-secondary" style={{ flexGrow: row.femaleN, flexBasis: 0 }} />
+        <div
+          className={
+            row.maleN > 0
+              ? 'h-full border-l-2 border-surface-card bg-secondary'
+              : 'h-full bg-secondary'
+          }
+          style={{ flexGrow: row.femaleN, flexBasis: 0 }}
+        />
       ) : null}
     </div>
   );

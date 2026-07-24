@@ -1,5 +1,6 @@
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
-import type { OutlierFindingsVM, OutlierRow, OutlierSection } from '@/ui/outlier-findings-vm';
+import { OutlierFindingsTable } from '@/ui/outlier-findings-table';
+import type { OutlierFindingsVM } from '@/ui/outlier-findings-vm';
 
 /**
  * The CAP-6 findings surface — MARKUP ONLY.
@@ -85,104 +86,9 @@ export function OutlierFindings({
         </a>
       </div>
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="sticky top-0 bg-surface-card">
-              <th scope="col" className="py-2 pr-3 text-label-caps uppercase text-ink-muted">
-                Employee
-              </th>
-              <th scope="col" className="py-2 pr-3 text-label-caps uppercase text-ink-muted">
-                Peer group
-              </th>
-              <th scope="col" className="py-2 pl-3 text-right text-label-caps uppercase text-ink-muted">
-                Peers
-              </th>
-              <th scope="col" className="py-2 pl-3 text-right text-label-caps uppercase text-ink-muted">
-                Distance
-              </th>
-            </tr>
-          </thead>
-          {vm.sections.map((section, index) => (
-            <SectionBody key={sectionKey(section, index)} section={section} />
-          ))}
-        </table>
-      </div>
+      {/* The table itself is a client island so its peer-group SECTIONS paginate (DR-scale: the
+          sweep can flag hundreds of groups). It renders data already in this payload — no fetch. */}
+      <OutlierFindingsTable sections={vm.sections} />
     </section>
-  );
-}
-
-/** A stable key for a section — the label is unique per peer-group triple; index disambiguates. */
-function sectionKey(section: OutlierSection, index: number): string {
-  return `${index}-${section.label}`;
-}
-
-/**
- * One peer-group section as a `<tbody>` — the 2px `border-strong` top rule is the divider DR8 asks
- * for between peer-group sections. An outlier section is one row per flagged member; a thin group is
- * a single full-width inline refusal row.
- */
-function SectionBody({ section }: { readonly section: OutlierSection }) {
-  if (section.kind === 'refusal') {
-    return (
-      <tbody className="border-t-2 border-border-strong">
-        <tr>
-          {/* The inline thin-group refusal (DR8 / AD-16): full-width, flat `refusal-fill`, hairline,
-              rounded — a calm statement, never widened, never `role="alert"`, never error-colored. */}
-          <td colSpan={4} className="py-2">
-            <div className="rounded border border-border-hairline bg-refusal-fill p-3">
-              <span className="text-body-md font-medium text-ink-muted">{section.label}</span>{' '}
-              <span className="text-body-sm text-ink-muted italic">{section.refusalText}</span>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    );
-  }
-
-  return (
-    <tbody className="border-t-2 border-border-strong">
-      {section.rows.map((row) => (
-        <FindingRow key={row.employeeId} row={row} label={section.label} n={section.n} />
-      ))}
-    </tbody>
-  );
-}
-
-/**
- * One 40px finding row: the employee name, the peer-group label, the right-aligned peer count, and
- * the right-aligned amber badge. Numerals are `font-mono`; hover tints the row.
- */
-function FindingRow({
-  row,
-  label,
-  n,
-}: {
-  readonly row: OutlierRow;
-  readonly label: string;
-  readonly n: number;
-}) {
-  return (
-    <tr className="h-10 hover:bg-surface-tint">
-      <td className="py-2 pr-3 text-body-md font-medium text-primary">{row.name}</td>
-      <td className="py-2 pr-3 text-body-sm text-ink-muted">{label}</td>
-      <td className="py-2 pl-3 text-right font-mono text-number-sm text-ink">{n} peers</td>
-      <td className="py-2 pl-3 text-right">
-        <OutlierBadge badgeText={row.badgeText} />
-      </td>
-    </tr>
-  );
-}
-
-/**
- * The outlier badge (DR4): a small rectangular amber stamp — near-sharp `rounded-sm` (2px), a 1px
- * amber border, mono numerals. The text carries the signed distance AND the direction WORD, so the
- * meaning never rides color alone (WCAG 2.2 AA). Amber means "beyond the threshold", never error.
- */
-function OutlierBadge({ badgeText }: { readonly badgeText: string }) {
-  return (
-    <span className="inline-block rounded-sm border border-amber-badge-border bg-amber-badge-bg px-2 py-0.5 font-mono text-number-sm text-amber-badge-text">
-      {badgeText}
-    </span>
   );
 }

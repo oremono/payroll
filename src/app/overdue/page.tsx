@@ -1,8 +1,13 @@
+import type { Metadata } from 'next';
 import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
 import { overduePeriodToParam, resolveOverduePeriod } from '@/application/overdue-period';
+import { pageTitleFor } from '@/ui/nav-items';
+
+// The browser-tab title, drawn from the same IA declaration the shell reads (`nav-items`).
+export const metadata: Metadata = { title: pageTitleFor('/overdue') };
 import { loadEmployeeFormOptions } from '@/application/use-cases/employees';
 import { getOverdue } from '@/application/use-cases/overdue';
 import type { CurrencyFormat } from '@/domain/money';

@@ -1,6 +1,12 @@
+import type { Metadata } from 'next';
+
 import { getSettings } from '@/application/use-cases/settings';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { pageTitleFor } from '@/ui/nav-items';
 import { ThresholdControl } from '@/ui/threshold-control';
+
+// The browser-tab title, drawn from the same IA declaration the shell reads (`nav-items`).
+export const metadata: Metadata = { title: pageTitleFor('/settings') };
 
 import { applyThresholdAction } from './actions';
 import { settingsReadDeps } from './settings-deps';

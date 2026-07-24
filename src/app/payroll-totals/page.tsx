@@ -1,9 +1,14 @@
+import type { Metadata } from 'next';
 import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
 import { loadEmployeeFormOptions } from '@/application/use-cases/employees';
 import { getPayrollTotals } from '@/application/use-cases/payroll-totals';
+import { pageTitleFor } from '@/ui/nav-items';
+
+// The browser-tab title, drawn from the same IA declaration the shell reads (`nav-items`).
+export const metadata: Metadata = { title: pageTitleFor('/payroll-totals') };
 import type { CurrencyFormat } from '@/domain/money';
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { PayrollTotalsView } from '@/ui/payroll-totals';
