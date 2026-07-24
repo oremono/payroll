@@ -134,7 +134,7 @@ development_status:
   epic-10-retrospective: optional
 
   # Epic 11 — CAP-10 Overdue for Review
-  epic-11: backlog
+  epic-11: done
   11-1-overdue-backend: done
   11-2-overdue-ui: done
   epic-11-retrospective: optional
