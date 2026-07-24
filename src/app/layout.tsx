@@ -32,8 +32,15 @@ import { Announcer } from '@/ui/announcer';
 import { SidebarNav } from '@/ui/sidebar-nav';
 import { SkipLink } from '@/ui/skip-link';
 
+// A title TEMPLATE, not one static string: each route sets its own short `title` (the sidebar
+// label, or the employee's name on the detail route) and Next composes it as `<label> · <product>`,
+// so the browser tab, history, and bookmarks name the surface being viewed. Home and any route that
+// sets no title of its own fall through to `default` — the bare product name, unprefixed.
 export const metadata: Metadata = {
-  title: 'Salary Management for ACME HR',
+  title: {
+    default: 'Salary Management for ACME HR',
+    template: '%s · Salary Management for ACME HR',
+  },
   description: 'Salary management for ACME HR.',
 };
 

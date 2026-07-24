@@ -1,8 +1,13 @@
+import type { Metadata } from 'next';
 import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
 import { getGenderDistribution } from '@/application/use-cases/gender-distribution';
+import { pageTitleFor } from '@/ui/nav-items';
+
+// The browser-tab title, drawn from the same IA declaration the shell reads (`nav-items`).
+export const metadata: Metadata = { title: pageTitleFor('/gender-insights') };
 import { formatPlainDate, plainDateToIso } from '@/domain/plain-date';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
 import { GenderDistributionChart } from '@/ui/gender-distribution';

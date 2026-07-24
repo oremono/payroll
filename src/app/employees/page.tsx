@@ -1,6 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { DEFAULT_LIST_LIMIT, MAX_SEARCH_LENGTH } from '@/adapters/db/employee-repository';
+import { pageTitleFor } from '@/ui/nav-items';
+
+// The browser-tab title for this surface, drawn from the same IA declaration the sidebar and the
+// header `<h1>` read (`nav-items`), so the tab can never name the page differently than the shell.
+// Next composes it through the layout's template as `Employees · Salary Management for ACME HR`.
+export const metadata: Metadata = { title: pageTitleFor('/employees') };
 import {
   listEmployees,
   loadEmployeeFormOptions,
