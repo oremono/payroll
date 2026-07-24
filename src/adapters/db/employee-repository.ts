@@ -6,6 +6,7 @@ import type {
   EmployeeListQuery,
   EmployeeRepository,
   EmployeeUpdate,
+  GenderDistributionPopulation,
   GenderGapPopulation,
   NewEmployee,
   NewEmployeeWithSalary,
@@ -1229,6 +1230,66 @@ export function createEmployeeRepository(
         levelLabel: level.name,
         countryName: country.name,
         currencyFormat,
+      };
+    },
+
+    // ── CAP-8 (story 9-1) ────────────────────────────────────────────────────────────────────
+    // A READ-ONLY, ORG-WIDE, gender-and-level-carrying sibling of `findAllPeerGroups` — the
+    // whole-population read the gender-distribution-by-level chart needs. Home surfaces the chart
+    // unprompted, so there is no subject to key off: this loads every employee at once, plus the
+    // canonical level axis, and the domain folds the as-of population into per-level gender counts.
+    // The SQL SELECTs rows only — no as-of `where`, no `orderBy` on salary records, no `COUNT`, no
+    // `GROUP BY` — the domain owns the ordering (AD-8), the as-of population, and every count (AD-16
+    // / Law 2 / AD-2). Nothing is materialized or cached (AD-12). No update, no delete (Law 5).
+
+    findGenderDistributionPopulation: async (): Promise<GenderDistributionPopulation> => {
+      // Two independent reads, mirroring `findAllPeerGroups`' load: the level axis and the whole
+      // employee population. Parallel selects rather than one join — the axis is a handful of small
+      // reference rows, and a join would fan them across every employee row.
+      const [levels, employees] = await Promise.all([
+        // The canonical level axis: `orderBy: { rank: 'asc' }` (the total order the chart is drawn
+        // in — `level.rank` is UNIQUE) and NO `is_active` filter (AD-16). is_active gates pickability
+        // for NEW writes, never existing statistics: an inactive level that still holds an
+        // in-population employee must appear, so the DOMAIN — not this SQL — decides which levels
+        // show. `isActive` rides along on each row for the domain's `active OR total > 0` filter.
+        client.level.findMany({
+          orderBy: { rank: 'asc' },
+          select: { code: true, name: true, rank: true, isActive: true },
+        }),
+        // Every employee, gender- and level-tagged, with their WHOLE history reduced to the ordering
+        // columns membership reads (AD-8). NO `where` (the whole population), NO `orderBy` on salary
+        // records (the domain resolves current salary), NO as-of filter (the domain owns the as-of
+        // population, AD-16), NO `COUNT`/`GROUP BY` (the domain counts people, AD-2). This
+        // capability counts PEOPLE, not money, so the record select carries only `seq` +
+        // `effectiveFrom` — no amount, no currency.
+        client.employee.findMany({
+          select: {
+            gender: true,
+            levelCode: true,
+            salaryRecords: {
+              select: { seq: true, effectiveFrom: true },
+            },
+          },
+        }),
+      ]);
+
+      return {
+        levels: levels.map((level) => ({
+          levelCode: level.code,
+          levelLabel: level.name,
+          rank: level.rank,
+          isActive: level.isActive,
+        })),
+        candidates: employees.map((employee) => ({
+          gender: employee.gender,
+          levelCode: employee.levelCode,
+          // `seq` comes back as native `bigint` (Prisma maps `@db.BigInt`); `effectiveFrom` is a
+          // `@db.Date` read back through `fromDbDate` (UTC getters, never the local ones — AD-11).
+          salaryRecords: employee.salaryRecords.map((record) => ({
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+          })),
+        })),
       };
     },
   };
