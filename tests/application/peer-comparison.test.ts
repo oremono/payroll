@@ -118,6 +118,7 @@ function fakeDeps(config: FakeConfig = {}): PeerComparisonDeps & {
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
     findAllPeerGroups: () => Promise.reject(new Error('not reachable')),
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
+    findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return { repository, askedById, askedForGroup };

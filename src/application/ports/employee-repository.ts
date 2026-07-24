@@ -1,3 +1,7 @@
+import type {
+  GenderDistributionCandidate,
+  LevelAxisEntry,
+} from '@/domain/gender-distribution';
 import type { GenderGapCandidate } from '@/domain/gender-gap';
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
@@ -316,6 +320,31 @@ export type GenderGapPopulation = {
   readonly currencyFormat: CurrencyFormat;
 };
 
+/**
+ * The ORG-WIDE gender-distribution population (CAP-8, AD-16 / AD-2) — the read-only sibling of
+ * `findAllPeerGroups`, gender- and level-carrying. Where `findAllPeerGroups` serves the outlier
+ * sweep, this serves the distribution-by-level chart: it carries the canonical level `axis` PLUS
+ * every employee as a `GenderDistributionCandidate` (their `gender`, `levelCode`, and whole UNORDERED
+ * salary history), so the domain can fold the as-of population into per-level gender counts.
+ *
+ * Two halves, and the split is the whole point (AD-2):
+ *   - `levels` is the reference taxonomy, resolved is_active-INCLUSIVE and rank-ordered — the chart's
+ *     axis. Enumerating every level guarantees each candidate's `levelCode` has a bucket (no orphan
+ *     is silently dropped) and honours "is_active never hides existing statistics"; the domain drops
+ *     only retired, empty levels.
+ *   - `candidates` is EVERY employee, gender- and level-tagged, carrying their salary history
+ *     UNORDERED and as-of-UNFILTERED. The domain owns the ordering (AD-8), the as-of population, and
+ *     every per-level and org-wide count (AD-16 / Law 2).
+ *
+ * Returned WITHOUT any `where`/`orderBy`/`COUNT`/`GROUP BY` on the employee sweep — the database
+ * SELECTs rows only and computes no count a user sees (AD-2). Gender is the SLICE dimension, never
+ * part of a group identity: the group axis is `level` alone (Law 3).
+ */
+export type GenderDistributionPopulation = {
+  readonly levels: readonly LevelAxisEntry[];
+  readonly candidates: readonly GenderDistributionCandidate[];
+};
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -542,4 +571,28 @@ export type EmployeeRepository = {
    * an exception; a triple no employee matches is a present-but-EMPTY `candidates` list instead.
    */
   readonly findGenderGapPopulation: (group: PeerGroupKey) => Promise<GenderGapPopulation | null>;
+
+  // ── CAP-8 (story 9-1) ────────────────────────────────────────────────────────────────────────
+  // A READ-ONLY, ORG-WIDE, gender-and-level-carrying SIBLING of `findAllPeerGroups` on this same
+  // port — not a second one, and emphatically not a write (Law 5 / AD-18). Where `findAllPeerGroups`
+  // serves the outlier sweep, this serves the gender-distribution-by-level chart: it loads the whole
+  // population at once (Home surfaces the chart unprompted, so there is no subject to key off) plus
+  // the canonical level axis, and the domain folds the as-of population into per-level gender counts.
+  // Grouping and counting stay OUT of SQL — the database SELECTs the candidate set and the level
+  // rows, the domain computes every per-level and org-wide count (Law 2 / AD-2). Computed fresh per
+  // request; nothing is materialized or cached (AD-12).
+
+  /**
+   * The org-wide gender-distribution population: the canonical level `axis` (is_active-INCLUSIVE,
+   * rank-ordered) PLUS every employee carrying their `gender`, `levelCode`, and whole UNORDERED
+   * salary history — enough for the domain to fold the as-of population into per-level gender counts.
+   *
+   * The employee sweep is returned WITHOUT any `where`, `orderBy`, `COUNT`, or `GROUP BY` — the
+   * domain owns the ordering (AD-8), the as-of population, and every count (AD-16 / Law 2 / AD-2).
+   * The level axis is read WITHOUT an `is_active` filter (AD-16): an inactive level that still holds
+   * an in-population employee must appear, so the domain — not the SQL — decides which levels show.
+   * There is no `null` arm and no refusal: an empty population is a valid answer of zeros, computed
+   * by the domain over an empty candidate set.
+   */
+  readonly findGenderDistributionPopulation: () => Promise<GenderDistributionPopulation>;
 };

@@ -123,7 +123,7 @@ development_status:
 
   # Epic 9 — CAP-8 Gender Distribution by Level
   epic-9: backlog
-  9-1-gender-distribution-backend: backlog
+  9-1-gender-distribution-backend: done
   9-2-gender-distribution-ui: backlog
   epic-9-retrospective: optional
 

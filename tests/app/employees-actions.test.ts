@@ -101,6 +101,9 @@ function fakeDeps(
     // CAP-7's gender-gap population read (story 8-1). Present so this fake still satisfies the
     // widened port; no CAP-2 handler reaches it.
     findGenderGapPopulation: () => Promise.resolve(null),
+    // CAP-8's org-wide gender-distribution read (story 9-1). Present so this fake still satisfies the
+    // widened port; no CAP-2 handler reaches it.
+    findGenderDistributionPopulation: () => Promise.resolve({ levels: [], candidates: [] }),
   };
 
   const idGenerator: IdGenerator = { next: () => 'id-1' };

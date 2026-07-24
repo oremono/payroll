@@ -126,6 +126,11 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
     // widened port; no CAP-2 use-case reaches it, and `tests/application/gender-gap.test.ts` is
     // where it is actually exercised.
     findGenderGapPopulation: async () => guard('findGenderGapPopulation', null),
+    // CAP-8's org-wide gender-distribution read (story 9-1). Present so this fake still satisfies the
+    // widened port; no CAP-2 use-case reaches it, and `tests/application/gender-distribution.test.ts`
+    // is where it is actually exercised.
+    findGenderDistributionPopulation: async () =>
+      guard('findGenderDistributionPopulation', { levels: [], candidates: [] }),
   };
 
   // Deterministic ids — no randomness in the fast suite (AD-14 / Law 6).

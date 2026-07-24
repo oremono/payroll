@@ -99,6 +99,7 @@ function fakeDeps(config: FakeConfig = {}): OutlierFindingsDeps & { readonly cal
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
+    findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return {
