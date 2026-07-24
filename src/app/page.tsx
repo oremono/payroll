@@ -2,14 +2,21 @@ import { connection } from 'next/server';
 
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
+import { getGenderDistribution } from '@/application/use-cases/gender-distribution';
 import { getOutlierFindings } from '@/application/use-cases/outliers';
 import { getSettings } from '@/application/use-cases/settings';
 import { formatPlainDate, plainDateToIso, type PlainDate } from '@/domain/plain-date';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
+import { GenderDistributionChart } from '@/ui/gender-distribution';
+import {
+  buildGenderDistribution,
+  GENDER_DISTRIBUTION_UNAVAILABLE_HEADING,
+  GENDER_DISTRIBUTION_UNAVAILABLE_STATEMENT,
+} from '@/ui/gender-distribution-vm';
 import { OutlierFindings } from '@/ui/outlier-findings';
 import { buildOutlierFindings } from '@/ui/outlier-findings-vm';
 
-import { outlierFindingsDeps } from './employees/employee-deps';
+import { genderDistributionDeps, outlierFindingsDeps } from './employees/employee-deps';
 import { settingsReadDeps } from './settings/settings-deps';
 
 /**
@@ -87,6 +94,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <Findings asOf={asOf} thresholdPct={settings.outlierThresholdPct} />
         </div>
       )}
+
+      {/* The CAP-8 gender-by-level pulse (story 9-2), under the outlier sweep. It needs no threshold,
+          so it renders regardless of the settings read, over the SAME resolved as-of. */}
+      <div className="mt-3">
+        <GenderPulse asOf={asOf} />
+      </div>
     </>
   );
 }
@@ -103,6 +116,33 @@ async function Findings({ asOf, thresholdPct }: { asOf: PlainDate; thresholdPct:
     <OutlierFindings
       vm={buildOutlierFindings(findings, asOf)}
       exportHref={`/api/outliers/export?asOf=${plainDateToIso(asOf)}`}
+    />
+  );
+}
+
+/**
+ * The CAP-8 gender-by-level pulse, given the resolved as-of. Kept a small async component so the page
+ * body stays a single boundary read; the `asOf` arrives as an argument (never read inside, Law 6). The
+ * counts ride a VISUALLY-HIDDEN table (`visuallyHiddenTable`) beside the decorative bars, and the drill
+ * link carries the current as-of so Gender Insights opens on the same date. An `unavailable` read
+ * renders the calm shared region with a distinct heading id.
+ */
+async function GenderPulse({ asOf }: { asOf: PlainDate }) {
+  const dist = await getGenderDistribution(genderDistributionDeps(), asOf);
+  if (dist.kind === 'unavailable') {
+    return (
+      <EmployeeUnavailable
+        id="home-gender-unavailable-heading"
+        heading={GENDER_DISTRIBUTION_UNAVAILABLE_HEADING}
+        statement={GENDER_DISTRIBUTION_UNAVAILABLE_STATEMENT}
+      />
+    );
+  }
+  return (
+    <GenderDistributionChart
+      vm={buildGenderDistribution(dist)}
+      visuallyHiddenTable
+      drillHref={`/gender-insights?asOf=${plainDateToIso(asOf)}`}
     />
   );
 }
