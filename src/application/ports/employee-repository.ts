@@ -5,6 +5,11 @@ import type {
 import type { GenderGapCandidate } from '@/domain/gender-gap';
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
+import type {
+  CountryRef,
+  CurrencyRef,
+  PayrollCandidate,
+} from '@/domain/payroll-totals';
 import type { PeerCandidate } from '@/domain/peer-comparison';
 import type { PlainDate } from '@/domain/plain-date';
 import type { SalaryRecordView } from '@/domain/salary-timeline';
@@ -345,6 +350,40 @@ export type GenderDistributionPopulation = {
   readonly candidates: readonly GenderDistributionCandidate[];
 };
 
+/**
+ * The ORG-WIDE payroll-totals population (CAP-9, AD-13 / AD-16 / AD-2) — a read-only org-wide read,
+ * the sibling of `findGenderDistributionPopulation`, money-carrying rather than gender-carrying.
+ * Where that read serves the distribution chart, this serves the payroll totals: it loads the whole
+ * population at once (the Payroll Totals surface and the Home metric are org-wide, so there is no
+ * subject to key off) plus the reference the domain needs to name countries and scale currencies.
+ *
+ * Three halves, and the split is the whole point (AD-2 / AD-13):
+ *   - `candidates` is EVERY employee, carrying their `countryCode` and whole UNORDERED salary history
+ *     reduced to the ordering columns + `Money`. The domain owns the ordering (AD-8), the as-of
+ *     population, every per-country `n`, and every sum (AD-16 / Law 2) — the SQL runs no
+ *     `where`/`orderBy`/`COUNT`/`GROUP BY`/`SUM`.
+ *   - `countries` is the reference naming, resolved is_active-INCLUSIVE — an inactive country that
+ *     still holds an in-population employee must name its row (AD-16); the domain decides which
+ *     countries appear (those with `n > 0`).
+ *   - `currencies` is every currency as a `CurrencyRef` (the ONE money formatter's `CurrencyFormat`,
+ *     carrying the `minorUnitExponent` the conversion needs — JPY 0, never a hard-coded 100), each
+ *     guarded by `isSupportedExponent` so only a usable format crosses the port.
+ *
+ * The per-country totals never convert (AD-13); only the domain's org-wide figure does, over the FX
+ * rows the separate `FxRateRepository` loads. There is no `null` arm and no refusal here: an empty
+ * population is a valid answer of zero, and the org-wide refusal (missing rates) is the domain's.
+ */
+export type PayrollTotalsPopulation = {
+  readonly candidates: readonly PayrollCandidate[];
+  readonly countries: readonly CountryRef[];
+  readonly currencies: readonly CurrencyRef[];
+};
+
+// The port re-exports the domain shapes it speaks in, so a reader of the port sees the whole
+// vocabulary in one place — as it already does for `GenderDistributionCandidate` et al. via the
+// method signatures below.
+export type { CountryRef, CurrencyRef, PayrollCandidate };
+
 export type EmployeeRepository = {
   /**
    * The reference codes a row is judged against, in the exact shape the domain validator wants.
@@ -595,4 +634,28 @@ export type EmployeeRepository = {
    * by the domain over an empty candidate set.
    */
   readonly findGenderDistributionPopulation: () => Promise<GenderDistributionPopulation>;
+
+  // ── CAP-9 (story 10-1) ───────────────────────────────────────────────────────────────────────
+  // A READ-ONLY, ORG-WIDE, money-carrying SIBLING of `findGenderDistributionPopulation` on this same
+  // port — not a second one, and emphatically not a write (Law 5 / AD-18). Where that read serves the
+  // gender-distribution chart, this serves the payroll totals: it loads every employee at once (the
+  // surface and the Home metric are org-wide, so there is no subject to key off), plus the country
+  // naming and the currency reference the domain needs. Grouping, counting, and every sum stay OUT of
+  // SQL — the database SELECTs the candidate set and the reference rows, and the domain computes every
+  // per-country total, headcount, and the org-wide converted total (Law 2 / AD-2 / AD-13). Computed
+  // fresh per request; nothing is materialized or cached (AD-12).
+
+  /**
+   * The org-wide payroll-totals population: every employee carrying their `countryCode` and whole
+   * UNORDERED salary history (with `Money`), the is_active-INCLUSIVE country naming, and every
+   * currency as an `isSupportedExponent`-guarded `CurrencyRef` — enough for the domain to fold the
+   * as-of population into per-country totals and one org-wide converted total.
+   *
+   * The employee sweep is returned WITHOUT any `where`, `orderBy`, `COUNT`, `GROUP BY`, or `SUM` —
+   * the domain owns the ordering (AD-8), the as-of population, every count, and every sum (AD-16 /
+   * Law 2 / AD-2). Country naming is read WITHOUT an `is_active` filter (AD-16). There is no `null`
+   * arm and no refusal: an empty population is a valid answer of zero, and the org-wide refusal on
+   * missing FX rates is the domain's, not this read's.
+   */
+  readonly findPayrollTotalsPopulation: () => Promise<PayrollTotalsPopulation>;
 };

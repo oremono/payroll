@@ -1,4 +1,6 @@
 import { createEmployeeRepository } from '@/adapters/db/employee-repository';
+import { createFxRateRepository } from '@/adapters/db/fx-rate-repository';
+import { createSettingsRepository } from '@/adapters/db/settings-repository';
 import { createUuidV7Generator } from '@/adapters/id';
 import type {
   EmployeeListQuery,
@@ -13,6 +15,7 @@ import type { EmployeeUseCaseDeps } from '@/application/use-cases/employees';
 import type { GenderDistributionDeps } from '@/application/use-cases/gender-distribution';
 import type { GenderGapDeps } from '@/application/use-cases/gender-gap';
 import type { OutlierFindingsDeps } from '@/application/use-cases/outliers';
+import type { PayrollTotalsDeps } from '@/application/use-cases/payroll-totals';
 import type { PlainDate } from '@/domain/plain-date';
 
 /**
@@ -68,6 +71,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
       createEmployeeRepository().findGenderGapPopulation(group),
     findGenderDistributionPopulation: async () =>
       createEmployeeRepository().findGenderDistributionPopulation(),
+    findPayrollTotalsPopulation: async () =>
+      createEmployeeRepository().findPayrollTotalsPopulation(),
   };
 }
 
@@ -110,4 +115,28 @@ export function genderGapDeps(): GenderGapDeps {
  */
 export function genderDistributionDeps(): GenderDistributionDeps {
   return { repository: lazyEmployeeRepository() };
+}
+
+/**
+ * The dependencies the CAP-9 payroll-totals read takes — the employee repository (the org-wide
+ * population), the FX-rate repository (every `fx_rate` row), and the settings repository (the
+ * reporting currency), all reached through the SAME lazy composition roots so a database-free
+ * surface (the `check`/`a11y` CI jobs) yields `unavailable` rather than throwing during render.
+ * `asOf` arrives per call as an argument (Law 6 / AD-11); no clock and no id generator are needed.
+ *
+ * `createFxRateRepository()` and `createSettingsRepository()` each default their client to
+ * `getDbClient()`, which throws when `DATABASE_URL_APP` is unset — so they are constructed lazily
+ * inside their forwarders too, keeping the throw a rejected promise the use-case's `try/catch` maps
+ * to `unavailable`, exactly as `lazyEmployeeRepository` does.
+ */
+export function payrollTotalsDeps(): PayrollTotalsDeps {
+  return {
+    repository: lazyEmployeeRepository(),
+    fxRateRepository: {
+      findAllFxRates: async () => createFxRateRepository().findAllFxRates(),
+    },
+    settingsRepository: {
+      readSettings: async () => createSettingsRepository().readSettings(),
+    },
+  };
 }
