@@ -3,8 +3,10 @@ import { connection } from 'next/server';
 import { systemClock } from '@/adapters/clock';
 import { resolveAsOf } from '@/application/as-of';
 import { loadEmployeeFormOptions } from '@/application/use-cases/employees';
+import { DEFAULT_OVERDUE_PERIOD } from '@/application/overdue-period';
 import { getGenderDistribution } from '@/application/use-cases/gender-distribution';
 import { getOutlierFindings } from '@/application/use-cases/outliers';
+import { getOverdue } from '@/application/use-cases/overdue';
 import { getPayrollTotals } from '@/application/use-cases/payroll-totals';
 import { getSettings } from '@/application/use-cases/settings';
 import type { CurrencyFormat } from '@/domain/money';
@@ -18,6 +20,8 @@ import {
 } from '@/ui/gender-distribution-vm';
 import { OutlierFindings } from '@/ui/outlier-findings';
 import { buildOutlierFindings } from '@/ui/outlier-findings-vm';
+import { OverdueSummary } from '@/ui/overdue-summary';
+import { buildOverdueSummary } from '@/ui/overdue-vm';
 import { PayrollByCountryChart, PayrollHeadlineTile } from '@/ui/payroll-totals';
 import { buildPayrollTotals } from '@/ui/payroll-totals-vm';
 
@@ -25,6 +29,7 @@ import {
   employeeReadDeps,
   genderDistributionDeps,
   outlierFindingsDeps,
+  overdueDeps,
   payrollTotalsDeps,
 } from './employees/employee-deps';
 import { settingsReadDeps } from './settings/settings-deps';
@@ -116,6 +121,12 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       <div className="mt-3">
         <PayrollSummary asOf={asOf} />
       </div>
+
+      {/* The CAP-10 overdue count (story 11-2): a compact "N people overdue as of {date}" tile
+          linking to the Overdue surface, over the SAME resolved as-of at the default period. */}
+      <div className="mt-3">
+        <OverdueCard asOf={asOf} />
+      </div>
     </>
   );
 }
@@ -205,5 +216,23 @@ async function PayrollSummary({ asOf }: { asOf: PlainDate }) {
         drillHref={`/payroll-totals?asOf=${plainDateToIso(asOf)}`}
       />
     </div>
+  );
+}
+
+/**
+ * The CAP-10 overdue count, given the resolved as-of. Kept a small async component so the page body
+ * stays a single boundary read; the `asOf` arrives as an argument (never read inside, Law 6). It uses
+ * the SAME `getOverdue` read the surface uses (never a second, clock-reading use-case — AD-22) at the
+ * DEFAULT period, so Home's count is `report.rows.length` and cannot disagree with the surface at that
+ * period. The drill link carries the current as-of so the Overdue surface opens on the same date. An
+ * `unavailable` read renders the calm shared region.
+ */
+async function OverdueCard({ asOf }: { asOf: PlainDate }) {
+  const result = await getOverdue(overdueDeps(), asOf, DEFAULT_OVERDUE_PERIOD);
+  return (
+    <OverdueSummary
+      vm={buildOverdueSummary(result)}
+      drillHref={`/overdue?asOf=${plainDateToIso(asOf)}`}
+    />
   );
 }
