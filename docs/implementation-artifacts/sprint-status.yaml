@@ -136,7 +136,7 @@ development_status:
   # Epic 11 — CAP-10 Overdue for Review
   epic-11: backlog
   11-1-overdue-backend: done
-  11-2-overdue-ui: backlog
+  11-2-overdue-ui: done
   epic-11-retrospective: optional
 
   # Epic 12 — CAP-11 Seed 10,000 (backend-only, no frontend surface)
