@@ -64,6 +64,10 @@ const NOT_USED_BY_IMPORT = {
   // rejecting stub keeps that true rather than asserting it in prose.
   findGenderDistributionPopulation: () =>
     Promise.reject(new Error('import never reads a gender-distribution population')),
+  // CAP-9's org-wide payroll-totals read (story 10-1). Import never computes totals — a rejecting
+  // stub keeps that true rather than asserting it in prose.
+  findPayrollTotalsPopulation: () =>
+    Promise.reject(new Error('import never reads a payroll-totals population')),
 } satisfies Pick<
   EmployeeRepository,
   | 'createEmployee'
@@ -77,6 +81,7 @@ const NOT_USED_BY_IMPORT = {
   | 'findAllPeerGroups'
   | 'findGenderGapPopulation'
   | 'findGenderDistributionPopulation'
+  | 'findPayrollTotalsPopulation'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */

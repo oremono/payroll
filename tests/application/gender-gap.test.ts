@@ -134,6 +134,7 @@ function fakeDeps(config: FakeConfig = {}): GenderGapDeps & {
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),
     findAllPeerGroups: () => Promise.reject(new Error('not reachable')),
     findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
+    findPayrollTotalsPopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return { repository, askedById, askedForGroup };

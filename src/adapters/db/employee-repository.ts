@@ -12,6 +12,7 @@ import type {
   NewEmployeeWithSalary,
   NewSalaryRecord,
   OutlierCandidate,
+  PayrollTotalsPopulation,
   PeerGroupKey,
   PeerGroupPopulation,
   PeerPopulation,
@@ -1290,6 +1291,65 @@ export function createEmployeeRepository(
             effectiveFrom: fromDbDate(record.effectiveFrom),
           })),
         })),
+      };
+    },
+
+    // ── CAP-9 (story 10-1) ───────────────────────────────────────────────────────────────────
+    // A READ-ONLY, ORG-WIDE, money-carrying sibling of `findGenderDistributionPopulation` — the
+    // whole-population read the payroll totals need. The surface and the Home metric are org-wide, so
+    // there is no subject to key off: this loads every employee at once, plus the country naming and
+    // the currency reference. The SQL SELECTs rows only — no as-of `where`, no `orderBy` on salary
+    // records, no `COUNT`, no `GROUP BY`, no `SUM` — the domain owns the ordering (AD-8), the as-of
+    // population, every count, and every total (AD-16 / Law 2 / AD-2 / AD-13). Nothing is materialized
+    // or cached (AD-12). No update, no delete (Law 5 / AD-18).
+
+    findPayrollTotalsPopulation: async (): Promise<PayrollTotalsPopulation> => {
+      // Three parallel selects, mirroring `findAllPeerGroups`' load: the whole employee population,
+      // the country naming, and the currency reference. Separate selects rather than one join — the
+      // reference tables are small, and a join would fan them across every employee row.
+      const [employees, countries, currencies] = await Promise.all([
+        // Every employee, country-tagged, with their WHOLE history reduced to the ordering columns +
+        // money membership reads (AD-8). NO `where` (the whole population), NO `orderBy` on salary
+        // records (the domain resolves current salary), NO as-of filter (the domain owns the as-of
+        // population, AD-16), NO `COUNT`/`GROUP BY`/`SUM` (the domain totals and counts, AD-2).
+        client.employee.findMany({
+          select: {
+            countryCode: true,
+            salaryRecords: {
+              select: { seq: true, effectiveFrom: true, amountMinor: true, currencyCode: true },
+            },
+          },
+        }),
+        // The country naming, WITHOUT an `is_active` filter (AD-16): an inactive country that still
+        // holds an in-population employee must name its row — the domain decides which countries show.
+        client.country.findMany({ select: { code: true, name: true } }),
+        // Every currency as the ONE money formatter needs it — `isSupportedExponent`-guarded by
+        // `toCurrencyFormats` below (a row the domain cannot format is dropped, exactly as
+        // `loadFormOptions` drops it). WITHOUT an `is_active` filter (AD-16), for the reason above.
+        client.currency.findMany({
+          select: { code: true, symbol: true, minorUnitExponent: true, groupingStyle: true },
+        }),
+      ]);
+
+      return {
+        candidates: employees.map((employee) => ({
+          countryCode: employee.countryCode,
+          // `amountMinor`/`seq` come back as native `bigint`; the currency is each record's OWN, read
+          // straight off the column and never re-resolved from the country (AD-6). No `id` — a total
+          // needs the amount and currency, never the record identity.
+          salaryRecords: employee.salaryRecords.map((record) => ({
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+            salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+          })),
+        })),
+        countries: countries.map((country) => ({
+          countryCode: country.code,
+          countryName: country.name,
+        })),
+        // Validated into `CurrencyFormat`s the domain can use — a `CurrencyRef` IS a `CurrencyFormat`,
+        // carrying the `minorUnitExponent` the conversion needs (JPY 0, never a hard-coded 100).
+        currencies: toCurrencyFormats(currencies),
       };
     },
   };

@@ -129,7 +129,7 @@ development_status:
 
   # Epic 10 — CAP-9 Payroll Totals
   epic-10: backlog
-  10-1-payroll-totals-backend: backlog
+  10-1-payroll-totals-backend: done
   10-2-payroll-totals-ui: backlog
   epic-10-retrospective: optional
 

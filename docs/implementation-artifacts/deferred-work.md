@@ -1384,3 +1384,7 @@ status: open
     currency/format mismatch → `unavailable`. Not a live defect. Revisit by pinning country-currency
     immutability at the schema/role level, or adding one shared domain guard that refuses a group
     whose in-population members disagree on currency (would close it for CAP-5/6/7 at once).
+
+- source_spec: `docs/implementation-artifacts/spec-10-1-payroll-totals-backend.md`
+  summary: Integration-test `level.rank` allocation `RANK_BAND_START + (parseInt(suffix,16) % RANK_BAND_WIDTH)` can collide across accumulated runs on the shared, never-cleaned Postgres, spuriously failing the whole suite on the UNIQUE `level.rank` INSERT.
+  evidence: Real birthday-bound collision (8 hex chars → 32 bits, reduced mod a ~4–6M band; `level.rank` is UNIQUE and integration suites never delete rows). Confirmed pre-existing and shared — `tests/integration/gender-distribution.test.ts` uses the identical pattern — so this is a cross-cutting test-infra hardening (e.g. wider entropy or a reserved sequence per suite), not unique to CAP-9.
