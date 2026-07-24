@@ -12,6 +12,7 @@ import type {
   NewEmployeeWithSalary,
   NewSalaryRecord,
   OutlierCandidate,
+  OverduePopulation,
   PayrollTotalsPopulation,
   PeerGroupKey,
   PeerGroupPopulation,
@@ -1350,6 +1351,46 @@ export function createEmployeeRepository(
         // Validated into `CurrencyFormat`s the domain can use — a `CurrencyRef` IS a `CurrencyFormat`,
         // carrying the `minorUnitExponent` the conversion needs (JPY 0, never a hard-coded 100).
         currencies: toCurrencyFormats(currencies),
+      };
+    },
+
+    // ── CAP-10 (story 11-1) ──────────────────────────────────────────────────────────────────
+    // A READ-ONLY, ORG-WIDE, identity-and-money-carrying sibling of `findPayrollTotalsPopulation` —
+    // the whole-population read the overdue-for-review list needs. The surface and the Home count are
+    // org-wide, so there is no subject to key off: this loads every employee at once, each with their
+    // id, name, and WHOLE history. The SQL SELECTs rows only — no membership `where`, no `orderBy` on
+    // salary records, no `COUNT` — the domain owns the cutoff (`asOf − period`, AD-22), the as-of
+    // population, the strictly-earlier overdue judgement, and the ordering (AD-16 / AD-8 / Law 2 /
+    // AD-2). Nothing is materialized or cached (AD-12). No update, no delete (Law 5 / AD-18).
+
+    findOverduePopulation: async (): Promise<OverduePopulation> => {
+      // Every employee with their id, name, and WHOLE UNORDERED history. NO `where` (the whole
+      // population), NO `orderBy` on salary records (the domain resolves the current record, AD-8),
+      // NO as-of filter (the domain owns the as-of population and the cutoff, AD-16 / AD-22).
+      const employees = await client.employee.findMany({
+        select: {
+          id: true,
+          name: true,
+          salaryRecords: {
+            select: { id: true, seq: true, amountMinor: true, currencyCode: true, effectiveFrom: true },
+          },
+        },
+      });
+
+      return {
+        candidates: employees.map((employee) => ({
+          employeeId: employee.id,
+          name: employee.name,
+          // `amountMinor`/`seq` come back as native `bigint`; the currency is each record's OWN, read
+          // straight off the column and never re-resolved from the country (AD-6). `seq` rides along
+          // for the resolver's ordering and is dropped at the application boundary.
+          salaryHistory: employee.salaryRecords.map((record) => ({
+            id: record.id,
+            seq: record.seq,
+            effectiveFrom: fromDbDate(record.effectiveFrom),
+            salary: { amountMinor: record.amountMinor, currency: record.currencyCode },
+          })),
+        })),
       };
     },
   };

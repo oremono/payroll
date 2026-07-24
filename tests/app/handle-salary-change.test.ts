@@ -98,6 +98,7 @@ function fakeDeps(
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
     findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
     findPayrollTotalsPopulation: () => Promise.reject(new Error('not reachable')),
+    findOverduePopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   const idGenerator: IdGenerator = { next: () => 'salary-id-1' };

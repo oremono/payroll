@@ -120,6 +120,7 @@ function fakeDeps(config: FakeConfig = {}): PeerComparisonDeps & {
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
     findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
     findPayrollTotalsPopulation: () => Promise.reject(new Error('not reachable')),
+    findOverduePopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return { repository, askedById, askedForGroup };

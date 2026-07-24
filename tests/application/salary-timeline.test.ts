@@ -81,6 +81,7 @@ function fakeDeps(config: FakeConfig = {}): SalaryTimelineDeps & { readonly aske
     findGenderGapPopulation: () => Promise.reject(new Error('not reachable')),
     findGenderDistributionPopulation: () => Promise.reject(new Error('not reachable')),
     findPayrollTotalsPopulation: () => Promise.reject(new Error('not reachable')),
+    findOverduePopulation: () => Promise.reject(new Error('not reachable')),
   } satisfies EmployeeRepository;
 
   return { repository, asked };

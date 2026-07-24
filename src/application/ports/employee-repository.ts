@@ -5,6 +5,7 @@ import type {
 import type { GenderGapCandidate } from '@/domain/gender-gap';
 import type { Gender, ReferenceData } from '@/domain/import-row';
 import type { CurrencyFormat, Money } from '@/domain/money';
+import type { OverdueCandidate } from '@/domain/overdue';
 import type {
   CountryRef,
   CurrencyRef,
@@ -379,10 +380,27 @@ export type PayrollTotalsPopulation = {
   readonly currencies: readonly CurrencyRef[];
 };
 
+/**
+ * The ORG-WIDE overdue-for-review population (CAP-10, AD-22 / AD-16 / AD-2 / AD-8) — a read-only
+ * org-wide read, the sibling of `findPayrollTotalsPopulation`, identity- and money-carrying. The
+ * Overdue surface and the Home count are org-wide, so there is no subject to key off: it loads every
+ * employee at once, each carrying their `employeeId`, display `name`, and whole UNORDERED salary
+ * history reduced to the resolver's `SalaryRecordView` (the ordering columns + `Money`).
+ *
+ * The domain owns everything a user sees: the cutoff (`asOf − period`, AD-22), the as-of population
+ * and membership, the strictly-earlier overdue judgement, and the ordering (AD-8 / AD-16 / Law 2).
+ * The SQL SELECTs rows only — NO `where` for membership, NO `orderBy`, NO `COUNT`. There is no `null`
+ * arm and no refusal: an empty `candidates` list is valid, and the domain answers it with an empty
+ * overdue list (`rows: []`, the zero-state).
+ */
+export type OverduePopulation = {
+  readonly candidates: readonly OverdueCandidate[];
+};
+
 // The port re-exports the domain shapes it speaks in, so a reader of the port sees the whole
 // vocabulary in one place — as it already does for `GenderDistributionCandidate` et al. via the
 // method signatures below.
-export type { CountryRef, CurrencyRef, PayrollCandidate };
+export type { CountryRef, CurrencyRef, OverdueCandidate, PayrollCandidate };
 
 export type EmployeeRepository = {
   /**
@@ -658,4 +676,26 @@ export type EmployeeRepository = {
    * missing FX rates is the domain's, not this read's.
    */
   readonly findPayrollTotalsPopulation: () => Promise<PayrollTotalsPopulation>;
+
+  // ── CAP-10 (story 11-1) ──────────────────────────────────────────────────────────────────────
+  // A READ-ONLY, ORG-WIDE, identity-and-money-carrying SIBLING of `findPayrollTotalsPopulation` on
+  // this same port — not a second one, and emphatically not a write (Law 5 / AD-18). Where that read
+  // serves the payroll totals, this serves the overdue-for-review list: it loads every employee at
+  // once (the surface and the Home count are org-wide, so there is no subject to key off), each with
+  // their id, name, and whole UNORDERED salary history. The cutoff, membership, the strictly-earlier
+  // overdue judgement, and the ordering are all the domain's — the SQL SELECTs rows only, with no
+  // membership `where`, no `orderBy`, no `COUNT` (AD-22 / AD-16 / AD-8 / Law 2 / AD-2). Computed
+  // fresh per request; nothing is materialized or cached (AD-12).
+
+  /**
+   * The org-wide overdue population: every employee carrying their `employeeId`, display `name`, and
+   * whole UNORDERED salary history (as `SalaryRecordView`s with `Money`) — enough for the domain to
+   * resolve the cutoff from `asOf`, the as-of population, and the strictly-earlier overdue list.
+   *
+   * Returned WITHOUT any membership `where`, `orderBy`, or `COUNT` — the domain owns the ordering
+   * (AD-8), the as-of population, the cutoff, and the overdue judgement (AD-22 / AD-16 / Law 2). There
+   * is no `null` arm and no refusal: an empty population is a valid answer of `rows: []` (the
+   * zero-state), computed by the domain over an empty candidate set.
+   */
+  readonly findOverduePopulation: () => Promise<OverduePopulation>;
 };

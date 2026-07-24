@@ -149,6 +149,49 @@ export function plainDateToIso(date: PlainDate): string {
   return `${padNumber(date.year, 4)}-${padNumber(date.month, 2)}-${padNumber(date.day, 2)}`;
 }
 
+/** How many months there are in a year — the base the month arithmetic below counts in. */
+const MONTHS_PER_YEAR = 12;
+
+/**
+ * `date` moved BACK by `months` calendar months, day-clamped into a shorter target month (AD-22 /
+ * M-5): `subtractMonths({2028,2,29}, 24)` is 28 Feb 2026, and `subtractMonths({2026,7,31}, 1)` is
+ * 30 Jun 2026. The cutoff the CAP-10 overdue read measures against is this, applied to the passed
+ * `asOf` — never a wall-clock date, which is the whole of the determinism promise here (AD-22).
+ *
+ * Written out in integer arithmetic rather than via a JS `Date`, for the reason the header gives: a
+ * `Date` reintroduces the timezone second-reading `PlainDate` exists to banish (Law 6 / AD-11). The
+ * month index is zero-based only inside this function — `month - 1` in, `+ 1` out — so the
+ * `Math.floor`/modulo land the year and month on the proleptic Gregorian calendar the rest of the
+ * module uses. `Math.floor` (not truncation) is what carries a borrow correctly when the month
+ * underflows into the previous year.
+ *
+ * Pure and TOTAL: same inputs ⇒ byte-identical output, no clock, no exception. The clamp REUSES the
+ * private `daysInMonth`/`isLeapYear`, so "which day exists in this month" has exactly one definition
+ * across the module (28/29 Feb, the 30-day months, the leap rule) rather than a second copy that
+ * could drift from the parser's.
+ */
+export function subtractMonths(date: PlainDate, months: number): PlainDate {
+  // Absolute month index, zero-based on the month so the modulo maps cleanly back to 1..12.
+  const monthIndex = date.year * MONTHS_PER_YEAR + (date.month - FIRST_MONTH) - months;
+  const year = Math.floor(monthIndex / MONTHS_PER_YEAR);
+  // The proleptic calendar this module implements has no year below FIRST_YEAR (see its header: year
+  // 0 does not exist and `<input type="date">` cannot hold it). An `asOf` near year 1 minus a
+  // multi-month period underflows past it, so clamp to the earliest representable date rather than
+  // emit a `{year: 0}` cutoff the picker would render blank. `months` itself is a non-negative
+  // integer — the delivery boundary validates the period selection before it reaches here, exactly
+  // as it resolves `asOf` (Law 6 / AD-11); the clamp guards the one invariant a *valid* period can
+  // still breach.
+  if (year < FIRST_YEAR) {
+    return { year: FIRST_YEAR, month: FIRST_MONTH, day: 1 };
+  }
+  // `%` follows the sign of the dividend in JS, so a positive remainder is guaranteed only once the
+  // year has been floored off; recovering the month from `monthIndex - year * 12` keeps it in 0..11.
+  const month = monthIndex - year * MONTHS_PER_YEAR + FIRST_MONTH;
+  // The day drops to the target month's last day when it does not exist there (29 Feb → 28 Feb).
+  const day = Math.min(date.day, daysInMonth(year, month));
+  return { year, month, day };
+}
+
 /**
  * Chronological ordering: negative when `a` is earlier than `b`, positive when later, zero when the
  * same day. The sign is the contract, not the magnitude.

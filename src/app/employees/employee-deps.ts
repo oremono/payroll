@@ -15,6 +15,7 @@ import type { EmployeeUseCaseDeps } from '@/application/use-cases/employees';
 import type { GenderDistributionDeps } from '@/application/use-cases/gender-distribution';
 import type { GenderGapDeps } from '@/application/use-cases/gender-gap';
 import type { OutlierFindingsDeps } from '@/application/use-cases/outliers';
+import type { OverdueDeps } from '@/application/use-cases/overdue';
 import type { PayrollTotalsDeps } from '@/application/use-cases/payroll-totals';
 import type { PlainDate } from '@/domain/plain-date';
 
@@ -73,6 +74,8 @@ function lazyEmployeeRepository(): EmployeeRepository {
       createEmployeeRepository().findGenderDistributionPopulation(),
     findPayrollTotalsPopulation: async () =>
       createEmployeeRepository().findPayrollTotalsPopulation(),
+    findOverduePopulation: async () =>
+      createEmployeeRepository().findOverduePopulation(),
   };
 }
 
@@ -139,4 +142,15 @@ export function payrollTotalsDeps(): PayrollTotalsDeps {
       readSettings: async () => createSettingsRepository().readSettings(),
     },
   };
+}
+
+/**
+ * The dependencies the CAP-10 overdue-for-review read takes — just the employee repository (the
+ * org-wide overdue population), reached through the SAME lazy composition root so a database-free
+ * surface (the `check`/`a11y` CI jobs) yields `unavailable` rather than throwing during render.
+ * `asOf` and the selected `period` arrive per call as arguments (Law 6 / AD-22); no clock and no id
+ * generator are needed for this read. Story 11-2 consumes this factory unmodified (AD-24).
+ */
+export function overdueDeps(): OverdueDeps {
+  return { repository: lazyEmployeeRepository() };
 }

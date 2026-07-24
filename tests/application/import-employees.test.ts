@@ -68,6 +68,10 @@ const NOT_USED_BY_IMPORT = {
   // stub keeps that true rather than asserting it in prose.
   findPayrollTotalsPopulation: () =>
     Promise.reject(new Error('import never reads a payroll-totals population')),
+  // CAP-10's org-wide overdue read (story 11-1). Import never computes the overdue list — a
+  // rejecting stub keeps that true rather than asserting it in prose.
+  findOverduePopulation: () =>
+    Promise.reject(new Error('import never reads an overdue population')),
 } satisfies Pick<
   EmployeeRepository,
   | 'createEmployee'
@@ -82,6 +86,7 @@ const NOT_USED_BY_IMPORT = {
   | 'findGenderGapPopulation'
   | 'findGenderDistributionPopulation'
   | 'findPayrollTotalsPopulation'
+  | 'findOverduePopulation'
 >;
 
 /** A repository that records what it was asked to write, and can be told to fail. */
