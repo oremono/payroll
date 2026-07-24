@@ -28,6 +28,7 @@
     "e2e:seed": "node e2e/fixtures/seed-employees.ts",
     "tokens:build": "node scripts/generate-design-tokens.ts",
     "tokens:check": "node scripts/generate-design-tokens.ts --check",
+    "seed": "node --max-old-space-size=4096 --experimental-strip-types --import ./prisma/seed.register.mjs prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

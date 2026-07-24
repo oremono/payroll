@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { epochMillisUtc } from '@/adapters/clock';
 import { createUuidV7Generator, uuidV7Generator } from '@/adapters/id';
+import { createSeededPrng } from '@/adapters/prng';
+import { SEED, SEED_EPOCH_MS as FIXED_EPOCH_MS } from '@/application/seed/config';
 
 // Test-first (Law 1 / AD-23): red before `src/adapters/id.ts` exists.
 //
@@ -89,5 +91,47 @@ describe('uuidV7Generator', () => {
     const ids = Array.from({ length: 1_000 }, () => generator.next());
 
     expect(new Set(ids).size).toBe(1_000);
+  });
+});
+
+describe('createUuidV7Generator over a seeded PRNG — the seed id seam (CAP-11)', () => {
+  // The composition the seed uses: a FIXED epoch (no wall clock) + the seeded PRNG's bytes. This is
+  // what makes a whole seed run byte-identical across runs (NFR8 / NFR1) while every id stays a
+  // valid, collision-free UUIDv7. No change to `src/adapters/id.ts` is expected or made — the
+  // existing injectable `now`/`randomBytes` seams carry it. The two constants come from the shared
+  // seed config (SEED_EPOCH_MS is 2025-01-01T00:00:00Z — a committed constant, not now()).
+  const build = () => {
+    const prng = createSeededPrng(SEED);
+    return createUuidV7Generator(
+      () => FIXED_EPOCH_MS,
+      (n) => prng.nextBytes(n),
+    );
+  };
+
+  it('yields a byte-identical id sequence across two same-seed runs', () => {
+    const runA = build();
+    const runB = build();
+
+    const idsA = Array.from({ length: 5_000 }, () => runA.next());
+    const idsB = Array.from({ length: 5_000 }, () => runB.next());
+
+    expect(idsB).toEqual(idsA);
+  });
+
+  it('emits valid version-7, RFC-4122-variant ids that never collide', () => {
+    const generator = build();
+    const ids = Array.from({ length: 10_000 }, () => generator.next());
+
+    for (const id of ids) {
+      expect(id).toMatch(UUID_V7_PATTERN);
+    }
+    expect(new Set(ids).size).toBe(10_000);
+  });
+
+  it('pins the timestamp bytes to the FIXED epoch, not to any wall clock', () => {
+    const id = build().next();
+    const timestampHex = id.slice(0, 8) + id.slice(9, 13);
+
+    expect(Number.parseInt(timestampHex, 16)).toBe(FIXED_EPOCH_MS);
   });
 });
