@@ -91,6 +91,7 @@ function fakeDeps(
     updateEmployee: () => Promise.reject(new Error('not reachable')),
     listEmployees: () => Promise.reject(new Error('not reachable')),
     loadFormOptions: () => Promise.reject(new Error('not reachable')),
+    loadDirectoryFacets: () => Promise.reject(new Error('not reachable')),
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),
     findAllPeerGroups: () => Promise.reject(new Error('not reachable')),

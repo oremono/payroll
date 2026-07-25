@@ -61,6 +61,7 @@ function lazyEmployeeRepository(): EmployeeRepository {
     listEmployees: async (query: EmployeeListQuery) =>
       createEmployeeRepository().listEmployees(query),
     loadFormOptions: async () => createEmployeeRepository().loadFormOptions(),
+    loadDirectoryFacets: async () => createEmployeeRepository().loadDirectoryFacets(),
     appendSalaryRecord: async (salaryRecord: NewSalaryRecord, today: PlainDate) =>
       createEmployeeRepository().appendSalaryRecord(salaryRecord, today),
     findSalaryHistory: async (employeeId: string) =>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DIRECTORY_COUNTRY_PARAM,
+  DIRECTORY_LEVEL_PARAM,
   DIRECTORY_PAGE_PARAM,
+  DIRECTORY_ROLE_PARAM,
   DIRECTORY_SEARCH_PARAM,
   directoryEmptyState,
   directoryHref,
@@ -11,6 +14,7 @@ import {
   directoryStatusLine,
   EMPLOYEES_HREF,
   parseDirectoryParams,
+  type DirectoryCriteria,
 } from '@/ui/employee-directory';
 
 // Test-first (Law 1 / AD-23): red before `src/ui/employee-directory.ts` exists.
@@ -27,19 +31,31 @@ import {
 // pager that renders the requested value after the adapter clamped it lies"), so everything below
 // is computed from the echo and never from what the URL asked for.
 
-/** The adapter's bound, passed IN — `src/ui` may not import `@/adapters/*`. */
+/** The adapter's bounds, passed IN — `src/ui` may not import `@/adapters/*`. */
 const MAX_SEARCH_LENGTH = 200;
+const MAX_CODE_LENGTH = 32;
+const BOUNDS = { maxSearchLength: MAX_SEARCH_LENGTH, maxCodeLength: MAX_CODE_LENGTH } as const;
+
+/** The criteria set with nothing in effect — the shape `parseDirectoryParams` answers on a bare URL. */
+const NO_CRITERIA: DirectoryCriteria = { q: null, role: null, level: null, country: null };
 
 describe('parseDirectoryParams', () => {
   it('reads a plain search term and page number', () => {
-    expect(parseDirectoryParams({ q: 'ana', page: '3' }, MAX_SEARCH_LENGTH)).toEqual({
+    expect(parseDirectoryParams({ q: 'ana', page: '3' }, BOUNDS)).toEqual({
+      ...NO_CRITERIA,
       q: 'ana',
       page: 3,
     });
   });
 
-  it('answers no filter and page 1 when neither param is present', () => {
-    expect(parseDirectoryParams({}, MAX_SEARCH_LENGTH)).toEqual({ q: null, page: 1 });
+  it('answers no filter and page 1 when no param is present', () => {
+    expect(parseDirectoryParams({}, BOUNDS)).toEqual({ ...NO_CRITERIA, page: 1 });
+  });
+
+  it('reads all three filter codes alongside the search term', () => {
+    expect(
+      parseDirectoryParams({ q: 'ana', role: 'ENG', level: 'IC5', country: 'IN' }, BOUNDS),
+    ).toEqual({ q: 'ana', role: 'ENG', level: 'IC5', country: 'IN', page: 1 });
   });
 
   // `?q=a&q=b` arrives as an ARRAY. Story 3-1's pass-3 review found this exact shape reaching
@@ -47,67 +63,97 @@ describe('parseDirectoryParams', () => {
   // outage screen for a duplicated query parameter. It is answered here as "no filter", the same
   // thing the port's `search: null` means, so the ambiguity never becomes a filter nobody asked for.
   it('treats a repeated `q` as no filter rather than picking one', () => {
-    expect(parseDirectoryParams({ q: ['a', 'b'] }, MAX_SEARCH_LENGTH).q).toBeNull();
+    expect(parseDirectoryParams({ q: ['a', 'b'] }, BOUNDS).q).toBeNull();
   });
 
   it('treats an absent-but-declared `q` as no filter', () => {
-    expect(parseDirectoryParams({ q: undefined }, MAX_SEARCH_LENGTH).q).toBeNull();
+    expect(parseDirectoryParams({ q: undefined }, BOUNDS).q).toBeNull();
   });
 
   // A cleared search box sends `''`; a brushed space bar sends `'   '`. Both mean "I am not
   // searching" — the port documents them as taking the same path as `null` rather than becoming a
   // filter that matches everything by accident or almost nothing.
   it('treats a blank or whitespace-only term as no filter', () => {
-    expect(parseDirectoryParams({ q: '' }, MAX_SEARCH_LENGTH).q).toBeNull();
-    expect(parseDirectoryParams({ q: '   ' }, MAX_SEARCH_LENGTH).q).toBeNull();
+    expect(parseDirectoryParams({ q: '' }, BOUNDS).q).toBeNull();
+    expect(parseDirectoryParams({ q: '   ' }, BOUNDS).q).toBeNull();
   });
 
   it('trims surrounding whitespace off a term that does survive', () => {
-    expect(parseDirectoryParams({ q: '  ana  ' }, MAX_SEARCH_LENGTH).q).toBe('ana');
+    expect(parseDirectoryParams({ q: '  ana  ' }, BOUNDS).q).toBe('ana');
   });
 
   // The bound is the adapter's `MAX_SEARCH_LENGTH`, passed in as an ARGUMENT. `src/ui` may not
   // import `@/adapters/*`, and inventing a second constant here would let the two disagree.
   it('truncates an over-long term to the bound it is given', () => {
     const long = 'x'.repeat(MAX_SEARCH_LENGTH + 50);
-    expect(parseDirectoryParams({ q: long }, MAX_SEARCH_LENGTH).q).toBe(
+    expect(parseDirectoryParams({ q: long }, BOUNDS).q).toBe(
       'x'.repeat(MAX_SEARCH_LENGTH),
     );
   });
 
   it('trims BEFORE truncating, so padding never eats the term', () => {
     const padded = `   ${'x'.repeat(10)}   `;
-    expect(parseDirectoryParams({ q: padded }, 10).q).toBe('x'.repeat(10));
+    expect(
+      parseDirectoryParams({ q: padded }, { ...BOUNDS, maxSearchLength: 10 }).q,
+    ).toBe('x'.repeat(10));
+  });
+
+  // Every hostile shape `q` is defended against reaches the filter codes too — they arrive from the
+  // same URL, through the same `searchParams`, and a repeated `?role=a&role=b` would otherwise hit
+  // `.trim()` as a TypeError and be reported to the reader as a database outage.
+  it.each([
+    ['role', DIRECTORY_ROLE_PARAM],
+    ['level', DIRECTORY_LEVEL_PARAM],
+    ['country', DIRECTORY_COUNTRY_PARAM],
+  ] as const)('answers no %s filter for an absent, repeated, or blank code', (key, param) => {
+    expect(parseDirectoryParams({}, BOUNDS)[key]).toBeNull();
+    expect(parseDirectoryParams({ [param]: undefined }, BOUNDS)[key]).toBeNull();
+    expect(parseDirectoryParams({ [param]: ['a', 'b'] }, BOUNDS)[key]).toBeNull();
+    expect(parseDirectoryParams({ [param]: '' }, BOUNDS)[key]).toBeNull();
+    expect(parseDirectoryParams({ [param]: '   ' }, BOUNDS)[key]).toBeNull();
+  });
+
+  it('trims and bounds a filter code, for the reason it bounds the search term', () => {
+    expect(parseDirectoryParams({ role: '  ENG  ' }, BOUNDS).role).toBe('ENG');
+    const long = 'X'.repeat(MAX_CODE_LENGTH + 20);
+    expect(parseDirectoryParams({ role: long }, BOUNDS).role).toBe('X'.repeat(MAX_CODE_LENGTH));
+  });
+
+  // An unknown code is a REAL filter that matches nothing. Dropping it to `null` here would make
+  // `?role=NOPE` render the whole directory — a filter that silently does not filter.
+  it('keeps a code it cannot recognise rather than dropping it to no filter', () => {
+    expect(parseDirectoryParams({ role: 'NOPE' }, BOUNDS).role).toBe('NOPE');
   });
 
   it('falls back to page 1 for a repeated, absent, or non-numeric page', () => {
-    expect(parseDirectoryParams({ page: ['1', '2'] }, MAX_SEARCH_LENGTH).page).toBe(1);
-    expect(parseDirectoryParams({ page: 'abc' }, MAX_SEARCH_LENGTH).page).toBe(1);
-    expect(parseDirectoryParams({ page: '' }, MAX_SEARCH_LENGTH).page).toBe(1);
+    expect(parseDirectoryParams({ page: ['1', '2'] }, BOUNDS).page).toBe(1);
+    expect(parseDirectoryParams({ page: 'abc' }, BOUNDS).page).toBe(1);
+    expect(parseDirectoryParams({ page: '' }, BOUNDS).page).toBe(1);
   });
 
   it('clamps a zero or negative page up to 1', () => {
-    expect(parseDirectoryParams({ page: '-5' }, MAX_SEARCH_LENGTH).page).toBe(1);
-    expect(parseDirectoryParams({ page: '0' }, MAX_SEARCH_LENGTH).page).toBe(1);
+    expect(parseDirectoryParams({ page: '-5' }, BOUNDS).page).toBe(1);
+    expect(parseDirectoryParams({ page: '0' }, BOUNDS).page).toBe(1);
   });
 
   it('truncates a fractional page rather than rejecting it', () => {
-    expect(parseDirectoryParams({ page: '2.9' }, MAX_SEARCH_LENGTH).page).toBe(2);
+    expect(parseDirectoryParams({ page: '2.9' }, BOUNDS).page).toBe(2);
   });
 
   // `1e9` is a NUMBER, so it parses — and it must not throw. Bounding it here (rather than trusting
   // the adapter's offset clamp alone) keeps the requested offset inside `Number.MAX_SAFE_INTEGER`
   // arithmetic; the page it actually lands on is settled by `directoryOffsetCorrection`.
   it('accepts an absurd page without throwing', () => {
-    const parsed = parseDirectoryParams({ page: '1e9' }, MAX_SEARCH_LENGTH);
+    const parsed = parseDirectoryParams({ page: '1e9' }, BOUNDS);
     expect(Number.isSafeInteger(parsed.page)).toBe(true);
     expect(parsed.page).toBeGreaterThanOrEqual(1);
   });
 
   it('ignores every other param it does not own', () => {
-    expect(
-      parseDirectoryParams({ asOf: '2026-01-01', threshold: '20' }, MAX_SEARCH_LENGTH),
-    ).toEqual({ q: null, page: 1 });
+    expect(parseDirectoryParams({ asOf: '2026-01-01', threshold: '20' }, BOUNDS)).toEqual({
+      ...NO_CRITERIA,
+      page: 1,
+    });
   });
 });
 
@@ -282,20 +328,53 @@ describe('directoryHref', () => {
   it('names the params it owns as constants rather than as scattered strings', () => {
     expect(DIRECTORY_SEARCH_PARAM).toBe('q');
     expect(DIRECTORY_PAGE_PARAM).toBe('page');
+    expect(DIRECTORY_ROLE_PARAM).toBe('role');
+    expect(DIRECTORY_LEVEL_PARAM).toBe('level');
+    expect(DIRECTORY_COUNTRY_PARAM).toBe('country');
+  });
+
+  it('carries a filter across a page change, alongside `asOf` and the term', () => {
+    const href = directoryHref({ asOf: '2026-01-01', level: 'IC5', q: 'ana' }, { page: 2 });
+    expect(href).toBe('/employees?asOf=2026-01-01&level=IC5&q=ana&page=2');
+  });
+
+  // A narrowed result set is a NEW result set, so the old page position is meaningless — exactly
+  // what changing the search term does.
+  it('resets the page when a filter changes', () => {
+    const href = directoryHref({ level: 'IC5', page: '3' }, { level: 'IC6', page: 1 });
+    expect(href).toBe('/employees?level=IC6');
+  });
+
+  it('removes a filter that is cleared back to all', () => {
+    const href = directoryHref({ asOf: '2026-01-01', role: 'ENG' }, { role: null, page: 1 });
+    expect(href).toBe('/employees?asOf=2026-01-01');
+  });
+
+  it('leaves a filter untouched when that filter is not patched', () => {
+    expect(directoryHref({ role: 'ENG', country: 'IN' }, { page: 2 })).toBe(
+      '/employees?role=ENG&country=IN&page=2',
+    );
+  });
+
+  it('collapses a repeated filter param when that param is patched', () => {
+    expect(directoryHref({ role: ['a', 'b'] }, { role: 'ENG', page: 1 })).toBe(
+      '/employees?role=ENG',
+    );
   });
 });
 
 describe('directoryEmptyState', () => {
   it('is absent whenever there is anything to show', () => {
-    expect(directoryEmptyState(30, null)).toBeNull();
-    expect(directoryEmptyState(1, 'ana')).toBeNull();
+    expect(directoryEmptyState(30, NO_CRITERIA)).toBeNull();
+    expect(directoryEmptyState(1, { ...NO_CRITERIA, q: 'ana' })).toBeNull();
+    expect(directoryEmptyState(1, { ...NO_CRITERIA, level: 'IC5' })).toBeNull();
   });
 
   // The ratified 1-6 first-run copy, preserved verbatim — this is the sentence the placeholder
   // route has shown since the shell landed, and the surface that replaces it says the same thing.
+  // It fires ONLY when nothing was asked for: no term, and no filter.
   it('states the first-run sentence when the table itself is empty', () => {
-    const empty = directoryEmptyState(0, null);
-    expect(empty).toEqual({
+    expect(directoryEmptyState(0, NO_CRITERIA)).toEqual({
       kind: 'first-run',
       statement: 'No employees yet. Import a spreadsheet to begin.',
     });
@@ -303,10 +382,47 @@ describe('directoryEmptyState', () => {
 
   // A search that matched nothing is NOT the first run: telling someone to import a spreadsheet
   // when they have 10,000 employees and mistyped a name is a false statement about their data.
-  it('names the term when a search matched nothing, and never offers the import copy', () => {
-    const empty = directoryEmptyState(0, 'zzz');
+  // This sentence is asserted VERBATIM by `e2e/employees.spec.ts` and must not drift.
+  it('keeps the search-only sentence exactly as it was', () => {
+    expect(directoryEmptyState(0, { ...NO_CRITERIA, q: 'zzz' })).toEqual({
+      kind: 'no-match',
+      statement: 'No employee’s name contains “zzz”.',
+    });
+  });
+
+  // The whole reason this function took a criteria set rather than a term: a filtered zero-result
+  // that answered `first-run` would tell someone with 10,000 employees to go and import a
+  // spreadsheet, because the only thing they did was pick a level.
+  it('never offers the import copy once any filter is in effect', () => {
+    const empty = directoryEmptyState(0, { ...NO_CRITERIA, level: 'IC5' });
     expect(empty?.kind).toBe('no-match');
-    expect(empty?.statement).toContain('zzz');
     expect(empty?.statement).not.toContain('Import a spreadsheet');
+  });
+
+  it('names the single criterion in effect', () => {
+    expect(directoryEmptyState(0, { ...NO_CRITERIA, level: 'IC5' })?.statement).toBe(
+      'No employee matches level IC5.',
+    );
+  });
+
+  it('joins two criteria without a stray comma', () => {
+    expect(
+      directoryEmptyState(0, { ...NO_CRITERIA, role: 'ENG', country: 'IN' })?.statement,
+    ).toBe('No employee matches role ENG and country IN.');
+  });
+
+  it('names every criterion in effect, the term included', () => {
+    expect(
+      directoryEmptyState(0, { q: 'ana', role: 'ENG', level: 'IC5', country: 'IN' })?.statement,
+    ).toBe('No employee matches role ENG, level IC5, country IN, and a name containing “ana”.');
+  });
+
+  // An unknown code reaches the sentence verbatim — the reader asked for `NOPE` and is told that
+  // nothing matched `NOPE`, rather than being shown the whole directory as though they had asked
+  // for nothing at all.
+  it('reports an unrecognised code as the criterion it was', () => {
+    expect(directoryEmptyState(0, { ...NO_CRITERIA, role: 'NOPE' })?.statement).toBe(
+      'No employee matches role NOPE.',
+    );
   });
 });

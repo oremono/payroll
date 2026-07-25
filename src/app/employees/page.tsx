@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { DEFAULT_LIST_LIMIT, MAX_SEARCH_LENGTH } from '@/adapters/db/employee-repository';
+import {
+  DEFAULT_LIST_LIMIT,
+  MAX_FILTER_CODE_LENGTH,
+  MAX_SEARCH_LENGTH,
+} from '@/adapters/db/employee-repository';
 import { pageTitleFor } from '@/ui/nav-items';
 
 // The browser-tab title for this surface, drawn from the same IA declaration the sidebar and the
@@ -10,6 +14,7 @@ import { pageTitleFor } from '@/ui/nav-items';
 export const metadata: Metadata = { title: pageTitleFor('/employees') };
 import {
   listEmployees,
+  loadDirectoryFacets,
   loadEmployeeFormOptions,
   type ListEmployeesResult,
 } from '@/application/use-cases/employees';
@@ -75,10 +80,22 @@ export default async function EmployeesPage({
   readonly searchParams: Promise<DirectorySearchParams>;
 }) {
   const params = await searchParams;
-  const { q, page } = parseDirectoryParams(params, MAX_SEARCH_LENGTH);
+  // Both bounds are the ADAPTER's, read here and passed inward: `src/ui/**` may import `domain` and
+  // `application` only, and a second copy of either in the UI would let it and the adapter disagree
+  // about the same number.
+  const { page, ...criteria } = parseDirectoryParams(params, {
+    maxSearchLength: MAX_SEARCH_LENGTH,
+    maxCodeLength: MAX_FILTER_CODE_LENGTH,
+  });
 
   const deps = employeeReadDeps();
-  const query = { search: q, limit: DEFAULT_LIST_LIMIT };
+  const query = {
+    search: criteria.q,
+    roleCode: criteria.role,
+    levelCode: criteria.level,
+    countryCode: criteria.country,
+    limit: DEFAULT_LIST_LIMIT,
+  };
 
   let listed: ListEmployeesResult = await listEmployees(deps, {
     ...query,
@@ -102,9 +119,18 @@ export default async function EmployeesPage({
     );
   }
 
-  const options = await loadEmployeeFormOptions(deps);
+  // Two INDEPENDENT reference reads, and they must stay independent (AD-16): `loadEmployeeFormOptions`
+  // is `is_active`-filtered because it feeds a CREATE form, `loadDirectoryFacets` is not because a
+  // filter must still reach an employee holding a retired code. Read concurrently — neither depends
+  // on the other, and each answers `unavailable` on its own rather than taking the surface down.
+  const [options, facets] = await Promise.all([
+    loadEmployeeFormOptions(deps),
+    loadDirectoryFacets(deps),
+  ]);
   const slice = directorySlice(listed);
-  const empty = directoryEmptyState(listed.totalCount, q);
+  // The WHOLE criteria set, not the term alone: a filtered zero-result that answered `first-run`
+  // would tell someone with ten thousand employees to go and import a spreadsheet.
+  const empty = directoryEmptyState(listed.totalCount, criteria);
 
   return (
     <>
@@ -123,7 +149,11 @@ export default async function EmployeesPage({
         </h2>
 
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-          <EmployeeSearch searchParams={params} q={q} />
+          <EmployeeSearch
+            searchParams={params}
+            criteria={criteria}
+            facets={facets.kind === 'facets' ? facets.facets : null}
+          />
           {options.kind === 'options' ? (
             <EmployeeFormPanel
               mode={{ kind: 'create', action: createEmployeeAction }}

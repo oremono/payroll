@@ -127,6 +127,19 @@ export type EmployeeListQuery = {
    * is trimmed off a term that does survive.
    */
   readonly search: string | null;
+  /**
+   * The three directory filters. Each is ONE reference `code` matched for EXACT equality, they AND
+   * with each other and with `search`, and `null` on any of them means "do not filter by this" —
+   * blank and whitespace-only included, for the reason `search` documents.
+   *
+   * An UNRECOGNISED code is not `null` and must not be normalized into it. `?role=NOPE` answers an
+   * empty page, because a filter that silently matches everything when it cannot resolve its
+   * argument is a filter that does not filter. The codes are opaque here: this port never checks
+   * them against the reference tables, and there is deliberately no refusal arm for an unknown one.
+   */
+  readonly roleCode: string | null;
+  readonly levelCode: string | null;
+  readonly countryCode: string | null;
   readonly offset: number;
   readonly limit: number;
 };
@@ -177,6 +190,30 @@ export type EmployeeFormOptions = {
    * Server-Component boundary as data and the caller resolves one row at a time anyway.
    */
   readonly currencies: readonly CurrencyFormat[];
+};
+
+/**
+ * The values the directory's FILTER controls may offer — and the deliberate opposite of
+ * `EmployeeFormOptions` on the one axis that matters: `is_active` is NOT applied here.
+ *
+ * `loadFormOptions` filters to `is_active: true` because it feeds a CREATE form, where a retired
+ * role must not be choosable for a NEW write. A filter is not a write. `is_active` gates
+ * PICKABILITY, never the visibility of an employee who already holds the code (AD-16) — so a role
+ * deactivated last quarter that twelve people still sit on must be offerable here, or those twelve
+ * become unreachable by filter and the directory under-reports a group with no signal at all. That
+ * is the same population divergence AD-16 exists to prevent, and it is why this is a SECOND read
+ * rather than a reuse of the first.
+ *
+ * Codes and display names only. No `currencyCode` on the country and no `rank` on the level: this
+ * feeds `<option>` elements, nothing here converts money or orders by seniority, and a field the
+ * surface does not use is a second source of truth waiting to disagree with `loadFormOptions`.
+ * Levels still arrive rank-ORDERED for the same reason they do there — `rank` is UNIQUE, so the
+ * order is total and cannot reshuffle between page loads.
+ */
+export type DirectoryFacets = {
+  readonly roles: readonly { readonly code: string; readonly name: string }[];
+  readonly levels: readonly { readonly code: string; readonly name: string }[];
+  readonly countries: readonly { readonly code: string; readonly name: string }[];
 };
 
 /**
@@ -492,6 +529,15 @@ export type EmployeeRepository = {
 
   /** The pickable reference values for the create/edit form. Active rows only. */
   readonly loadFormOptions: () => Promise<EmployeeFormOptions>;
+
+  /**
+   * The reference values the directory's FILTER controls may offer — every row, `is_active`
+   * INCLUSIVE. See `DirectoryFacets` for why this is not `loadFormOptions`.
+   *
+   * A sibling read on this same port, not a second one: it reads the same three reference tables
+   * through the same client, and the only difference is the `where` clause it declines to apply.
+   */
+  readonly loadDirectoryFacets: () => Promise<DirectoryFacets>;
 
   // ── CAP-3 (story 4-1) ──────────────────────────────────────────────────────────────────────
   // A SIBLING of the batch funnel above, on this same port and this same adapter — not a second

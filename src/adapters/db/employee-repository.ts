@@ -1,5 +1,6 @@
 import type {
   AppendSalaryRecordOutcome,
+  DirectoryFacets,
   EmployeeDetail,
   EmployeeFormOptions,
   EmployeeListPage,
@@ -231,6 +232,44 @@ export function normalizeSearchTerm(search: string | null): string | null {
   // real name reaches this length, so anything past it is noise, and a substring search on the
   // first 200 characters of a hostile term matches nothing either way.
   return trimmed.slice(0, MAX_SEARCH_LENGTH);
+}
+
+/**
+ * The longest filter code this repository will send to the database.
+ *
+ * Reference codes are short by construction (`ENG`, `IC5`, `IN`), so this is comfortably past any
+ * real one. Bounded for the reason `MAX_SEARCH_LENGTH` is: the value arrives from a URL a user can
+ * hand-edit, and an unbounded string reaching the database is a cost paid for nothing — no code
+ * this long can match a row.
+ */
+export const MAX_FILTER_CODE_LENGTH = 32;
+
+/**
+ * The filter code this repository will actually filter on, or `null` for "do not filter".
+ *
+ * The same normalization `normalizeSearchTerm` applies, for the same reasons and against the same
+ * hostile input: a repeated `?role=a&role=b` arrives as an ARRAY and an absent one as `undefined`,
+ * either of which would reach `.trim()` as a `TypeError` that the read use-case reports as
+ * `{ kind: 'unavailable' }` — an outage screen for a duplicated query parameter. A cleared select
+ * sends `''`, which is not a filter for the empty-string code.
+ *
+ * With ONE deliberate difference, and it is the important one: an UNRECOGNISED code survives. This
+ * function does not consult the reference tables and must not — `?role=NOPE` becomes an exact
+ * equality predicate that matches no row, and an empty page is the honest answer to it. Normalizing
+ * an unknown code to `null` would render the entire directory to a reader who asked for one role.
+ *
+ * No LIKE escaping either: this compiles to `=`, not `LIKE`, so `%` and `_` carry no wildcard
+ * meaning here and stripping them would corrupt a code that legitimately contained one.
+ */
+export function normalizeFilterCode(code: string | null): string | null {
+  if (typeof code !== 'string') {
+    return null;
+  }
+  const trimmed = code.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return trimmed.slice(0, MAX_FILTER_CODE_LENGTH);
 }
 
 /**
@@ -698,17 +737,28 @@ export function createEmployeeRepository(
       const offset = clampListOffset(query.offset);
 
       // No search, an empty search box, and a fistful of spaces are all "no filter" — see
-      // `normalizeSearchTerm`.
+      // `normalizeSearchTerm`. The three codes take the same path through `normalizeFilterCode`,
+      // which differs on exactly one point: an UNRECOGNISED code survives and matches nothing.
       const term = normalizeSearchTerm(query.search);
-      const where =
-        term === null
+      const roleCode = normalizeFilterCode(query.roleCode);
+      const levelCode = normalizeFilterCode(query.levelCode);
+      const countryCode = normalizeFilterCode(query.countryCode);
+
+      // Built as ONE object and used for BOTH statements below. That is not a convenience: a
+      // predicate applied to the rows but not to the count reads as "Employees 1–3 of 10,000"
+      // beside three rows — the same class of lie the single snapshot exists to prevent, arriving
+      // through a different door. A dimension that is not filtered contributes no key at all,
+      // rather than an `undefined` Prisma would have to be trusted to ignore.
+      const where = {
+        ...(term === null
           ? {}
-          : {
-              name: {
-                contains: escapeLikePattern(term),
-                mode: 'insensitive' as const,
-              },
-            };
+          : { name: { contains: escapeLikePattern(term), mode: 'insensitive' as const } }),
+        // Exact equality on the reference `code` — the employee row's own column, no join. The
+        // three AND together and AND with the search, which is what an object's keys mean here.
+        ...(roleCode === null ? {} : { roleCode }),
+        ...(levelCode === null ? {} : { levelCode }),
+        ...(countryCode === null ? {} : { countryCode }),
+      };
 
       // ONE transaction at REPEATABLE READ, not two independent queries: a page and a total read
       // separately can straddle a concurrent write, and a pager showing "1-25 of 24" is a bug the
@@ -793,6 +843,39 @@ export function createEmployeeRepository(
       ]);
 
       return { roles, levels, countries, currencies: toCurrencyFormats(currencies) };
+    },
+
+    loadDirectoryFacets: async (): Promise<DirectoryFacets> => {
+      // The DELIBERATE opposite of `loadFormOptions` directly above, on one axis: there is no
+      // `where: { isActive: true }` here, and its absence is the entire reason this method exists.
+      //
+      // `is_active` gates PICKABILITY for a NEW write — a retired role must not be choosable on the
+      // create form. It has never gated the VISIBILITY of an employee who already holds the code
+      // (AD-16), and a filter is a read. Applying the form's filter here would make every employee
+      // on a deactivated role unreachable: the directory would quietly under-report that group with
+      // no signal to the reader, which is the population divergence AD-16 exists to prevent.
+      //
+      // Every ordering is TOTAL, exactly as it is above. Levels order by `rank` (UNIQUE), so the
+      // select cannot reshuffle between page loads; roles and countries have no rank, so `code` is
+      // the tie-break behind `name`. `rank` is ordered BY but not selected — the filter control has
+      // no use for the number, and a field the surface does not read is a second source of truth
+      // waiting to disagree with `loadFormOptions`.
+      const [roles, levels, countries] = await Promise.all([
+        client.role.findMany({
+          orderBy: [{ name: 'asc' }, { code: 'asc' }],
+          select: { code: true, name: true },
+        }),
+        client.level.findMany({
+          orderBy: { rank: 'asc' },
+          select: { code: true, name: true },
+        }),
+        client.country.findMany({
+          orderBy: [{ name: 'asc' }, { code: 'asc' }],
+          select: { code: true, name: true },
+        }),
+      ]);
+
+      return { roles, levels, countries };
     },
 
     // ── CAP-3 (story 4-1) ────────────────────────────────────────────────────────────────────
