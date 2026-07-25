@@ -129,6 +129,7 @@ function fakeDeps(config: FakeConfig = {}): GenderGapDeps & {
     updateEmployee: () => Promise.reject(new Error('not reachable')),
     listEmployees: () => Promise.reject(new Error('not reachable')),
     loadFormOptions: () => Promise.reject(new Error('not reachable')),
+    loadDirectoryFacets: () => Promise.reject(new Error('not reachable')),
     appendSalaryRecord: () => Promise.reject(new Error('not reachable')),
     findSalaryHistory: () => Promise.reject(new Error('not reachable')),
     findPeerPopulation: () => Promise.reject(new Error('not reachable')),

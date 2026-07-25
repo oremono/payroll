@@ -28,6 +28,7 @@
  */
 
 import type {
+  DirectoryFacets,
   EmployeeDetail,
   EmployeeFormOptions,
   EmployeeListQuery,
@@ -92,6 +93,15 @@ export type GetEmployeeResult =
 /** The form-options payload. */
 export type FormOptionsResult =
   | { readonly kind: 'options'; readonly options: EmployeeFormOptions }
+  | { readonly kind: 'unavailable' };
+
+/**
+ * The directory FILTER payload. A separate union from `FormOptionsResult` on purpose: the two carry
+ * different reference sets (this one is `is_active`-INCLUSIVE — see `DirectoryFacets`), and one
+ * union shared between them would invite a surface to feed the create form from the filter read.
+ */
+export type DirectoryFacetsResult =
+  | { readonly kind: 'facets'; readonly facets: DirectoryFacets }
   | { readonly kind: 'unavailable' };
 
 /** Injected, never imported: no `today`, no clock, no Prisma. */
@@ -251,6 +261,32 @@ export async function loadEmployeeFormOptions(
 ): Promise<FormOptionsResult> {
   try {
     return { kind: 'options', options: await deps.repository.loadFormOptions() };
+  } catch {
+    return { kind: 'unavailable' };
+  }
+}
+
+/**
+ * The reference values the directory's FILTER controls may offer. EVERY row, retired ones included
+ * — the deliberate opposite of `loadEmployeeFormOptions` directly above.
+ *
+ * The two are siblings, not duplicates, and the difference is load-bearing: the form read excludes
+ * inactive rows because a retired role must not be assignable on a NEW write, while a filter is a
+ * read and `is_active` has never gated an existing employee's visibility (AD-16). Filtering this
+ * list would make everyone holding a retired code unreachable, and the directory would under-report
+ * that group with nothing on screen to say so.
+ *
+ * Orchestration only — this layer never checks a code against these facets. An unknown code is the
+ * adapter's exact-equality predicate matching nothing; adding a refusal arm here would be a second
+ * judge of a question the reference tables already answer.
+ *
+ * TOTAL: a repository throw is `unavailable`, not an exception.
+ */
+export async function loadDirectoryFacets(
+  deps: EmployeeUseCaseDeps,
+): Promise<DirectoryFacetsResult> {
+  try {
+    return { kind: 'facets', facets: await deps.repository.loadDirectoryFacets() };
   } catch {
     return { kind: 'unavailable' };
   }

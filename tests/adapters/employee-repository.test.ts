@@ -9,9 +9,11 @@ import {
   fromDbDate,
   hasErrorCode,
   isUuid,
+  MAX_FILTER_CODE_LENGTH,
   MAX_LIST_LIMIT,
   MAX_LIST_OFFSET,
   MIN_LIST_LIMIT,
+  normalizeFilterCode,
   normalizeSearchTerm,
   toCurrencyFormats,
   MAX_SEARCH_LENGTH,
@@ -530,10 +532,18 @@ describe('listEmployees reads the page and its total under ONE snapshot', () => 
   /** Records HOW `$transaction` was called, which is the whole point — see the tests below. */
   function transactionProbe() {
     const calls: { form: 'array' | 'interactive'; options: unknown }[] = [];
+    /** Every `where` the two statements were handed, so a filter can be proven to reach the query. */
+    const wheres: unknown[] = [];
     const delegates = {
       employee: {
-        findMany: () => Promise.resolve([]),
-        count: () => Promise.resolve(0),
+        findMany: (args: { where?: unknown }) => {
+          wheres.push(args.where);
+          return Promise.resolve([]);
+        },
+        count: (args: { where?: unknown }) => {
+          wheres.push(args.where);
+          return Promise.resolve(0);
+        },
       },
     };
     const client = {
@@ -547,8 +557,11 @@ describe('listEmployees reads the page and its total under ONE snapshot', () => 
         return Promise.all(body as Promise<unknown>[]);
       },
     } as unknown as StubClient;
-    return { client, calls };
+    return { client, calls, wheres };
   }
+
+  /** The three filters are `null` unless a test is about them. */
+  const NO_FILTERS = { roleCode: null, levelCode: null, countryCode: null } as const;
 
   it('asks for REPEATABLE READ, on the transaction form that actually applies it', async () => {
     // Wrapping `findMany` and `count` in a transaction does NOT by itself make them agree:
@@ -564,6 +577,7 @@ describe('listEmployees reads the page and its total under ONE snapshot', () => 
     const probe = transactionProbe();
 
     await createEmployeeRepository(probe.client).listEmployees({
+      ...NO_FILTERS,
       search: null,
       limit: 10,
       offset: 0,
@@ -578,6 +592,7 @@ describe('listEmployees reads the page and its total under ONE snapshot', () => 
     const probe = transactionProbe();
 
     const page = await createEmployeeRepository(probe.client).listEmployees({
+      ...NO_FILTERS,
       search: null,
       limit: 10,
       offset: 0,
@@ -585,6 +600,126 @@ describe('listEmployees reads the page and its total under ONE snapshot', () => 
 
     expect(probe.calls).toHaveLength(1);
     expect(page).toEqual({ employees: [], totalCount: 0, limit: 10, offset: 0 });
+  });
+
+  // The rows and the total must be judged by the SAME predicate. A filter applied to `findMany` but
+  // not to `count` gives a pager reading "Employees 1–3 of 10,000" beside three rows — the exact
+  // class of lie the one-snapshot transaction above exists to prevent, arriving by another door.
+  it('applies every filter to BOTH the page and its count, as exact equality', async () => {
+    const probe = transactionProbe();
+
+    await createEmployeeRepository(probe.client).listEmployees({
+      search: null,
+      roleCode: 'ENG',
+      levelCode: 'IC5',
+      countryCode: 'IN',
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(probe.wheres).toHaveLength(2);
+    for (const where of probe.wheres) {
+      expect(where).toEqual({ roleCode: 'ENG', levelCode: 'IC5', countryCode: 'IN' });
+    }
+  });
+
+  it('ANDs a filter with the search term rather than replacing it', async () => {
+    const probe = transactionProbe();
+
+    await createEmployeeRepository(probe.client).listEmployees({
+      ...NO_FILTERS,
+      search: 'ana',
+      levelCode: 'IC5',
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(probe.wheres[0]).toEqual({
+      name: { contains: 'ana', mode: 'insensitive' },
+      levelCode: 'IC5',
+    });
+  });
+
+  it('omits a dimension entirely when it is not filtered', async () => {
+    const probe = transactionProbe();
+
+    await createEmployeeRepository(probe.client).listEmployees({
+      ...NO_FILTERS,
+      search: null,
+      roleCode: 'ENG',
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(probe.wheres[0]).toEqual({ roleCode: 'ENG' });
+  });
+
+  // A blank or whitespace-only code is a cleared select, not a filter for the empty string — the
+  // same rule `normalizeSearchTerm` applies to a cleared search box.
+  it('treats a blank or whitespace-only code as no filter at all', async () => {
+    const probe = transactionProbe();
+
+    await createEmployeeRepository(probe.client).listEmployees({
+      search: null,
+      roleCode: '',
+      levelCode: '   ',
+      countryCode: null,
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(probe.wheres[0]).toEqual({});
+  });
+
+  // The one thing that must NOT be normalized away. An unknown code reaching the database as an
+  // exact-equality predicate answers zero rows, which is the honest answer; dropping it to "no
+  // filter" would render the whole directory to someone who asked for one role.
+  it('sends an unrecognised code to the database rather than dropping it', async () => {
+    const probe = transactionProbe();
+
+    await createEmployeeRepository(probe.client).listEmployees({
+      ...NO_FILTERS,
+      search: null,
+      roleCode: 'NOPE',
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(probe.wheres[0]).toEqual({ roleCode: 'NOPE' });
+  });
+});
+
+describe('normalizeFilterCode — hostile input on the filter params', () => {
+  // `string | null` is a COMPILE-time claim. The caller is a Server Component reading
+  // `searchParams`, where a repeated `?role=a&role=b` is an ARRAY and an absent one is `undefined`
+  // — either would reach `.trim()` as a TypeError, which the read use-case catches and reports as
+  // `{ kind: 'unavailable' }`: an outage screen for a duplicated query parameter.
+  it('answers null for anything that is not a string', () => {
+    expect(normalizeFilterCode(null)).toBeNull();
+    expect(normalizeFilterCode(undefined as unknown as string)).toBeNull();
+    expect(normalizeFilterCode(['a', 'b'] as unknown as string)).toBeNull();
+  });
+
+  it('answers null for a blank or whitespace-only code', () => {
+    expect(normalizeFilterCode('')).toBeNull();
+    expect(normalizeFilterCode('   ')).toBeNull();
+  });
+
+  it('trims a code that survives', () => {
+    expect(normalizeFilterCode('  ENG  ')).toBe('ENG');
+  });
+
+  // Bounded for the reason the search term is: the value arrives from a hand-editable URL and is
+  // sent to the database. No reference code approaches this length, so anything past it is noise.
+  it('truncates an over-long code to MAX_FILTER_CODE_LENGTH', () => {
+    const long = 'X'.repeat(MAX_FILTER_CODE_LENGTH + 40);
+    expect(normalizeFilterCode(long)).toBe('X'.repeat(MAX_FILTER_CODE_LENGTH));
+  });
+
+  // No LIKE escaping, deliberately: this compiles to `=`, not to `LIKE`, so `%` and `_` are
+  // ordinary characters with no wildcard meaning to strip.
+  it('leaves LIKE metacharacters alone — an equality match has no wildcards', () => {
+    expect(normalizeFilterCode('EN%_G')).toBe('EN%_G');
   });
 });
 

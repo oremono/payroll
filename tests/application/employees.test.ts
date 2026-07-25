@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  DirectoryFacets,
   EmployeeDetail,
   EmployeeFormOptions,
   EmployeeListPage,
@@ -15,6 +16,7 @@ import {
   createEmployee,
   getEmployee,
   listEmployees,
+  loadDirectoryFacets,
   loadEmployeeFormOptions,
   updateEmployee,
   type EmployeeUseCaseDeps,
@@ -57,6 +59,23 @@ const FORM_OPTIONS: EmployeeFormOptions = {
   // complete `EmployeeFormOptions`.
   currencies: [{ code: 'INR', symbol: '₹', minorUnitExponent: 2, groupingStyle: 'INDIAN' }],
 };
+
+/**
+ * The FILTER facets — is_active-INCLUSIVE, unlike `FORM_OPTIONS` above. `retired_role` is here and
+ * deliberately NOT in the form options: an employee who holds it must stay filterable even though
+ * nobody may be newly assigned to it (AD-16).
+ */
+const DIRECTORY_FACETS: DirectoryFacets = {
+  roles: [
+    { code: 'retired_role', name: 'Retired Role' },
+    { code: 'software_engineer', name: 'Software Engineer' },
+  ],
+  levels: [{ code: 'L3', name: 'Level 3' }],
+  countries: [{ code: 'IN', name: 'India' }],
+};
+
+/** The three filters, all off — what a directory read looks like when nothing is narrowed. */
+const NO_FILTERS = { roleCode: null, levelCode: null, countryCode: null } as const;
 
 const BOOM = new Error('the database is not answering');
 
@@ -106,6 +125,7 @@ function fakeDeps(config: FakeConfig = {}): EmployeeUseCaseDeps & { recorded: Re
       );
     },
     loadFormOptions: async () => guard('loadFormOptions', FORM_OPTIONS),
+    loadDirectoryFacets: async () => guard('loadDirectoryFacets', DIRECTORY_FACETS),
     // CAP-3's sibling append (story 4-1). Present so this fake still satisfies the port; no CAP-2
     // use-case reaches it, and `tests/application/record-salary-change.test.ts` is where it is
     // actually exercised.
@@ -376,7 +396,7 @@ describe('listEmployees — a read is total too', () => {
       page: { employees: [DETAIL], totalCount: 137, limit: 200, offset: 0 },
     });
 
-    const result = await listEmployees(deps, { search: null, limit: 1_000_000, offset: -5 });
+    const result = await listEmployees(deps, { ...NO_FILTERS, search: null, limit: 1_000_000, offset: -5 });
 
     expect(result).toEqual({
       kind: 'page',
@@ -390,16 +410,16 @@ describe('listEmployees — a read is total too', () => {
   it('passes the search term through to the repository untouched', async () => {
     const deps = fakeDeps();
 
-    await listEmployees(deps, { search: 'ana', limit: 25, offset: 50 });
+    await listEmployees(deps, { ...NO_FILTERS, search: 'ana', limit: 25, offset: 50 });
 
-    expect(deps.recorded.listed).toEqual([{ search: 'ana', limit: 25, offset: 50 }]);
+    expect(deps.recorded.listed).toEqual([{ ...NO_FILTERS, search: 'ana', limit: 25, offset: 50 }]);
   });
 
   it('answers `unavailable` when the repository throws — it does NOT propagate', async () => {
     const deps = fakeDeps({ throwsOn: 'listEmployees' });
 
     await expect(
-      listEmployees(deps, { search: null, limit: 25, offset: 0 }),
+      listEmployees(deps, { ...NO_FILTERS, search: null, limit: 25, offset: 0 }),
     ).resolves.toEqual({ kind: 'unavailable' });
   });
 });
@@ -421,6 +441,85 @@ describe('loadEmployeeFormOptions — a read is total too', () => {
   });
 });
 
+describe('loadDirectoryFacets — a read is total too', () => {
+  it('answers `facets` with every reference value, retired ones included', async () => {
+    const deps = fakeDeps();
+
+    await expect(loadDirectoryFacets(deps)).resolves.toEqual({
+      kind: 'facets',
+      facets: DIRECTORY_FACETS,
+    });
+  });
+
+  // The distinction this use-case exists for. `loadFormOptions` feeds a CREATE form and excludes
+  // retired rows because they must not be newly assignable; the FILTER must still offer them or
+  // every employee holding one becomes unreachable and the directory under-reports that group with
+  // no signal (AD-16). Asserting the two reads DISAGREE is what stops a later refactor collapsing
+  // them back into one.
+  it('offers a retired role the create form does not', async () => {
+    const deps = fakeDeps();
+
+    const facets = await loadDirectoryFacets(deps);
+    const options = await loadEmployeeFormOptions(deps);
+    const codeOf = (rows: readonly { readonly code: string }[]) => rows.map((row) => row.code);
+
+    expect(facets.kind === 'facets' && codeOf(facets.facets.roles)).toContain('retired_role');
+    expect(options.kind === 'options' && codeOf(options.options.roles)).not.toContain(
+      'retired_role',
+    );
+  });
+
+  it('answers `unavailable` when the repository throws — it does NOT propagate', async () => {
+    const deps = fakeDeps({ throwsOn: 'loadDirectoryFacets' });
+
+    await expect(loadDirectoryFacets(deps)).resolves.toEqual({ kind: 'unavailable' });
+  });
+});
+
+describe('listEmployees carries the filters', () => {
+  it('passes all three codes through to the repository untouched', async () => {
+    const deps = fakeDeps();
+
+    await listEmployees(deps, {
+      search: 'ana',
+      roleCode: 'software_engineer',
+      levelCode: 'L3',
+      countryCode: 'IN',
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(deps.recorded.listed).toEqual([
+      {
+        search: 'ana',
+        roleCode: 'software_engineer',
+        levelCode: 'L3',
+        countryCode: 'IN',
+        limit: 25,
+        offset: 0,
+      },
+    ]);
+  });
+
+  // Orchestration only. This layer does not know which codes exist, and must not start checking —
+  // an unknown code is the adapter's exact-equality predicate matching nothing, and a refusal arm
+  // here would be a second judge of a question the reference tables already answer.
+  it('does not judge an unrecognised code', async () => {
+    const deps = fakeDeps();
+
+    const result = await listEmployees(deps, {
+      ...NO_FILTERS,
+      search: null,
+      roleCode: 'NOPE',
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(result.kind).toBe('page');
+    expect(deps.recorded.listed[0]?.roleCode).toBe('NOPE');
+  });
+});
+
 describe('no use-case in this module ever throws', () => {
   it('resolves every one of the five against a repository whose every method rejects', async () => {
     // The acceptance criterion, as one test: no test in the suite may observe a read use-case
@@ -431,6 +530,7 @@ describe('no use-case in this module ever throws', () => {
       updateEmployee(fakeDeps({ throwsOn: 'loadReferenceData' }), 'emp-1', validUpdate()),
       getEmployee(fakeDeps({ throwsOn: 'findEmployeeById' }), 'emp-1'),
       listEmployees(fakeDeps({ throwsOn: 'listEmployees' }), {
+        ...NO_FILTERS,
         search: null,
         limit: 25,
         offset: 0,

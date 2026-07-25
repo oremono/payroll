@@ -30,6 +30,7 @@ import {
   createEmployee,
   getEmployee,
   listEmployees,
+  loadDirectoryFacets,
   loadEmployeeFormOptions,
   updateEmployee,
   type EmployeeUseCaseDeps,
@@ -80,6 +81,9 @@ const RANK_BAND_WIDTH = 6_000_000;
 const fixtureRank = RANK_BAND_START + (parseInt(suffix, 16) % RANK_BAND_WIDTH);
 
 const HIRE_DATE = '2021-06-01';
+
+/** The three directory filters, all off — a list read that narrows by nothing but its search term. */
+const NO_FILTERS = { roleCode: null, levelCode: null, countryCode: null } as const;
 
 function deps(): EmployeeUseCaseDeps {
   return { repository: createEmployeeRepository(), idGenerator: createUuidV7Generator() };
@@ -562,7 +566,7 @@ describe('listEmployees paginates and searches', () => {
   });
 
   it('returns a page in (hire-date desc, id) order with the total, and echoes the effective window', async () => {
-    const result = await listEmployees(deps(), { search: cohort, limit: 3, offset: 0 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: cohort, limit: 3, offset: 0 });
 
     expect(result.kind).toBe('page');
     if (result.kind !== 'page') return;
@@ -580,7 +584,7 @@ describe('listEmployees paginates and searches', () => {
   it('pages through the whole cohort without dropping or repeating a row', async () => {
     const seen: string[] = [];
     for (let offset = 0; offset < 8; offset += 3) {
-      const page = await listEmployees(deps(), { search: cohort, limit: 3, offset });
+      const page = await listEmployees(deps(), { ...NO_FILTERS, search: cohort, limit: 3, offset });
       if (page.kind !== 'page') throw new Error('expected a page');
       seen.push(...page.employees.map((e) => e.id));
     }
@@ -591,7 +595,7 @@ describe('listEmployees paginates and searches', () => {
 
   it('gives duplicate names a stable, distinct order across repeated reads', async () => {
     const read = async () => {
-      const page = await listEmployees(deps(), { search: TWIN, limit: 10, offset: 0 });
+      const page = await listEmployees(deps(), { ...NO_FILTERS, search: TWIN, limit: 10, offset: 0 });
       if (page.kind !== 'page') throw new Error('expected a page');
       return page.employees.map((e) => e.id);
     };
@@ -605,7 +609,7 @@ describe('listEmployees paginates and searches', () => {
   });
 
   it('searches the name case-insensitively, as a substring', async () => {
-    const result = await listEmployees(deps(), { search: `ana ${cohort}`, limit: 50, offset: 0 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: `ana ${cohort}`, limit: 50, offset: 0 });
 
     if (result.kind !== 'page') throw new Error('expected a page');
     // Three matches, and each one proves something different: `Ana …` matches at position 0 with
@@ -619,14 +623,14 @@ describe('listEmployees paginates and searches', () => {
   });
 
   it('searches the NAME only — a role or country code is not a search key', async () => {
-    const result = await listEmployees(deps(), { search: ROLE, limit: 10, offset: 0 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: ROLE, limit: 10, offset: 0 });
 
     if (result.kind !== 'page') throw new Error('expected a page');
     expect(result.totalCount).toBe(0);
   });
 
   it('answers an empty page with the correct total when the offset is past the end', async () => {
-    const result = await listEmployees(deps(), { search: cohort, limit: 10, offset: 500 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: cohort, limit: 10, offset: 500 });
 
     if (result.kind !== 'page') throw new Error('expected a page');
     expect(result.employees).toEqual([]);
@@ -636,7 +640,7 @@ describe('listEmployees paginates and searches', () => {
   it('treats a LIKE metacharacter as ordinary punctuation, not a wildcard', async () => {
     // Unescaped, `%` matches every employee in the table and `_` matches any single character.
     for (const search of ['%', '_', `${cohort}%`, `Ana_${cohort}`]) {
-      const result = await listEmployees(deps(), { search, limit: 10, offset: 0 });
+      const result = await listEmployees(deps(), { ...NO_FILTERS, search, limit: 10, offset: 0 });
       if (result.kind !== 'page') throw new Error('expected a page');
       expect(result.employees).toEqual([]);
       expect(result.totalCount).toBe(0);
@@ -644,20 +648,20 @@ describe('listEmployees paginates and searches', () => {
   });
 
   it('clamps a hostile limit and a negative offset, and echoes the CLAMPED values', async () => {
-    const huge = await listEmployees(deps(), { search: cohort, limit: 1_000_000, offset: -5 });
+    const huge = await listEmployees(deps(), { ...NO_FILTERS, search: cohort, limit: 1_000_000, offset: -5 });
     if (huge.kind !== 'page') throw new Error('expected a page');
     expect(huge.limit).toBe(200);
     expect(huge.offset).toBe(0);
     expect(huge.employees).toHaveLength(7);
 
-    const tiny = await listEmployees(deps(), { search: cohort, limit: 0, offset: 0 });
+    const tiny = await listEmployees(deps(), { ...NO_FILTERS, search: cohort, limit: 0, offset: 0 });
     if (tiny.kind !== 'page') throw new Error('expected a page');
     expect(tiny.limit).toBe(1);
     expect(tiny.employees).toHaveLength(1);
   });
 
   it('a null search is no filter at all, and finds this cohort among everyone else', async () => {
-    const result = await listEmployees(deps(), { search: null, limit: 200, offset: 0 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: null, limit: 200, offset: 0 });
 
     if (result.kind !== 'page') throw new Error('expected a page');
     // Deliberately not an equality assertion on the total: other suites share this database.
@@ -668,9 +672,9 @@ describe('listEmployees paginates and searches', () => {
     // Story 3-2's search box sends `''` the moment a reader clears it, and `'   '` the moment they
     // hit the space bar. Both mean "I am not searching", and they must reach the same page a null
     // search reaches — not a filter that matches by accident, and not one that matches nothing.
-    const none = await listEmployees(deps(), { search: null, limit: 200, offset: 0 });
-    const empty = await listEmployees(deps(), { search: '', limit: 200, offset: 0 });
-    const blank = await listEmployees(deps(), { search: '   ', limit: 200, offset: 0 });
+    const none = await listEmployees(deps(), { ...NO_FILTERS, search: null, limit: 200, offset: 0 });
+    const empty = await listEmployees(deps(), { ...NO_FILTERS, search: '', limit: 200, offset: 0 });
+    const blank = await listEmployees(deps(), { ...NO_FILTERS, search: '   ', limit: 200, offset: 0 });
 
     if (none.kind !== 'page' || empty.kind !== 'page' || blank.kind !== 'page') {
       throw new Error('expected pages');
@@ -682,7 +686,7 @@ describe('listEmployees paginates and searches', () => {
   });
 
   it('trims a search term rather than searching for the spaces around it', async () => {
-    const result = await listEmployees(deps(), {
+    const result = await listEmployees(deps(), { ...NO_FILTERS,
       search: `  ana ${cohort}  `,
       limit: 50,
       offset: 0,
@@ -713,14 +717,14 @@ describe('a name containing a literal backslash — the one case the escape doub
     // PostgreSQL as LIKE '%Back\slash …%', where `\s` is an ESCAPED s — the pattern silently
     // becomes "Backslash …", so this search would return the OTHER employee and miss the one it
     // named. Both rows exist here precisely so that failure is visible rather than merely empty.
-    const result = await listEmployees(deps(), { search: WITH_BACKSLASH, limit: 10, offset: 0 });
+    const result = await listEmployees(deps(), { ...NO_FILTERS, search: WITH_BACKSLASH, limit: 10, offset: 0 });
 
     if (result.kind !== 'page') throw new Error('expected a page');
     expect(result.employees.map((e) => e.name)).toEqual([WITH_BACKSLASH]);
   });
 
   it('does not match the backslash-free twin, and is not matched BY it', async () => {
-    const result = await listEmployees(deps(), {
+    const result = await listEmployees(deps(), { ...NO_FILTERS,
       search: WITHOUT_BACKSLASH,
       limit: 10,
       offset: 0,
@@ -734,7 +738,7 @@ describe('a name containing a literal backslash — the one case the escape doub
     // An unescaped trailing `\` is a malformed LIKE pattern and PostgreSQL raises rather than
     // answering, so this asserts the search stays a search instead of becoming an outage. Scoped by
     // the run token because previous runs of this very suite left their own backslashed rows behind.
-    const result = await listEmployees(deps(), {
+    const result = await listEmployees(deps(), { ...NO_FILTERS,
       search: String.raw`\slash ${token}`,
       limit: 10,
       offset: 0,
@@ -776,6 +780,149 @@ describe('the isolation level the list query depends on is really applied', () =
     );
 
     expect(rows[0]?.level).toBe('read committed');
+  });
+});
+
+describe('the directory filters, against the real database', () => {
+  const cohort = `filt-${suffix}`;
+  const NAMES = {
+    midHome: `Mid Home ${cohort}`,
+    midHomeTwo: `Mid Home Two ${cohort}`,
+    highHome: `High Home ${cohort}`,
+    midAway: `Mid Away ${cohort}`,
+  };
+
+  beforeAll(async () => {
+    // A 2x2 taxonomy so every filter has something to EXCLUDE. A test where the filter's answer
+    // equals the whole cohort proves nothing — it passes just as well when the `where` is dropped.
+    await createEmployee(deps(), validInput({ name: NAMES.midHome, levelCode: LEVEL_MID }));
+    await createEmployee(deps(), validInput({ name: NAMES.midHomeTwo, levelCode: LEVEL_MID }));
+    await createEmployee(deps(), validInput({ name: NAMES.highHome, levelCode: LEVEL_HIGH }));
+    await createEmployee(
+      deps(),
+      validInput({ name: NAMES.midAway, levelCode: LEVEL_MID, countryCode: COUNTRY_ZERO }),
+    );
+  });
+
+  /** Every name the given query matched, scoped to this cohort by the shared search term. */
+  async function namesMatching(filters: {
+    roleCode?: string | null;
+    levelCode?: string | null;
+    countryCode?: string | null;
+  }): Promise<string[]> {
+    const result = await listEmployees(deps(), {
+      ...NO_FILTERS,
+      ...filters,
+      search: cohort,
+      limit: 200,
+      offset: 0,
+    });
+    if (result.kind !== 'page') throw new Error('expected a page');
+    // The total must agree with the rows, or the pager would describe a different result set than
+    // the one on screen — the filter has to reach BOTH statements in the transaction.
+    expect(result.totalCount).toBe(result.employees.length);
+    return result.employees.map((employee) => employee.name).sort();
+  }
+
+  it('narrows to one level, excluding the others', async () => {
+    expect(await namesMatching({ levelCode: LEVEL_MID })).toEqual(
+      [NAMES.midAway, NAMES.midHome, NAMES.midHomeTwo].sort(),
+    );
+    expect(await namesMatching({ levelCode: LEVEL_HIGH })).toEqual([NAMES.highHome]);
+  });
+
+  it('narrows to one country, excluding the others', async () => {
+    expect(await namesMatching({ countryCode: COUNTRY_ZERO })).toEqual([NAMES.midAway]);
+  });
+
+  it('ANDs the dimensions rather than widening across them', async () => {
+    expect(await namesMatching({ levelCode: LEVEL_MID, countryCode: COUNTRY })).toEqual(
+      [NAMES.midHome, NAMES.midHomeTwo].sort(),
+    );
+    // A combination no employee satisfies, though each half matches somebody — an AND that had
+    // silently become an OR would answer three names here.
+    expect(await namesMatching({ levelCode: LEVEL_HIGH, countryCode: COUNTRY_ZERO })).toEqual([]);
+  });
+
+  it('ANDs a filter with the name search rather than replacing it', async () => {
+    const result = await listEmployees(deps(), {
+      ...NO_FILTERS,
+      search: `High Home ${cohort}`,
+      levelCode: LEVEL_MID,
+      limit: 200,
+      offset: 0,
+    });
+    if (result.kind !== 'page') throw new Error('expected a page');
+    // The name matches one employee and the level matches three; their intersection is empty. A
+    // search that had replaced the filter (or the reverse) would answer one row.
+    expect(result.employees).toEqual([]);
+    expect(result.totalCount).toBe(0);
+  });
+
+  it('answers an empty page for an unrecognised code rather than ignoring the filter', async () => {
+    // The behaviour a whole layer of this feature exists to protect: `?role=NOPE` must not render
+    // the entire directory. Zero rows is the honest answer to a role nobody holds.
+    expect(await namesMatching({ roleCode: `no-such-role-${suffix}` })).toEqual([]);
+  });
+
+  it('treats a blank or whitespace-only code as no filter at all', async () => {
+    const unfiltered = await namesMatching({});
+    expect(await namesMatching({ roleCode: '' })).toEqual(unfiltered);
+    expect(await namesMatching({ levelCode: '   ' })).toEqual(unfiltered);
+  });
+});
+
+describe('loadDirectoryFacets offers what the form options refuse', () => {
+  // The one assertion this whole design decision rests on, and it can only be made against a real
+  // database: the two reads disagree, by exactly the `is_active` rows. `is_active` gates
+  // PICKABILITY for a new write; it has never gated the visibility of an employee who already holds
+  // the code (AD-16), so a filter that reused the form's list would leave those employees
+  // unreachable and the directory would under-report them with no signal at all.
+  it('INCLUDES the inactive role, level, and country the create form excludes', async () => {
+    const facets = await loadDirectoryFacets(deps());
+    const options = await loadEmployeeFormOptions(deps());
+    if (facets.kind !== 'facets') throw new Error('expected facets');
+    if (options.kind !== 'options') throw new Error('expected options');
+
+    const codes = (rows: readonly { readonly code: string }[]) => rows.map((row) => row.code);
+
+    expect(codes(facets.facets.roles)).toContain(INACTIVE_ROLE);
+    expect(codes(options.options.roles)).not.toContain(INACTIVE_ROLE);
+
+    expect(codes(facets.facets.levels)).toContain(INACTIVE_LEVEL);
+    expect(codes(options.options.levels)).not.toContain(INACTIVE_LEVEL);
+
+    expect(codes(facets.facets.countries)).toContain(INACTIVE_COUNTRY);
+    expect(codes(options.options.countries)).not.toContain(INACTIVE_COUNTRY);
+  });
+
+  it('still offers the ACTIVE rows — it is a superset, not a swap', async () => {
+    const facets = await loadDirectoryFacets(deps());
+    if (facets.kind !== 'facets') throw new Error('expected facets');
+
+    expect(facets.facets.roles.map((r) => r.code)).toContain(ROLE);
+    expect(facets.facets.countries.map((c) => c.code)).toContain(COUNTRY);
+  });
+
+  it('orders levels by rank, so the select cannot reshuffle between page loads', async () => {
+    const facets = await loadDirectoryFacets(deps());
+    if (facets.kind !== 'facets') throw new Error('expected facets');
+
+    // Scoped to these four codes EXPLICITLY rather than to everything ending in `suffix`: other
+    // tests in this file plant their own levels at higher ranks, and unlike `loadFormOptions` this
+    // read does not filter the deactivated ones back out — a suffix-wide assertion would depend on
+    // which tests had run, which this suite forbids.
+    const wanted = new Set([LEVEL_LOW, LEVEL_MID, LEVEL_HIGH, INACTIVE_LEVEL]);
+    const ours = facets.facets.levels.filter((level) => wanted.has(level.code));
+
+    // Inserted out of rank order in `beforeAll`, so this cannot pass on insertion order. The
+    // INACTIVE level is in the list and sits at its own rank — the ordering is over every row.
+    expect(ours.map((level) => level.code)).toEqual([
+      LEVEL_LOW,
+      LEVEL_MID,
+      LEVEL_HIGH,
+      INACTIVE_LEVEL,
+    ]);
   });
 });
 

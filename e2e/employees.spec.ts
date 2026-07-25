@@ -210,7 +210,7 @@ test.describe('search', () => {
     // UPPERCASE deliberately: a search that matched only the spelling it was given would prove
     // nothing about the `mode: 'insensitive'` the adapter asks for.
     await page.getByLabel('Search employees by name').fill('ANA');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.getByRole('button', { name: 'Apply' }).click();
 
     await expect(page.getByRole('row')).toHaveCount(ANA_MATCHES.length + 1);
     for (const name of ANA_MATCHES) {
@@ -223,7 +223,7 @@ test.describe('search', () => {
     await page.goto('/employees?asOf=2026-01-01&page=2');
 
     await page.getByLabel('Search employees by name').fill('ana');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByText('Employees 1–4 of 4')).toBeVisible();
 
     const url = new URL(page.url());
@@ -249,6 +249,130 @@ test.describe('search', () => {
     const response = await page.goto('/employees?q=a&q=b');
 
     expect(response?.status()).toBe(200);
+    await expect(page.getByText(`Employees 1–${String(PAGE_SIZE)} of ${String(TOTAL)}`)).toBeVisible();
+  });
+});
+
+test.describe('the role / level / country filters', () => {
+  /** How many of the thirty fixture employees the given predicate holds for. */
+  const countWhere = (predicate: (name: string, index: number) => boolean) =>
+    NAMES.filter((name, index) => predicate(name, index)).length;
+
+  test('narrows the table to one country, and the total agrees with the rows', async ({ page }) => {
+    await page.goto('/employees');
+
+    await page.getByLabel('Country').selectOption('US');
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    const expected = countWhere((name, index) => countryFor(name, index) === 'US');
+    // The status line is the assertion that matters: it is computed from `totalCount`, which is the
+    // COUNT statement. If the filter reached the rows but not the count, this number would still be
+    // thirty while the table showed fewer.
+    await expect(page.getByText(`of ${String(expected)} · Page 1 of 1`)).toBeVisible();
+    await expect(page.getByRole('row')).toHaveCount(expected + 1);
+    await expect(page.getByRole('cell', { name: 'US', exact: true })).toHaveCount(expected);
+  });
+
+  test('ANDs a filter with the search term', async ({ page }) => {
+    await page.goto('/employees');
+
+    await page.getByLabel('Search employees by name').fill('ana');
+    await page.getByLabel('Country').selectOption('US');
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    const expected = ANA_MATCHES.filter((name) =>
+      NAMES.some((seeded, index) => seeded === name && countryFor(name, index) === 'US'),
+    ).length;
+    await expect(page.getByText(`of ${String(expected)} ·`)).toBeVisible();
+    expect(new URL(page.url()).searchParams.get('q')).toBe('ana');
+  });
+
+  // AD-16: `is_active` gates PICKABILITY for a NEW write, never the visibility of someone who
+  // already holds the code. `Zoltan Kovacs` sits on `retired_role`, which the CREATE form must not
+  // offer and the FILTER must. This is the acceptance criterion for the whole second-read design.
+  test('offers a RETIRED role the create form withholds, and finds who holds it', async ({
+    page,
+  }) => {
+    await page.goto('/employees');
+
+    const roleFilter = page.getByLabel('Role');
+    await expect(roleFilter.locator('option[value="retired_role"]')).toHaveCount(1);
+
+    await roleFilter.selectOption('retired_role');
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    await expect(page.getByRole('cell', { name: 'Zoltan Kovacs' })).toBeVisible();
+    await expect(page.getByText('of 1 · Page 1 of 1')).toBeVisible();
+
+    // The same code, in the CREATE form's role select, must be absent — the two reads disagree by
+    // design, and a regression that collapsed them into one would show up right here.
+    await page.getByRole('button', { name: 'Add employee' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Role').locator('option[value="retired_role"]')).toHaveCount(0);
+  });
+
+  test('resets to page 1 when a filter changes, and keeps `asOf`', async ({ page }) => {
+    await page.goto('/employees?asOf=2026-01-01&page=2');
+
+    await page.getByLabel('Level').selectOption('L1');
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    const url = new URL(page.url());
+    expect(url.searchParams.has('page')).toBe(false);
+    expect(url.searchParams.get('asOf')).toBe('2026-01-01');
+    expect(url.searchParams.get('level')).toBe('L1');
+    await expect(page.getByText('Page 1 of 1')).toBeVisible();
+  });
+
+  test('echoes the filter in effect back into the select', async ({ page }) => {
+    await page.goto('/employees?level=L2');
+
+    await expect(page.getByLabel('Level')).toHaveValue('L2');
+  });
+
+  test('shows an unrecognised code as itself rather than reporting no filter', async ({ page }) => {
+    // A `<select>` whose value matches no option silently displays the FIRST one — so without the
+    // prepended option this control would read "All roles" beside a table narrowed to nothing.
+    const response = await page.goto('/employees?role=no-such-role');
+
+    expect(response?.status()).toBe(200);
+    await expect(page.getByLabel('Role')).toHaveValue('no-such-role');
+    await expect(page.getByText('No employee matches role no-such-role.')).toBeVisible();
+    // Never the first-run copy: there are thirty employees, and telling this reader to import a
+    // spreadsheet would be a false statement about their data.
+    await expect(page.getByText('Import a spreadsheet to begin')).toHaveCount(0);
+  });
+
+  test('names every criterion in effect when nothing matches', async ({ page }) => {
+    await page.goto('/employees?q=zzz&role=software_engineer&level=L1&country=US');
+
+    await expect(
+      page.getByText(
+        'No employee matches role software_engineer, level L1, country US, and a name containing “zzz”.',
+      ),
+    ).toBeVisible();
+  });
+
+  test('answers a repeated filter param with no filter rather than an outage', async ({ page }) => {
+    const response = await page.goto('/employees?level=L1&level=L2');
+
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(`Employees 1–${String(PAGE_SIZE)} of ${String(TOTAL)}`)).toBeVisible();
+  });
+
+  test('clearing a filter back to All stops filtering', async ({ page }) => {
+    await page.goto('/employees?level=L1');
+
+    await page.getByLabel('Level').selectOption('');
+    await page.getByRole('button', { name: 'Apply' }).click();
+
+    // The URL carries `level=` rather than dropping the key: a native GET form serializes EVERY
+    // named control it holds, empty ones included, and this form has no JavaScript on submit by
+    // design (AD-21 — the search field behaves identically when a reader clears it). What matters
+    // is that an empty value is not a filter, which `parseDirectoryParams` and the adapter both
+    // settle, so the whole directory comes back.
+    expect(new URL(page.url()).searchParams.get('level')).toBe('');
+    await expect(page.getByLabel('Level')).toHaveValue('');
     await expect(page.getByText(`Employees 1–${String(PAGE_SIZE)} of ${String(TOTAL)}`)).toBeVisible();
   });
 });
@@ -919,6 +1043,17 @@ const STATES = [
   { name: 'the populated directory', open: async (page: Page) => page.goto('/employees') },
   { name: 'the second page', open: async (page: Page) => page.goto('/employees?page=2') },
   { name: 'a search with no matches', open: async (page: Page) => page.goto('/employees?q=zzz') },
+  // The three filter selects and their labels are new markup on this toolbar, and a filtered
+  // no-match is a different empty region than a searched one — neither is covered by the states
+  // above, so without these two the floor has a hole exactly the width of this change.
+  {
+    name: 'the directory with filters applied',
+    open: async (page: Page) => page.goto('/employees?level=L1&country=US'),
+  },
+  {
+    name: 'a filtered result with no matches',
+    open: async (page: Page) => page.goto('/employees?role=no-such-role'),
+  },
   {
     name: 'an employee detail page',
     open: async (page: Page) => page.goto(`/employees/${fixtureId(0)}`),

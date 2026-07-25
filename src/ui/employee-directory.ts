@@ -41,6 +41,17 @@ export const DIRECTORY_SEARCH_PARAM = 'q';
 /** The page param, `?page=`. 1-based, and absent when it is 1. */
 export const DIRECTORY_PAGE_PARAM = 'page';
 
+/**
+ * The three filter params, `?role=` / `?level=` / `?country=`. Each carries ONE reference `code`,
+ * they AND with each other and with `q`, and each is absent when nothing is selected.
+ *
+ * A CODE, never a display name: the code is the reference table's identity, and Law 3 favours exact
+ * vocabulary. It is also what makes a bookmarked URL survive a role being renamed.
+ */
+export const DIRECTORY_ROLE_PARAM = 'role';
+export const DIRECTORY_LEVEL_PARAM = 'level';
+export const DIRECTORY_COUNTRY_PARAM = 'country';
+
 /** The directory's own path — the base every link this module builds hangs off. */
 export const EMPLOYEES_HREF = '/employees';
 
@@ -57,10 +68,29 @@ const NUMBER_LOCALE = 'en-US';
  */
 export type DirectorySearchParams = Readonly<Record<string, string | string[] | undefined>>;
 
-/** What the URL asked for, after every hostile shape has been answered. */
-export type DirectoryParams = {
-  /** `null` means no filter — including for a repeated, blank, or whitespace-only term. */
+/**
+ * Everything the reader asked the directory to narrow by, after every hostile shape is answered.
+ *
+ * `null` means "no filter on this dimension" in every field — including for a repeated, blank, or
+ * whitespace-only value. An unrecognised code is NOT null: it is a real filter that will match
+ * nothing, because `?role=NOPE` rendering the whole directory would be a filter that silently does
+ * not filter.
+ */
+export type DirectoryCriteria = {
   readonly q: string | null;
+  readonly role: string | null;
+  readonly level: string | null;
+  readonly country: string | null;
+};
+
+/** The bounds this module is handed. They are the ADAPTER's — see the module header. */
+export type DirectoryBounds = {
+  readonly maxSearchLength: number;
+  readonly maxCodeLength: number;
+};
+
+/** What the URL asked for, after every hostile shape has been answered. */
+export type DirectoryParams = DirectoryCriteria & {
   /** 1-based and at least 1. Whether the page EXISTS is settled later, from the echo. */
   readonly page: number;
 };
@@ -81,29 +111,44 @@ function singleValue(raw: string | string[] | undefined): string | null {
 }
 
 /**
- * Read `q` and `page` out of the URL. Total for every shape `searchParams` can produce.
+ * Read the search term, the three filter codes, and the page out of the URL. Total for every shape
+ * `searchParams` can produce.
  *
- * `maxSearchLength` is the ADAPTER's `MAX_SEARCH_LENGTH`, passed in. Bounding the term here as well
- * as in the adapter is not belt-and-braces: the term is echoed back into the search field and into
- * every pager link, so an unbounded one would be re-serialized into the URL on every page turn.
+ * `bounds` carries the ADAPTER's `MAX_SEARCH_LENGTH` and `MAX_FILTER_CODE_LENGTH`, passed in.
+ * Bounding here as well as in the adapter is not belt-and-braces: every one of these values is
+ * echoed back into a form control AND into every pager link, so an unbounded one would be
+ * re-serialized into the URL on every page turn.
  */
 export function parseDirectoryParams(
   searchParams: DirectorySearchParams,
-  maxSearchLength: number,
+  bounds: DirectoryBounds,
 ): DirectoryParams {
+  const code = (param: string) =>
+    trimmedBounded(singleValue(searchParams[param]), bounds.maxCodeLength);
+
   return {
-    q: parseSearchTerm(singleValue(searchParams[DIRECTORY_SEARCH_PARAM]), maxSearchLength),
+    q: trimmedBounded(singleValue(searchParams[DIRECTORY_SEARCH_PARAM]), bounds.maxSearchLength),
+    role: code(DIRECTORY_ROLE_PARAM),
+    level: code(DIRECTORY_LEVEL_PARAM),
+    country: code(DIRECTORY_COUNTRY_PARAM),
     page: parsePageNumber(singleValue(searchParams[DIRECTORY_PAGE_PARAM])),
   };
 }
 
-/** Trim, then bound. In that order — padding must never be what pushes a term over the bound. */
-function parseSearchTerm(raw: string | null, maxSearchLength: number): string | null {
+/**
+ * Trim, then bound. In that order — padding must never be what pushes a value over the bound.
+ *
+ * One function for the search term and for the three codes, because their NORMALIZATION is
+ * identical: a cleared control sends `''`, a brushed space bar sends `'   '`, and both mean "I am
+ * not narrowing by this". What differs is the bound each is given and what the adapter then DOES
+ * with the survivor — a substring match for the term, exact equality for a code.
+ */
+function trimmedBounded(raw: string | null, bound: number): string | null {
   if (raw === null) {
     return null;
   }
   const trimmed = raw.trim();
-  return trimmed === '' ? null : trimmed.slice(0, maxSearchLength);
+  return trimmed === '' ? null : trimmed.slice(0, bound);
 }
 
 function parsePageNumber(raw: string | null): number {
@@ -208,11 +253,21 @@ export function directoryStatusLine(slice: DirectorySlice): string {
   );
 }
 
-/** The two params this module owns; everything else on the URL is somebody else's and survives. */
+/** The five params this module owns; everything else on the URL is somebody else's and survives. */
 export type DirectoryHrefPatch = {
   readonly q?: string | null;
+  readonly role?: string | null;
+  readonly level?: string | null;
+  readonly country?: string | null;
   readonly page?: number;
 };
+
+/** The filter params, paired with the patch key that sets each. */
+const FILTER_PARAMS = [
+  [DIRECTORY_ROLE_PARAM, 'role'],
+  [DIRECTORY_LEVEL_PARAM, 'level'],
+  [DIRECTORY_COUNTRY_PARAM, 'country'],
+] as const;
 
 /**
  * A directory href with `q` and/or `page` changed and EVERYTHING ELSE carried over.
@@ -253,6 +308,21 @@ export function directoryHref(
     }
   }
 
+  // The three filters follow the search term's rule exactly: `null` is "all", and "all" is the
+  // default, so it is DELETED rather than spelled out as an empty value. Two URLs for one view is
+  // what that would cost, and these URLs are bookmarked and shared.
+  for (const [param, key] of FILTER_PARAMS) {
+    const value = patch[key];
+    if (value === undefined) {
+      continue;
+    }
+    if (value === null) {
+      query.delete(param);
+    } else {
+      query.set(param, value);
+    }
+  }
+
   if (patch.page !== undefined) {
     if (patch.page <= 1) {
       query.delete(DIRECTORY_PAGE_PARAM);
@@ -270,8 +340,12 @@ export function directoryHref(
  *
  * The distinction is the whole function. "No employees yet. Import a spreadsheet to begin." is a
  * TRUE statement about a fresh install and a FALSE one about ten thousand employees and a mistyped
- * search — and the second reader is the one who would act on it. So a search that matched nothing
- * says so, names the term it looked for, and never offers the import copy.
+ * search — and the second reader is the one who would act on it. So a narrowed result that matched
+ * nothing says so, names what it looked for, and never offers the import copy.
+ *
+ * It takes the whole CRITERIA SET rather than the term alone for exactly that reason: once filters
+ * exist, `q === null` no longer means "nothing was asked for". A reader who picked a level and
+ * matched nobody would otherwise be told their database is empty and pointed at the import screen.
  */
 export type DirectoryEmptyState = {
   readonly kind: 'first-run' | 'no-match';
@@ -280,15 +354,49 @@ export type DirectoryEmptyState = {
 
 export function directoryEmptyState(
   totalCount: number,
-  q: string | null,
+  criteria: DirectoryCriteria,
 ): DirectoryEmptyState | null {
   if (totalCount > 0) {
     return null;
   }
-  if (q === null) {
-    // The 1-6 placeholder's ratified sentence, verbatim — the surface that replaces it says exactly
-    // what it said. The link to `/import` is the component's; the sentence is this module's.
-    return { kind: 'first-run', statement: 'No employees yet. Import a spreadsheet to begin.' };
+
+  const { q, role, level, country } = criteria;
+  const named: string[] = [];
+  if (role !== null) {
+    named.push(`role ${role}`);
   }
-  return { kind: 'no-match', statement: `No employee’s name contains “${q}”.` };
+  if (level !== null) {
+    named.push(`level ${level}`);
+  }
+  if (country !== null) {
+    named.push(`country ${country}`);
+  }
+
+  if (named.length === 0) {
+    if (q === null) {
+      // The 1-6 placeholder's ratified sentence, verbatim — the surface that replaces it says
+      // exactly what it said. The link to `/import` is the component's; the sentence is this
+      // module's.
+      return { kind: 'first-run', statement: 'No employees yet. Import a spreadsheet to begin.' };
+    }
+    // The search-only sentence, unchanged since story 3-2 and asserted VERBATIM by
+    // `e2e/employees.spec.ts`. A filter being available is no reason to reword the answer to a
+    // question that did not involve one.
+    return { kind: 'no-match', statement: `No employee’s name contains “${q}”.` };
+  }
+
+  if (q !== null) {
+    named.push(`a name containing “${q}”`);
+  }
+  return { kind: 'no-match', statement: `No employee matches ${joinCriteria(named)}.` };
+}
+
+/** `a` · `a and b` · `a, b, and c` — the Oxford comma only where there is a list to punctuate. */
+function joinCriteria(parts: readonly string[]): string {
+  const last = parts.at(-1);
+  if (parts.length <= 1 || last === undefined) {
+    return parts.join('');
+  }
+  const rest = parts.slice(0, -1);
+  return rest.length === 1 ? `${rest.join('')} and ${last}` : `${rest.join(', ')}, and ${last}`;
 }
