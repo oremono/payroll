@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 import {
@@ -26,6 +26,16 @@ import {
  * Active state is carried by THREE signals — background, weight, and `aria-current` — never by
  * color alone (DESIGN: "Color is never the sole carrier of meaning").
  *
+ * PENDING state is carried the same way, for the same reason. Every destination is a server render
+ * behind a dynamic layout, so a click is a round trip; before this, the sidebar gave no answer at
+ * all until the new page committed, and a nav that looks identical the instant after a click as it
+ * did the instant before reads as a nav that did not register the click. The item the person is
+ * travelling TO therefore takes the tint and the weight immediately, and says `aria-busy` while it
+ * waits. It does NOT take `aria-current` — that would assert the destination is the page being
+ * viewed while the previous one is still on screen, and a nav that lies about where you are is worse
+ * than one that is slow. `useLinkStatus` reads this per link, which is why the label is a component
+ * of its own: the hook is only meaningful to a DESCENDANT of the `<Link>` it reports on.
+ *
  * Every href CARRIES THE AS-OF DATE (`navHrefWithAsOf`). The as-of date is persistent ambient
  * provenance, not a per-page filter, and it lives in the URL — so a bare href silently returns the
  * whole application to today on every navigation, with no signal at all, because the header then
@@ -37,9 +47,18 @@ import {
  * there is no `dark:` variant — the same names re-point themselves under `prefers-color-scheme`.
  */
 
-const LINK_BASE = 'block rounded px-3 py-2 text-body-md';
-const LINK_IDLE = `${LINK_BASE} text-ink-muted hover:bg-surface-tint hover:text-ink`;
-const LINK_ACTIVE = `${LINK_BASE} bg-surface-tint font-semibold text-primary`;
+// The padded box lives on the LABEL, not on the anchor, because the pending state is only readable
+// from inside the `<Link>` — so the element that changes appearance has to be in there with it. The
+// anchor keeps `rounded` so the focus ring still traces the same shape, and `group` is what lets the
+// idle label answer a hover on the anchor around it.
+const LINK_BASE = 'group block rounded';
+const LABEL_BASE = 'block rounded px-3 py-2 text-body-md';
+const LABEL_IDLE = `${LABEL_BASE} text-ink-muted group-hover:bg-surface-tint group-hover:text-ink`;
+const LABEL_ACTIVE = `${LABEL_BASE} bg-surface-tint font-semibold text-primary`;
+// Tint and weight, exactly as the active item wears them — but `text-ink` rather than `text-primary`,
+// so the destination being travelled to and the page actually being viewed never look like two
+// answers to the same question.
+const LABEL_PENDING = `${LABEL_BASE} bg-surface-tint font-semibold text-ink`;
 
 function NavLink({
   item,
@@ -57,11 +76,33 @@ function NavLink({
       <Link
         href={navHrefWithAsOf(item.href, asOfParam)}
         aria-current={isActive ? 'page' : undefined}
-        className={isActive ? LINK_ACTIVE : LINK_IDLE}
+        className={LINK_BASE}
       >
-        {item.label}
+        <NavLinkLabel label={item.label} isActive={isActive} />
       </Link>
     </li>
+  );
+}
+
+/**
+ * The label, which is where every visual state of a nav item is decided.
+ *
+ * `useLinkStatus()` reports on the nearest ancestor `<Link>`, so this must be a separate component —
+ * calling it in `NavLink` would report on nothing. The active arm wins over the pending one: clicking
+ * the item you are already on should not make the current page look like somewhere else.
+ *
+ * `aria-busy` is set only when true. `aria-busy="false"` is the default and spelling it out on seven
+ * links would be seven assertions that nothing is happening.
+ */
+function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean }) {
+  const { pending } = useLinkStatus();
+
+  const className = isActive ? LABEL_ACTIVE : pending ? LABEL_PENDING : LABEL_IDLE;
+
+  return (
+    <span aria-busy={pending ? true : undefined} className={className}>
+      {label}
+    </span>
   );
 }
 

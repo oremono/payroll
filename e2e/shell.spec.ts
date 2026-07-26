@@ -621,3 +621,69 @@ test.describe('hostile and stale URLs fall back to today', () => {
     });
   }
 });
+
+// Every destination is a server render behind a dynamic layout, so a click is a round trip — and
+// before this the application answered a click with nothing at all until the new page committed.
+// Two mechanisms now cover that gap, and which one you see depends on whether the router had
+// prefetched the destination's loading boundary:
+//
+//   - PREFETCHED (the ordinary case, links in the viewport): the transition commits immediately onto
+//     the route's `loading.tsx`, so the destination's skeleton is on screen before its data exists.
+//   - COLD (prefetch unavailable — a slow link, a fresh tab, `next dev` compiling the route): there
+//     is no shell to commit onto yet, so the SIDEBAR carries the answer instead: the item being
+//     travelled to takes the tint and the weight and reports `aria-busy` (`useLinkStatus`).
+//
+// Both are asserted, because each is the other's fallback and a regression in either one restores
+// the original symptom — a click that looks like it did not land.
+test.describe('a navigation says it is happening', () => {
+  test('the destination skeleton is on screen while the server renders', async ({ page }) => {
+    await page.goto('/');
+
+    // Hold the destination's render long enough for the fallback to be observable. The delay is the
+    // point of the test, not a workaround: it stands in for the seconds a cold server really takes.
+    await page.route('**/gender-insights**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await route.continue();
+    });
+
+    await page.getByRole('link', { name: 'Gender Insights', exact: true }).click();
+
+    // The skeleton names itself to a screen reader — the shapes themselves are `aria-hidden`.
+    await expect(
+      page.getByRole('region', { name: 'Loading the gender distribution by level' }),
+    ).toBeVisible();
+
+    // And it gives way to the real surface rather than lingering.
+    await expect(page.getByTestId('as-of-echo')).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Loading the gender distribution by level' }),
+    ).toHaveCount(0);
+  });
+
+  test('the sidebar item marks itself busy when there is no prefetched shell to commit onto', async ({
+    page,
+  }) => {
+    // Abort the PREFETCH traffic only, so the click is a genuine cold navigation, and hold the real
+    // one. `next-router-prefetch` is the header the router marks its speculative fetches with.
+    await page.route('**/*_rsc*', async (route) => {
+      if (route.request().headers()['next-router-prefetch'] === '1') {
+        await route.abort();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await route.continue();
+    });
+
+    await page.goto('/settings');
+    await page.getByRole('link', { name: 'Payroll Totals', exact: true }).click();
+
+    const busy = page.locator('nav[aria-label="Primary"] [aria-busy="true"]');
+    await expect(busy).toHaveCount(1);
+    await expect(busy).toHaveText('Payroll Totals');
+
+    // `aria-busy` is not `aria-current`: while the destination is in flight, Settings is still the
+    // page being viewed and is still the one item marked current. A nav that moved `aria-current` on
+    // click would be asserting a page that is not on screen.
+    await expect(page.locator('nav [aria-current="page"]')).toHaveText('Settings');
+  });
+});
