@@ -16,8 +16,10 @@ import type { GenderDistributionRow, GenderDistributionVM } from '@/ui/gender-di
  * ## One component, two surfaces
  *
  * Gender Insights and the Home pulse render THIS component over the SAME view-model; they differ only
- * in the counts table's visibility (`visuallyHiddenTable`) and the presence of a drill link
- * (`drillHref`). The accessible content is structurally identical on both.
+ * in the counts table's visibility (`visuallyHiddenTable`), whether the M/F split is repeated above
+ * each bar, and the presence of a drill link (`drillHref`). The accessible content is structurally
+ * identical on both. Every bar is labeled with its level on BOTH — a bar that does not say which
+ * level it is is a length, not a reading.
  *
  * ## Color is never the sole carrier (WCAG 2.2 AA)
  *
@@ -86,25 +88,29 @@ export function GenderDistributionChart({
             <Legend />
           </div>
 
-          {/* The decorative bar stack — `aria-hidden`, static, no hover/tooltip/click target. On the
-              Home PULSE the counts table beside it is `sr-only`, so the bars would otherwise be
-              unlabeled to a sighted reader; a caps level label and the M/F split are shown above each
-              bar THERE (still `aria-hidden` — the table remains the accessible carrier). On Gender
-              Insights the visible table already labels every row, so the bar labels are withheld to
-              avoid stating each level twice. */}
+          {/* The decorative bar stack — `aria-hidden`, static, no hover/tooltip/click target.
+              EVERY bar carries its caps level label, on both surfaces. It was once withheld here on
+              the reasoning that the visible table below already names each level, but the two are
+              separate blocks: an unlabeled strip is legible only by counting bars and counting table
+              rows and trusting they agree, which is not reading a chart. A label is what makes the
+              bar mean a level rather than a length. (Both remain `aria-hidden` — the table is still
+              the accessible carrier.)
+
+              The M/F split beside it is shown only on the Home PULSE, where the table IS `sr-only`
+              and the numbers would otherwise be nowhere a sighted reader can reach them. On Gender
+              Insights the visible table carries them a few pixels below, so repeating them here
+              would be stating the same counts twice. */}
           <ol aria-hidden className="mt-4 flex flex-col gap-cell-padding-v">
             {vm.rows.map((row) => (
               <li key={row.levelCode}>
-                {visuallyHiddenTable ? (
-                  <div className="mb-1 flex items-baseline justify-between gap-gutter">
-                    <span className="text-label-caps uppercase text-ink-muted">
-                      {row.levelLabel}
-                    </span>
+                <div className="mb-1 flex items-baseline justify-between gap-gutter">
+                  <span className="text-label-caps uppercase text-ink-muted">{row.levelLabel}</span>
+                  {visuallyHiddenTable ? (
                     <span className="font-mono text-number-sm text-ink-muted">
                       {row.maleN} / {row.femaleN}
                     </span>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
                 <LevelBar row={row} />
               </li>
             ))}
