@@ -2,7 +2,7 @@ name: CI
 
 # Standing rails (AD-1, AD-23). Every push (any branch) and every PR to master runs the full gate
 # set; a failing gate blocks merge once the checks below are required in branch protection.
-# See README.md § Continuous Integration for the required-check list.
+# See docs/ENGINEERING.md § Continuous Integration for the required-check list.
 
 on:
   push:

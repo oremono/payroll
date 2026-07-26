@@ -1,343 +1,320 @@
-# Payroll — Salary Management for ACME HR
+# Salary Management for ACME HR
 
-A Next.js 16 application built on a **functional core / imperative shell** architecture: a pure
-`domain`, an `application` layer of use-cases and ports, `adapters` for all I/O, and `app`/`ui`
-delivery — with dependencies pointing strictly inward.
+Salary software for one person: the HR manager of a 10,000-employee company spread across eight
+countries. It replaces her spreadsheets, and it answers what they cannot — **how does this
+organization actually pay people?** The hardest question in that set, *are we paying them fairly?*,
+is the one it was built around.
 
-This repository is **hand-scaffolded** — not generated from `create-next-app` or any `create-*`
-template. See `docs/project-context.md` for the standing engineering Laws and
-`docs/planning-artifacts/architecture/` for the architecture spine.
-
-## Prerequisites
-
-- **Node.js 24 LTS** — the pinned runtime. With [nvm](https://github.com/nvm-sh/nvm): `nvm use`
-  (reads `.nvmrc`). `package.json` declares `engines.node >=24 <25`.
-- **npm** (bundled with Node) — the project uses npm; `package-lock.json` is committed. Do not swap
-  in another package manager.
-
-## Install
-
-```bash
-npm install
-```
-
-## Commands
-
-| Command | What it does |
+| | |
 | --- | --- |
-| `npm run dev` | Start the Next.js dev server at http://localhost:3000 |
-| `npm run build` | Production build (`next build`) |
-| `npm run start` | Serve the production build (`next start`) |
-| `npm run typecheck` | Type-check with `tsc --noEmit` |
-| `npm run lint` | Lint with the ESLint CLI (`eslint .`) |
-| `npm run test` | Run the Vitest unit suite once |
-| `npm run test:watch` | Run Vitest in watch mode |
-| `npm run test:coverage` | Vitest with the coverage floor on `src/domain` + `src/application` |
-| `npm run test:mutation` | Stryker mutation testing over `src/domain` (a survivor fails) |
-| `npm run test:a11y` | Playwright + axe accessibility pass over the built app |
-| `npm run test:smoke` | Playwright reachability check; set `PLAYWRIGHT_BASE_URL` to probe a deployed URL |
-| `npm run test:integration` | Integration suite against a **real** Postgres 18 (see § Database) |
-| `npm run db:generate` | Regenerate the Prisma client (also wired to `postinstall`) |
-| `npm run db:migrate` | Create + apply a migration locally (`prisma migrate dev`) |
-| `npm run db:deploy` | Apply pending migrations (`prisma migrate deploy`) — CI and deploys |
+| **Live app** | <https://acmesalary.vercel.app/> |
+| **Video demo** | _To be added._ |
+| **Scale** | 10,000 seeded employees · 8 countries · 8 currencies · 25 roles · 6 levels |
+| **Tests** | 1,630 unit tests in 5.0 seconds, plus integration, browser, and accessibility suites |
+| **History** | 193 incremental commits |
+| **Built with** | TypeScript on Node 24 · Next.js 16 (App Router) · React 19 · PostgreSQL 18 via Prisma · Tailwind 4 · Vitest and Playwright · deployed on Vercel and Neon |
 
-## Database
+There is no third-party component library. The components are hand-built against design tokens
+generated from [`DESIGN.md`](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/DESIGN.md), so
+no color is ever hard-coded and the design document cannot drift from the code. See
+[§4](#4-the-decisions-that-shaped-it).
 
-PostgreSQL **18**, pinned across every environment (Neon in deployed environments, a local
-container for development). Prisma **7.8.0** is the ORM.
+To run it locally, see [docs/ENGINEERING.md](docs/ENGINEERING.md) — setup, the database, and
+`npm run seed` for the 10,000-employee population. Or just open the live link, which is already
+populated.
 
-### Connection strings
+---
 
-Copy `.env.example` to `.env` and fill it in. Two URLs, and the distinction matters:
+## Where to find what
 
-| Variable | Role | Used by |
+Everything the assessment asks for has one home. This table is the map.
+
+| What you are looking for | Where |
+| --- | --- |
+| The problem being solved | [§1](#1-the-problem) |
+| What the software does | [§2](#2-what-it-does) |
+| Requirements: goal, scope, what I left out and why | [§3](#3-what-i-deliberately-left-out-and-why) |
+| Architecture and design decisions | [§4](#4-the-decisions-that-shaped-it) |
+| Architecture diagrams | [C4-MODEL.md](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/C4-MODEL.md) |
+| Trade-off explanations | [§4](#4-the-decisions-that-shaped-it), in full at [TRADE-OFFS.md](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/TRADE-OFFS.md) |
+| Performance considerations | [§4](#4-the-decisions-that-shaped-it) (what each decision costs) and [§8](#8-known-gaps-and-what-comes-next) (where it stops scaling) |
+| Code structure | [§5](#5-how-the-code-is-organized) |
+| Tests, and how I know they mean something | [§6](#6-how-i-know-it-works) |
+| How I used AI | [§7](#7-how-the-work-was-done) |
+| Design work done before building | [§7](#designing-before-building) |
+| How the commit history reads | [§7](#reading-the-commits) |
+| What is missing, and what I would do next | [§8](#8-known-gaps-and-what-comes-next) |
+| Every planning and design artifact | [§9](#9-artifact-index) |
+| Running it locally, the 10,000-employee seed, CI and deployment | [docs/ENGINEERING.md](docs/ENGINEERING.md) |
+
+---
+
+## 1. The problem
+
+ACME's HR team keeps salary data for 10,000 people in spreadsheets. The people are spread across
+many countries, so the data spans many currencies.
+
+The tedium is not the real cost. The real cost is that some questions cannot be answered at all.
+*Is anyone badly out of line with their peers? Are men and women paid differently for the same job?
+Who has not had a raise in two years?* Each of those takes a competent analyst a week of manual
+work. By the time the answer arrives it is out of date, and nobody can reproduce how it was
+reached.
+
+So the HR manager stops asking. That is the actual failure — not slow answers, but unasked
+questions.
+
+This product exists to make those questions cheap enough to ask on a Tuesday morning.
+
+---
+
+## 2. What it does
+
+Below is what the HR manager can do, written as the questions she can now ask — because that is how
+she thinks about them. Together these are the eleven capabilities specified in
+[SPEC.md](docs/specs/spec-payroll/SPEC.md); the eleventh is the 10,000-employee seed, documented in
+[docs/ENGINEERING.md](docs/ENGINEERING.md#seeding).
+
+### Get the data in
+
+| She can | How |
+| --- | --- |
+| Load the whole org from a spreadsheet | Upload a CSV. Valid rows import. Bad rows are rejected one by one, each with its reason, and never block the good ones. |
+| Add or edit one employee | A form. Role and level come from fixed lists — never free text. |
+| Record a raise | Two fields and about thirty seconds. It appends to history; it never overwrites. |
+
+### Ask questions about pay
+
+| She can ask | And gets |
+| --- | --- |
+| *Is anyone paid far from their peers?* | A list, unprompted, on the home page. Each finding names the person, their peer group, the group's size, and how far from the median they sit. |
+| *How far is "far"?* | A threshold she controls. It defaults to 20%. The boundary is exact: 19.9% does not flag, 20.1% does. |
+| *Where does this person sit?* | Their peer group's median, its spread, and their signed distance from it — in one sentence she can paste into Slack. |
+| *Are men and women paid differently for the same job?* | The gap between male and female medians inside a peer group. |
+| *Where are the women in this org?* | Gender counts at every level, org-wide. This catches clustering that the peer view is structurally blind to, because the peer view controls level away. |
+| *What do we spend on salary?* | Totals per country in local currency. Any total that spans currencies shows the exchange rate used and the date it was pinned to. |
+| *Who is overdue for a review?* | Everyone whose last salary change predates a period she picks, with the date of that change. |
+
+### See the history
+
+| She can | How |
+| --- | --- |
+| Read anyone's full salary history | Every record, in order, each with its amount, currency, and effective date. Nothing has ever been edited, so the history is the truth. |
+| Take the answer with her | Copy the verdict sentence, or export the list as CSV. |
+
+---
+
+## 3. What I deliberately left out, and why
+
+I wrote a one-page requirements document before writing any code:
+**[brief.md](docs/planning-artifacts/briefs/brief-payroll-2026-07-16/brief.md)**. It fixes the goal,
+the scope, and the exclusions. [SPEC.md](docs/specs/spec-payroll/SPEC.md) is the machine-readable
+version that everything downstream was built from.
+
+**In scope:** employee records with role, level, country, currency, gender and hire date · role and
+level as fixed reference tables · salary as append-only effective-dated history · create and edit
+employees · record salary changes · bulk import · peer comparison · outlier surfacing · gender gap
+within peer groups · gender distribution across levels · payroll totals by country and org-wide ·
+the minimum-peer-group refusal · a seed script for 10,000 employees.
+
+**Out, and why:**
+
+| Excluded | Reason |
+| --- | --- |
+| **Employee and manager self-service** | There is one user. Anything else is a different product. |
+| **Authentication and permissions** | Deferred, not dismissed — and the one exclusion that must be reversed before this touches a real salary record. The assessment names a single user, so there is no second role to model yet. See [§8](#8-known-gaps-and-what-comes-next). |
+| **Equity, bonus, and benefits** | Compensation components are not interchangeable and vary sharply by country. Base salary is one honest, comparable unit. A mixed bundle compared across countries is an invisible error. |
+| **Payroll execution** | This manages salaries. Money never moves. |
+| **Future-dated and scheduled changes** | A salary change is recorded when it takes effect. Scheduling implies an approval workflow, which is also out. |
+| **Mobile layout** | The user does this work at a desk. Below 1280px the layout degrades gracefully, but no phone design was specified. |
+| **Changing an employee's country** | A deliberate narrowing of the brief, not an oversight. Country is part of peer identity and determines currency, so changing it would silently move someone between peer groups and break the currency stored on records already written. It needs a mobility feature to do properly. |
+
+---
+
+## 4. The decisions that shaped it
+
+Three decisions did most of the work. Each cost something, and naming the cost is the point — a
+decision with no downside is usually an opinion.
+
+Full reasoning in
+[TRADE-OFFS.md](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/TRADE-OFFS.md).
+The structure these decisions produced is drawn in
+[C4-MODEL.md](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/C4-MODEL.md) —
+context, container, and component diagrams.
+
+| Decision | Why | What it cost |
 | --- | --- | --- |
-| `DATABASE_URL` | The **owner** — owns the schema and can create databases | Migrations, `prisma generate`, integration-test fixtures |
-| `DATABASE_URL_APP` | `payroll_app`, the **restricted runtime role** — `SELECT`/`INSERT` on `salary_record` but **not** `UPDATE`/`DELETE` | The application at runtime |
+| **The database computes nothing the user sees.** No `percentile_cont`, no `AVG`. Every median, distance, gap and total is calculated in TypeScript. | Two implementations of "median" drift apart, and the SQL one cannot be unit-tested or mutation-tested. One canonical function means one definition of fairness. | The app loads rows Postgres could have aggregated. At 10,000 employees this is comfortably fast; well beyond it, this is the first thing to revisit. |
+| **Salary history is append-only, enforced by the database.** `UPDATE` and `DELETE` are revoked from the app's role, and a trigger blocks them for *every* role including the owner. | An audit trail maintained by discipline is not an audit trail. Correcting a salary means appending a new record — there is no other path, even by accident. | Test data cannot be cleaned up. The integration suite leaves its rows behind by design, so it uses a disposable database and uniquely suffixed fixtures. |
+| **Next.js 16 as a single full-stack deployable, on Postgres 18.** Server components read through use-cases in-process; mutations are server actions; only four HTTP route handlers exist — one CSV upload and three CSV exports. | One deployable, one language, one type system from database row to rendered cell. No API layer to keep in sync with itself. | Ties the product to one framework's conventions. Reads happen in-process, so there is no HTTP API another client could use. |
 
-They are deliberately different roles. `prisma migrate dev` needs `CREATEDB` for its shadow
-database, which the least-privilege runtime role must not have — and the append-only revoke
-(Law 5 / AD-18) is meaningless if the app connects as the owner, since PostgreSQL lets a table
-owner bypass privilege checks entirely.
+---
 
-> Prisma 7 removed `url` from the `datasource` block. Connection URLs live **only** in
-> `prisma.config.ts`, which loads `.env` explicitly (Prisma 7 auto-loads nothing). `prisma migrate
-> deploy` has no `--url` flag — CI supplies the URL through the job `env:` block.
+## 5. How the code is organized
 
-### Local setup
-
-```bash
-# 1. A disposable Postgres 18
-docker run -d --name payroll-pg18 \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=payroll \
-  -p 55432:5432 postgres:18
-
-# 2. Provision the restricted runtime role (once per cluster; idempotent).
-#    The password is required — the script refuses to create a role with a default one, and a
-#    re-run with a different password corrects the existing role rather than silently no-opping.
-PGPASSWORD=postgres psql -h localhost -p 55432 -U postgres -d payroll \
-  -v ON_ERROR_STOP=1 -v payroll_app_password=payroll_app \
-  -f prisma/sql/bootstrap-roles.sql
-
-# 3. Apply migrations — this MUST come after step 2. Migrations grant privileges to payroll_app
-#    and fail fast with a message naming this file if the role does not exist yet.
-npm run db:deploy
-
-# 4. Run the integration suite
-npm run test:integration
-```
-
-Role creation lives in `prisma/sql/bootstrap-roles.sql` rather than in a migration on purpose:
-roles are **cluster-wide** and survive `migrate dev`'s shadow database, so a bare `CREATE ROLE` in
-a migration fails on replay with `P3006 role already exists` (prisma/prisma#6581). Only the
-`GRANT`/`REVOKE` — idempotent once the role exists — are in the migration.
-
-### Schema and migrations
-
-`prisma/schema.prisma` is the data model; `prisma/migrations/` holds the committed history. Some
-invariants cannot be expressed declaratively (Prisma 7.8.0 has no `@@check`, and cannot model
-`GRANT`/`REVOKE` or triggers), so they are hand-authored SQL in
-`20260718163326_append_only_and_checks`:
-
-- **`salary_record` is append-only** in two layers — the `UPDATE`/`DELETE` revoke from
-  `payroll_app`, *and* a `BEFORE UPDATE OR DELETE` trigger that raises for **every** role,
-  including the owner. Appending a new record is the only correction mechanism (Law 5 / AD-18).
-- **`CHECK (amount_minor > 0)`** — a salary is strictly positive (AD-4).
-- **`CHECK (id = 1)` on `settings`** — the single-row guard (AD-19).
-
-The reference tables (`role`, `level`, `country`, `currency`) and `settings` ship **empty**; their
-values arrive in Story 1-4.
-
-Deployed environments run `prisma migrate deploy` **at build** — see [§ Deployment &
-environments](#deployment--environments).
-
-The generated Prisma client is written to `src/adapters/db/generated/` (git-ignored, and excluded
-from ESLint, coverage, Stryker, and `tsc`). The Prisma 7 generator emits TypeScript **source**, so
-`prisma generate` must run before `typecheck`/`build` — `postinstall` handles that wherever
-`npm ci` runs.
-
-## Continuous Integration
-
-`.github/workflows/ci.yml` runs on every push (any branch) and every pull request to `master`
-(Node 24, `npm ci`). A failing gate blocks merge once the checks are marked **required** in branch
-protection.
-
-| Gate | Local command | Enforces |
-| --- | --- | --- |
-| Lint (import-boundary + purity) | `npm run lint` | Layer import direction; the pure-core ban on the clock (`Date`/`performance`), randomness (`Math.random`/`crypto`), `process.env`, dynamic `import()`, and `fs`/Prisma/Next imports (Law 2, Law 6 / AD-1); the repo-wide `Math.random` ban (AD-14, `src/adapters/prng.ts` exempt) |
-| Typecheck | `npm run typecheck` | `tsc --noEmit` |
-| Build | `npm run build` | The production build compiles — a named gate, not a side effect of another job |
-| Unit + coverage floor | `npm run test:coverage` | Fast deterministic unit suite + per-path coverage floors on `domain` (100) and `application` (90) (AD-23) |
-| Mutation testing | `npm run test:mutation` | A surviving mutant over `src/domain` fails the build (AD-23) |
-| Accessibility (axe) | `npm run test:a11y` | WCAG 2.2 AA floor over the built app; any violation fails (NFR9). Scoped to `e2e/accessibility.spec.ts` — it must **not** widen to other specs |
-| Integration (Postgres 18) | `npm run test:integration` | The schema's DB-enforced invariants — append-only `salary_record`, the positive-amount CHECK, single-row `settings` — against a real disposable Postgres 18, never a mock (AD-24) |
-| Browser + DB (Postgres 18) | `npm run test:browser:db` | The Employees directory, its detail route and the create form against **real rows** — the only gate with both a browser and a database, since the axe job builds with none and the integration job has no browser (story 3-2) |
-
-**Branch protection:** require these status checks on `master` — **`Lint · Typecheck · Build ·
-Unit + Coverage`**, **`Mutation testing (domain)`**, **`Accessibility (axe)`**,
-**`Integration (Postgres 18)`**, and **`Browser + DB (Postgres 18)`** (the job names in `ci.yml`). Configuring branch protection is a
-repository-admin action in GitHub settings, not part of the code.
-
-The `test:mutation` and `test:a11y` gates need extra local setup on first run: Stryker downloads
-nothing, but the axe gate needs a browser — run `npx playwright install chromium` once.
-
-`.github/workflows/preview.yml` is a **second, separate** workflow (see [§ Deployment &
-environments](#the-preview-pipeline)). It is not part of the required-check set above and must not
-be merged into `ci.yml`: the four gates decide merge eligibility, and coupling them to Vercel or
-Neon availability would change what they assert. If a deploy check is ever added to branch
-protection, update the required-check list above.
-
-## Deployment & environments
-
-Vercel (Next.js preset, Node 24) on top of Neon PostgreSQL **18**, region `aws-ap-southeast-1`.
-
-**Production:** <https://payroll-iota-coral.vercel.app>
-
-| Environment | Trigger | Database |
-| --- | --- | --- |
-| **Production** | Push to `master` (Vercel's Git integration) | The Neon project's default branch, `production` |
-| **Preview** | `.github/workflows/preview.yml` on every PR to `master` | A Neon branch named `pr-<number>`, created per PR and deleted on close |
-| **Local** | `npm run dev` | The Docker Postgres 18 on port 55432 (§ Database) |
-
-### Migrations run at build
-
-`vercel.json` sets:
-
-```json
-{ "buildCommand": "prisma generate && prisma migrate deploy && next build" }
-```
-
-In `vercel.json` rather than the dashboard Build Command, so the deploy contract is reviewable in
-the diff instead of living as invisible project state. `prisma generate` appears here **as well as**
-in `postinstall`, and both must stay: Vercel restores `node_modules` from cache *before* install, so
-an unchanged lockfile means `postinstall` never fires while `schema.prisma` has changed — the
-documented "outdated Prisma Client" failure. `postinstall` remains because CI, local installs, and
-`npm ci --omit=dev` all depend on it.
-
-`installCommand` is deliberately **not** set: overriding it makes Vercel select the oldest available
-package-manager version, and the default `npm install` is what fires `postinstall`.
-
-> **Story 1-5 seam.** The AD-15 design-token build step will need its own stage in `buildCommand`,
-> ahead of `next build`. Nothing is built for it here. JSON has no comments, which is why this note
-> lives in the README.
-
-### Two URLs, two roles, two endpoints
-
-| Variable | Role | Neon endpoint | Consumed by |
-| --- | --- | --- | --- |
-| `DATABASE_URL` | `neondb_owner` | **direct** (unpooled) | `prisma.config.ts` → `migrate deploy` at build |
-| `DATABASE_URL_APP` | `payroll_app` | **pooled** (`-pooler` in the host) | `src/adapters/db/client.ts` at runtime |
-
-Both differences are correctness constraints, not preferences:
-
-- **Migrations need the direct endpoint.** Neon's pooler runs PgBouncer in *transaction* mode,
-  handing a connection to another client between statements. That discards session state —
-  including session-level advisory locks, the exact mechanism a migration runner uses to serialize
-  itself against a concurrent migrator.
-- **Runtime needs the restricted role.** PostgreSQL lets a table owner bypass privilege checks, so
-  connecting as the owner would silently reduce the append-only `REVOKE UPDATE, DELETE` to a
-  no-op (Law 5 / AD-18). `client.ts` therefore **requires** `DATABASE_URL_APP` with no fallback to
-  `DATABASE_URL` — a fallback would restore that silent failure the moment the variable went
-  missing.
-- **Runtime wants the pooled endpoint**, because every serverless instance otherwise opens its own
-  pool. PgBouncer is the real pool; `APP_POOL_MAX` (5) in `client.ts` only bounds the sockets one
-  instance opens toward it.
-
-Both carry `sslmode=require` — Neon rejects non-TLS connections outright.
-
-> **`DATABASE_URL` must be a NON-sensitive Vercel variable.** Vercel's *sensitive* environment
-> variables are exposed at **runtime only, not to the build step** — and `migrate deploy` runs in
-> `buildCommand`. A sensitive `DATABASE_URL` fails the production build with
-> `Error: Connection url is empty`, which names neither the variable nor the reason. `vercel env add`
-> defaults to sensitive, so pass `--no-sensitive` explicitly:
->
-> ```bash
-> vercel env add DATABASE_URL production --no-sensitive
-> ```
->
-> `DATABASE_URL_APP` is read only at runtime, so it should stay **sensitive**. The asymmetry is the
-> point: the variable that must be readable at build cannot be sensitive, and the one that must not
-> leak should be. (Hit and fixed during Story 1-7.)
-
-### Bootstrap runs once per Neon project, not per branch
-
-`prisma/sql/bootstrap-roles.sql` was run **once** against the `production` branch. It is deliberately
-**not** re-run per preview branch: a Neon branch is a copy-on-write clone that inherits its parent's
-Postgres roles *and their passwords*, so `payroll_app` already exists, with the same credential, on
-every branch.
-
-This is exactly what lets the two-role split survive a branch-per-PR model. Role creation is
-cluster-scoped and inherited; the schema-scoped `USAGE`/`GRANT`/`REVOKE` live in the migration and
-are re-applied by every `migrate deploy`.
-
-The ordering is unforgiving on a **fresh** project: the `AP002` guard in
-`20260718163326_append_only_and_checks` fails `migrate deploy` with `P3018` if `payroll_app` does
-not exist yet, leaving the migration history poisoned. Bootstrap first, always.
-
-### The preview pipeline
-
-`.github/workflows/preview.yml`, deliberately separate from `ci.yml` so the four required checks
-keep their meaning and merge eligibility never depends on Vercel or Neon being up.
-
-Per PR it creates (or reuses) Neon branch `pr-<number>`, then reproduces `ci.yml`'s integration
-sequence **in full and in order** against it — `migrate deploy` → `migrate diff --exit-code` →
-`npm run test:integration` — before deploying. Running only the tests would prove nothing about
-migrations: the branch is a clone that already carries the parent's schema, so on a PR that *adds* a
-migration the suite would exercise a stale schema and the first real `migrate deploy` on Neon would
-be the Vercel build, after the gate.
-
-**Preview runs are serialized per PR, not cancelled.** Both jobs share one concurrency group with
-`cancel-in-progress: false`, which differs from `ci.yml`'s rail deliberately. Cancelling is cheap in
-`ci.yml` but not here: a SIGTERM during `prisma migrate deploy` leaves a failed row in
-`_prisma_migrations`, and since the Neon branch is *reused* across pushes, every later run on that PR
-then aborts with `P3009`. That wedge is not generically repairable — a cancelled migration leaves
-either DDL-not-applied (`migrate resolve --rolled-back`) or DDL-applied-but-unrecorded (`--applied`),
-and the history cannot tell you which. Sharing the group also makes a mid-run PR close *queue* the
-branch delete behind the run that creates the branch, instead of racing it. The cost is that a
-superseded run finishes instead of being killed; GitHub still discards *queued* runs, so stale work
-does not accumulate.
-
-Preview deploys are **CI-driven, not Git-driven.** `vercel.json`'s `ignoreCommand` blocks Vercel's
-automatic build for every ref except `master`, so a preview can never start before its Neon branch
-and environment variables exist. (Per-branch `git.deploymentEnabled` entries do *not* work for this:
-they are an opt-**out** map — unspecified branches default to `true` — so they cannot express
-deny-by-default.) Preview values are passed per-deployment via `vercel deploy --build-env` / `--env`
-rather than persisted with `vercel env add`, so no per-branch state accumulates in the Vercel
-project.
-
-**Branch quota.** Neon caps branches per project (commonly 10 on free plans). Cleanup on PR close is
-the primary mechanism; branches also carry a 7-day `expires_at` as a backstop, because the `closed`
-event never fires for a git branch deleted outside a PR. To clean up orphans by hand:
-
-```bash
-npx neonctl branches list  --project-id "$NEON_PROJECT_ID"
-npx neonctl branches delete pr-<number> --project-id "$NEON_PROJECT_ID"
-```
-
-### Why the native Neon/Vercel integration is NOT installed
-
-Neither the Neon-managed nor the Vercel-managed native integration is used. It injects its own
-`DATABASE_URL` as a **pooled owner** URL, which is wrong on both axes at once — pooled breaks
-`migrate deploy`, and owner-at-runtime voids AD-18 layer A. It also **silently overrides** a
-deployment's preview environment variables with no failure signal, **fails setup outright** if
-`DATABASE_URL` already exists on the project, and cannot express a second role at all. The
-Vercel-managed variant additionally ties branch lifetime to Vercel's deployment retention (6 months
-by default) rather than to the PR.
-
-### No health-check endpoint
-
-There is none, and none may be added: AD-21 fixes the route-handler count at exactly two (the CAP-1
-multipart upload and CSV export), and neither exists yet.
-
-What is and is not proven, stated precisely — the earlier wording here overclaimed:
-
-- `e2e/smoke.spec.ts` proves the **deployed URL serves** (reachability), from CI, against the real
-  deployment.
-- The preview pipeline's integration suite proves the **Neon branch is correctly provisioned** —
-  role inheritance, schema-scoped grants, the append-only `REVOKE`. It runs **on the GitHub runner**,
-  not from a Vercel function, so it says nothing about the deployed app's own path to the database.
-- **Nothing currently exercises the deployed app's database connectivity**, and nothing can until a
-  dynamic surface exists — today both routes are static-prerendered, so there is no function to
-  exercise. This is the one thing a health route would genuinely prove, and AD-21 forecloses it.
-  The gap closes naturally at Story 1-6, when the first server-rendered surface reaches the database.
-
-## Source tree
+Four layers. Dependencies point inward, and nothing points back out.
 
 ```
 src/
-  domain/        # PURE core — no I/O, no clock, no randomness, no Date, no fs
-  application/
-    ports/       #   repository, clock, prng, id interfaces
-    use-cases/   #   one per capability
-  adapters/
-    db/          #   Prisma client + repositories (from Story 1-3)
-    csv/          #   import parse / export render (Epic 2)
-    clock.ts     #   the ONLY Date.now() home (seam)
-    prng.ts      #   the ONLY randomness home (seam)
-  app/           # Next.js App Router surfaces
-  ui/            # components; tokens generated from DESIGN.md (Story 1-5)
-prisma/          # schema + migrations + seed (Stories 1-3, 12)
-tests/           # domain/application unit tests
+  domain/        pure logic — medians, distances, gaps, money, dates
+    ↑
+  application/   use-cases and the port interfaces they depend on
+    ↑
+  adapters/      everything with side effects — Prisma, CSV, the clock, randomness
+  app/ + ui/     Next.js routes and React components
 ```
 
-Each `src/*` layer carries a `README.md` stating exactly what it may import. Dependencies point
-inward: `domain ← application ← adapters/ui`. This is mechanically enforced in CI by the
-`import/no-restricted-paths` zones and the pure-core purity rules in `eslint.config.mjs` (Story
-1-2) — a violating import or a stray `Date.now()` in the core fails `npm run lint`.
+---
 
-## Testing
+## 6. How I know it works
 
-Vitest is the runner, and there are **two suites, kept deliberately apart**:
+Five layers of checking, each buying something different.
 
-- **Unit** (`npm run test`, `vitest.config.ts`, `tests/**`) — the domain/application suite. Touches
-  **no database, no clock, and no network**, and follows TDD (red → green → refactor). The coverage
-  floor and mutation gate run over this suite only.
-- **Integration** (`npm run test:integration`, `vitest.integration.config.ts`,
-  `tests/integration/**`) — the one place database access is allowed (AD-24). Runs against a real
-  disposable Postgres 18, **never a mock**. Excluded from the unit config's `include`, so
-  `npm run test` never touches a database.
+| Layer | What it covers | What it buys |
+| --- | --- | --- |
+| **Unit** (`npm run test`) | The pure core and the use-cases. 62 files, **1,630 tests, 5.0 seconds.** No database, no clock, no network. | Fast enough to run on every save, so it actually gets run. Deterministic, so a failure always means something. |
+| **Coverage floors** (`npm run test:coverage`) | 100% on `src/domain`, 90% on `src/application`. | An untested branch cannot land in the core. New untested files fail the floor rather than vanishing from the report. |
+| **Mutation testing** (`npm run test:mutation`) | Stryker mutates `src/domain`. A surviving mutant fails the build. | This is the real test of the tests. Coverage proves a line ran; mutation proves an assertion would have caught it if the line were wrong. |
+| **Integration** (`npm run test:integration`) | The database's own guarantees, against a real disposable Postgres 18 — never a mock. | Proves the append-only revoke and trigger actually hold, that positive-amount checks fire, and that migrations apply cleanly. |
+| **Browser + accessibility** (`npm run test:browser:db`, `npm run test:a11y`) | Real pages against real rows, plus an axe pass for WCAG 2.2 AA. | Proves the surfaces work end to end, and that the product is usable by keyboard and screen reader. Any accessibility violation fails the build. |
 
-The integration suite deliberately does **not** clean up the `salary_record` rows it appends: the
-append-only trigger blocks `DELETE` for every role including the owner, which is the invariant
-working as designed. Fixture codes are uniquely suffixed per run, and AD-24 specifies a disposable
-database.
+All of it runs in CI as five separate gates: `Lint · Typecheck · Build · Unit + Coverage`,
+`Mutation testing (domain)`, `Integration (Postgres 18)`, `Accessibility (axe)`, and
+`Browser + DB (Postgres 18)`. A failing gate blocks the merge.
+
+The tests are deliberately readable. They use the same vocabulary as the product — `peerGroup`,
+`peerMedian`, `distancePct`, `refusal` — so a test name states a rule about fairness, not a fact
+about a function.
+
+---
+
+## 7. How the work was done
+
+I used AI throughout. The interesting part is not that I did, but where I drew the line.
+
+### The order of work
+
+Nothing was coded before it was specified. Each stage produced a committed artifact, which is why
+[§9](#9-artifact-index) reads like a timeline.
+
+```
+requirements → UX contract → architecture → adversarial review of that architecture
+   → epics → a written spec per story → test-first implementation → code review
+```
+
+### Who decided what
+
+I made the decisions. AI executed against them.
+
+The decisions are the rows in [§4](#4-the-decisions-that-shaped-it), the eleven capabilities in
+[§2](#2-what-it-does), and the exclusions in [§3](#3-what-i-deliberately-left-out-and-why) —
+all written down and committed before any code existed. Where a judgment call was genuinely mine to
+make (a peer group is five people; an outlier is 20% away; gender is two values), the reasoning is
+recorded next to the decision, including what it costs.
+
+### What stopped quality from drifting
+
+Two mechanisms, because intent alone does not survive a hundred sessions.
+
+**A standing set of rules.** [`docs/project-context.md`](docs/project-context.md) states eight laws
+that every coding session inherits: test-first, the pure core, exact vocabulary, no salary without a
+currency, append-only history, determinism, backend before frontend, and answers that carry their
+provenance. They did not have to be re-argued each time, and a session that contradicted one was
+required to stop and say so rather than quietly comply.
+
+**Gates that do not negotiate.** Generated code proposes; CI disposes. The import-boundary rule, the
+coverage floors, mutation testing, the accessibility pass, and the real-database integration suite
+all had to be green. None of them care how the code was written. That is the point — it is the same
+bar whether a line was typed or generated.
+
+### Designing before building
+
+Before writing code I mocked all eleven screens in **Google Stitch**
+([project](https://stitch.withgoogle.com/projects/17248335032802531831)) — to see the product before
+committing to it. Nothing was built one-to-one from it.
+
+The [prompt](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/stitch-handoff-prompt.md) fixed
+everything already decided and marked eight questions `[OPEN]` for the tool to propose. The mocks
+were then reconciled against the decision log in
+[`reconcile-stitch.md`](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/reconcile-stitch.md),
+which classifies every idea the tool invented as adopt, drop, or neutral, with a reason. The mock
+could contribute ideas; it could not smuggle in decisions.
+
+### Reading the commits
+
+193 commits, with conventional prefixes (`feat`, `fix`, `test`, `docs`, `ci`, `chore`), one
+capability at a time, backend before frontend.
+
+The test harness came before any feature: story 1-2 added the gates one at a time — import-boundary
+lint (`8a6cf70`), the coverage floor (`a5e6503`), mutation testing (`f89e0d2`), accessibility
+(`efba311`) — so the bar existed before there was anything to hold to it.
+
+**A worked example — CAP-1, bulk import.** There is no separate phase for writing tests; each test
+is committed red and the next commit greens it. The backend story finishes entirely before the
+frontend story starts. Key commits from the 25 in the run:
+
+```
+── story 2-1 · backend ────────────────────────────────────────────────
+a8fad0b  test: pin the import row-validation contract, red
+3d66096  feat: validate an import row purely, totally, and in a fixed order
+824e380  test: attack the CSV parser adversarially, red
+f3c1f52  feat: parse import CSV with containment as a structural property
+7d4fb7e  test: prove the write funnel against real Postgres 18, red
+d3348cd  feat: land the Prisma write funnel
+f8d4f79  feat: land the sanctioned import Route Handler, which never answers 500
+── story 2-2 · frontend ───────────────────────────────────────────────
+0a463ec  test: pin the import report's pure logic, red
+b40f3e3  feat: land the import report's framework-free decisions
+cd3a838  test: pin the import surface and the refusal-fill floor, red
+b65364a  docs: close story 2-2 and complete Epic 2 (CAP-1 bulk import)
+```
+
+Abridged — `git log --oneline --reverse bff1948~1..b65364a` shows all 25.
+
+---
+
+## 8. Known gaps and what comes next
+
+Stated plainly, because a submission that claims to be finished is not credible.
+
+| Gap | Status |
+| --- | --- |
+| **No authentication.** Anyone with the URL sees every salary. | The one exclusion that must be reversed before this touches real data. Out of scope because the assessment names a single user — not because the problem is absent. This is what I would build next. |
+| **Exchange rates are pinned, not live.** | Deliberate. A rate that moves makes yesterday's total irreproducible. The pinned rate and its date are shown wherever a converted figure appears, so the number is always honest about what it is. A live feed would need to store the rate per calculation anyway. |
+| **No mobile layout.** | Below 1280px the layout degrades gracefully. No phone design was specified. |
+| **Everything is computed fresh, nothing is cached.** | Correct at 10,000 employees, where a full sweep is fast. Well beyond that, caching is the first optimization — and the port boundary makes it a local change. |
+| **Country cannot be changed on an existing employee.** | A recorded deviation from the brief, not an oversight — see [§3](#3-what-i-deliberately-left-out-and-why). It needs a mobility feature that decides what happens to historical currency. |
+| **No observability, rate limiting, or backups.** | One user, and a population regenerable from one command. Revisit when this holds data that is not reproducible. |
+
+---
+
+## 9. Artifact index
+
+Everything below is committed, in the order it was produced. Read top to bottom and you can follow
+the thinking from problem to deployed product.
+
+**Requirements**
+- [`brief.md`](docs/planning-artifacts/briefs/brief-payroll-2026-07-16/brief.md) — the one-page
+  requirements document. Goal, scope, exclusions with reasoning.
+- [`SPEC.md`](docs/specs/spec-payroll/SPEC.md) — the brief distilled into eleven capabilities,
+  constraints, and non-goals. Everything downstream was built from this.
+
+**Design**
+- [`EXPERIENCE.md`](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/EXPERIENCE.md) — how it
+  behaves: information architecture, flows, state patterns, the accessibility floor.
+- [`stitch-handoff-prompt.md`](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/stitch-handoff-prompt.md)
+  — the prompt used to generate the visual mocks.
+- [`imports/stitch/`](docs/planning-artifacts/ux-designs/ux-payroll-2026-07-16/imports/stitch/) — the
+  eleven generated screens, with a manifest.
+
+**Architecture**
+- [`C4-MODEL.md`](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/C4-MODEL.md) —
+  context, container, and component diagrams.
+- [`TRADE-OFFS.md`](docs/planning-artifacts/architecture/architecture-payroll-2026-07-17/TRADE-OFFS.md)
+  — the reasoning in prose, including what each decision cost and what was deliberately left open.
+
+**Planning**
+- [`epics.md`](docs/planning-artifacts/epics.md) — every requirement inventoried and mapped to an
+  epic. Twelve epics: one foundation, then one per capability.
+
+**Implementation**
+- [`ENGINEERING.md`](docs/ENGINEERING.md) — setup, database, CI, and deployment.
