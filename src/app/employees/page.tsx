@@ -28,7 +28,7 @@ import {
 } from '@/ui/employee-directory';
 import { EmployeeFormPanel } from '@/ui/employee-form-panel';
 import { EmployeePager } from '@/ui/employee-pager';
-import { EmployeeSearch } from '@/ui/employee-search';
+import { EmployeeSearch, ToolbarLabelSpacer } from '@/ui/employee-search';
 import { EmployeeTable } from '@/ui/employee-table';
 import { EmployeeUnavailable } from '@/ui/employee-unavailable';
 
@@ -148,17 +148,27 @@ export default async function EmployeesPage({
           Employee directory
         </h2>
 
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+        {/* Aligned by the TOP, matching the search form's own row: the toolbar's controls all sit one
+            label-line down, and bottom alignment would instead hang this control off the bottom of
+            the search column — which is the field's help sentence, a line and a half below the row
+            everything else is on. `ToolbarLabelSpacer` is what puts a control with no label of its
+            own onto the control line. */}
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <EmployeeSearch
             searchParams={params}
             criteria={criteria}
             facets={facets.kind === 'facets' ? facets.facets : null}
           />
           {options.kind === 'options' ? (
-            <EmployeeFormPanel
-              mode={{ kind: 'create', action: createEmployeeAction }}
-              options={options.options}
-            />
+            <div>
+              <ToolbarLabelSpacer />
+              <div className="mt-1">
+                <EmployeeFormPanel
+                  mode={{ kind: 'create', action: createEmployeeAction }}
+                  options={options.options}
+                />
+              </div>
+            </div>
           ) : (
             // No Add-employee button, and never an empty select: the reference tables are what a
             // create would have to choose from, so a form that could not read them has nothing to

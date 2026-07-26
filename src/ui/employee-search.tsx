@@ -97,8 +97,33 @@ function optionsFor(rows: readonly FacetRow[], selected: string | null): readonl
   return [{ code: selected, name: selected }, ...rows];
 }
 
+// A FIXED width, not the browser's content-derived one. Left to size themselves, the three selects
+// come out three different widths — the widest role name, the widest level name, the widest country
+// name — which reads as a ragged toolbar rather than three peers narrowing the same list.
+const CONTROL_WIDTH = 'w-44';
+
+// `truncate` is what makes that width safe: an unusually long reference name ends in an ellipsis
+// instead of being cut mid-letter against the arrow. Only the CLOSED control is ever abbreviated —
+// the open list renders every option in full, and the table below always names the row verbatim.
 const SELECT_CLASS =
-  'mt-1 block rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink focus:border-primary';
+  `mt-1 block truncate ${CONTROL_WIDTH} rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink focus:border-primary`;
+
+/**
+ * A label-shaped spacer for the toolbar children that have no label of their own — the submit
+ * button, the sentence that replaces the filters when the facets cannot be read, and (from the
+ * page, which composes the row) the Add-employee control beside them.
+ *
+ * The toolbar aligns its children by their TOPS, which is what puts every label on one line and
+ * every control on the next. Anything without a label would otherwise land on the LABEL line,
+ * floating above the controls it belongs beside. This reserves exactly the line box a
+ * `text-label-caps` label occupies (16px, `--text-label-caps--line-height`), so the offset is
+ * derived from the same type scale the labels are rather than hand-measured into a margin.
+ *
+ * `aria-hidden` and empty: it is a spacer, not a silent label.
+ */
+export function ToolbarLabelSpacer() {
+  return <span aria-hidden className="block h-4" />;
+}
 
 /** One labelled filter select. A real `<label htmlFor>`, never a placeholder standing in for one. */
 function FilterSelect({
@@ -218,14 +243,25 @@ export function EmployeeSearch({
   );
 
   return (
-    <form method="get" action={EMPLOYEES_HREF} className="flex flex-wrap items-end gap-3">
+    // Aligned by the TOP, not the bottom. Every child is the same two-part shape — a label's line
+    // box, then the control — so aligning tops puts all four labels on one line and all four
+    // controls on the next. Bottom alignment cannot: the search field carries a help line UNDER it,
+    // so its bottom is that sentence rather than its input, and matching bottoms therefore lifted
+    // the search field a whole line above the three selects and left the button compensating with a
+    // hand-measured `mb-8`. The help line now simply hangs off the end of its own column, where it
+    // moves nothing.
+    <form method="get" action={EMPLOYEES_HREF} className="flex flex-wrap items-start gap-3">
       {carried.map(([key, value], index) => (
         // Index is part of the key deliberately: a repeated param yields two hidden inputs sharing
         // a name, and the pair `${key}-${index}` is what makes them distinct React children.
         <input key={`${key}-${String(index)}`} type="hidden" name={key} value={value} />
       ))}
 
-      <div>
+      {/* The column is what carries the width, and the field fills it. The help line beneath then
+          wraps INSIDE the column instead of setting its own width — left to itself that one sentence
+          is wider than the field it describes, and it would be the thing deciding how much of the
+          toolbar the search occupies. */}
+      <div className="w-56">
         {/* A real `<label htmlFor>`, not a placeholder and not an aria-label standing in for one. */}
         <label htmlFor="employee-search" className="block text-label-caps text-ink-muted uppercase">
           Search employees by name
@@ -240,7 +276,7 @@ export function EmployeeSearch({
           // Form controls sit on `surface-card`: `input-border` measures 3.09:1 there but 2.96:1 on
           // `surface-base` and 2.82:1 on `surface-tint`, both below DESIGN's 3:1 non-text floor.
           // That is why this field lives inside a card toolbar rather than loose on the page.
-          className="mt-1 block rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink focus:border-primary"
+          className="mt-1 block w-full rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink focus:border-primary"
         />
         {/* The shortcut is discoverable in TEXT, associated with the field programmatically —
             not hidden in a placeholder, which assistive technology may never announce and which
@@ -255,10 +291,13 @@ export function EmployeeSearch({
         // Said out loud rather than silently omitting the controls, and the same shape the surface
         // uses when the create form cannot read its reference tables: three empty selects would
         // tell the reader there are no roles, which is a different and false statement.
-        <p className="mb-8 text-body-sm text-ink-muted">
-          The reference tables could not be read, so the filters are unavailable. Search still
-          works.
-        </p>
+        <div className="w-80">
+          <ToolbarLabelSpacer />
+          <p className="mt-1 text-body-sm text-ink-muted">
+            The reference tables could not be read, so the filters are unavailable. Search still
+            works.
+          </p>
+        </div>
       ) : (
         <>
           <FilterSelect
@@ -291,12 +330,15 @@ export function EmployeeSearch({
       {/* One submit for the whole form. The label says "Apply" rather than "Search" now that it
           also applies three filters — a button that named only one of the four controls it submits
           would be a label that is true of a quarter of what it does. */}
-      <button
-        type="submit"
-        className="mb-8 rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink"
-      >
-        Apply
-      </button>
+      <div>
+        <ToolbarLabelSpacer />
+        <button
+          type="submit"
+          className="mt-1 rounded border border-input-border bg-surface-card px-3 py-2 text-body-md text-ink"
+        >
+          Apply
+        </button>
+      </div>
     </form>
   );
 }
