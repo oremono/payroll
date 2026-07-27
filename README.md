@@ -7,7 +7,7 @@ question in that set — _are we paying them fairly?_ — is the one it was buil
 |                |                                                                                                                                              |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Live app**   | <https://acmesalary.vercel.app/>                                                                                                             |
-| **Video demo** | _To be added._                                                                                                                               |
+| **Video demo** | <https://drive.google.com/file/d/1wkTKj10-Cefhx3v3F22EcspRg4wHAN12/view>                                                                      |
 | **Scale**      | 10,000 seeded employees · 8 countries · 8 currencies · 25 roles · 6 levels                                                                   |
 | **Tests**      | 1,630 unit tests in 5.0 seconds, plus integration, browser, and accessibility suites                                                         |
 | **History**    | 193 incremental commits                                                                                                                      |
