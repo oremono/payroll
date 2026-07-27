@@ -56,6 +56,18 @@ import {
 const HELP_ID = 'import-file-help';
 const FILE_INPUT_ID = 'import-file';
 
+/**
+ * A ready-made file for anyone evaluating this surface without a payroll export of their own.
+ *
+ * Hosted off-origin on purpose. `public/` is served by the same deployment, and a static asset there
+ * would be one more thing the production build carries for a path no HR manager ever takes. The cost
+ * is a third-party dependency for a non-essential link: if the host disappears the link 404s, which
+ * degrades the demo and breaks nothing in the product. `e2e/import.spec.ts` pins the URL so it
+ * cannot be edited silently.
+ */
+const SAMPLE_CSV_URL =
+  'https://res.cloudinary.com/nodejs-starter-kit/raw/upload/v1785150018/g5dffkgkzpkzcd0six1f.csv';
+
 /** The heading the refusal region is named by — used for both a payload refusal and a dead POST. */
 const REFUSAL_HEADING = 'The file was not imported';
 
@@ -145,6 +157,36 @@ export function ImportPanel() {
             CSV only — a spreadsheet workbook has to be saved as CSV first. The header row must name
             these nine columns:{' '}
             <span className="font-mono text-number-sm">{REQUIRED_COLUMN_NAMES.join(', ')}</span>.
+          </p>
+
+          {/* Somebody evaluating this surface has no payroll export to hand, and the nine-column
+              contract above is a specification, not a file. This is that file.
+
+              It is DELIBERATELY not a clean one: it carries valid rows alongside a row per rejection
+              path — unknown role, unknown level, unknown country, a currency that disagrees with its
+              country, and a future effective date. A sample that imported cleanly would demonstrate
+              only half of CAP-1, and the half it hid is the one worth seeing.
+
+              A text link, not a button. The button grammar on this surface is "solid = commits
+              data", and the note on the submit button records that this form deliberately carries no
+              secondary button at all; a ghost button here would reopen that decision AND the open
+              `button-secondary` border-contrast defect. The anchor styling is the one already used
+              for drill-through links elsewhere in the UI.
+
+              `rel="noreferrer"` rides along with `noopener` because the target is a third-party
+              host: it needs to serve the file, not learn which page asked for it. */}
+          <p className="mt-1 text-body-sm text-ink-muted">
+            No payroll export to hand?{' '}
+            <a
+              href={SAMPLE_CSV_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ink underline underline-offset-2 hover:text-primary"
+            >
+              Download a sample CSV
+            </a>{' '}
+            (opens in a new tab) — it contains valid rows and one row for every rejection reason, so
+            the report has something to say.
           </p>
 
           {/* Solid primary: this control commits data (the adopted button grammar). There is no
