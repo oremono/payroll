@@ -8,6 +8,12 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // visible report, which is what these tests are about.
 const reportRegion = (page: Page) => page.locator('section[aria-labelledby="import-report-heading"]');
 
+// The sample file offered on the upload form. Asserted here rather than imported from the component
+// so the test fails if the URL is edited — the point of the assertion is that this exact file, the
+// one whose rows are known to exercise both the accepted and the rejected path, stays reachable.
+const SAMPLE_CSV_URL =
+  'https://res.cloudinary.com/nodejs-starter-kit/raw/upload/v1785150018/g5dffkgkzpkzcd0six1f.csv';
+
 // The browser-level gate for the bulk-import surface (story 2-2).
 //
 // Everything asserted here is markup a page-load scan structurally cannot reach: the summary strip,
@@ -165,6 +171,21 @@ test.describe('the upload form before anything is chosen', () => {
     ]) {
       await expect(help).toContainText(column);
     }
+  });
+
+  test('offers a sample CSV to download, named as a file rather than as "here"', async ({
+    page,
+  }) => {
+    await page.goto('/import');
+
+    // The link exists so a reviewer with no payroll export can still exercise the surface. Its
+    // accessible name has to survive being read out of context by a screen reader, which is why it
+    // says what the file IS — "sample CSV" — and never "click here" or a bare "download".
+    const sample = page.getByRole('link', { name: /sample CSV/i });
+
+    await expect(sample).toHaveAttribute('href', SAMPLE_CSV_URL);
+    // It leaves the app, so it must say so and must not silently hijack the tab's opener.
+    await expect(sample).toHaveAttribute('rel', /noopener/);
   });
 
   test('has no `<h1>` — the header owns the document’s one top-level heading', async ({
